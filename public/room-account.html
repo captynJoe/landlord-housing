@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Room Account</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin.css?v=20260322b" />
+    <link rel="stylesheet" href="/landlord.css?v=20260517c" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="shell room-account-shell">
+      <section class="panel landlord-navbar-panel room-account-hero">
+        <div class="landlord-navbar-head">
+          <div class="landlord-navbar-copy">
+            <p id="room-account-tag" class="tag landlord-navbar-tag">Room Account</p>
+            <h1 id="room-account-title" class="landlord-navbar-title">Checking room...</h1>
+            <p id="room-account-subtitle" class="sidebar-note">
+              One ledger for room balances, utility months, charges, and anomalies.
+            </p>
+            <p id="room-account-status" class="status-text landlord-navbar-status">
+              Checking landlord session...
+            </p>
+          </div>
+          <div class="landlord-navbar-actions">
+            <a href="/landlord" class="home-link">Back to Management</a>
+            <button id="room-account-refresh-btn" type="button">Refresh</button>
+            <button id="room-account-logout-btn" type="button">Sign Out</button>
+          </div>
+        </div>
+      </section>
+
+      <p id="room-account-error" class="status-text hidden"></p>
+
+      <section class="panel metrics-panel">
+        <div class="panel-head">
+          <h2>Room Snapshot</h2>
+        </div>
+        <div class="metrics-grid room-account-metrics">
+          <div class="metric-card"><p>Occupancy</p><strong id="room-metric-occupancy">-</strong></div>
+          <div class="metric-card"><p>Billing Mode</p><strong id="room-metric-billing-mode">-</strong></div>
+          <div class="metric-card"><p>Outstanding</p><strong id="room-metric-outstanding">-</strong></div>
+          <div class="metric-card"><p>Projected</p><strong id="room-metric-projected">-</strong></div>
+          <div class="metric-card"><p>Current Utility Due</p><strong id="room-metric-current-utility">-</strong></div>
+          <div class="metric-card"><p>Room Charges</p><strong id="room-metric-charges">-</strong></div>
+          <div class="metric-card"><p>This Month Paid</p><strong id="room-metric-paid">-</strong></div>
+          <div class="metric-card"><p>Next Due</p><strong id="room-metric-next-due">-</strong></div>
+        </div>
+      </section>
+
+      <section class="panel wide-panel room-account-grid-panel">
+        <div class="room-account-grid">
+          <article class="package-card">
+            <div class="panel-head">
+              <h2>Charge Setup</h2>
+            </div>
+            <div class="resident-agreement-overview">
+              <div><span>Resolved Rule</span><strong id="room-charge-source">-</strong></div>
+              <div><span>Visible Through</span><strong id="room-visible-through">-</strong></div>
+              <div><span>Room Custom</span><strong id="room-charge-custom">-</strong></div>
+              <div><span>Month Override</span><strong id="room-charge-month">-</strong></div>
+              <div><span>Building Default</span><strong id="room-charge-building-default">-</strong></div>
+              <div><span>Fixed Fallback</span><strong id="room-charge-fixed">-</strong></div>
+            </div>
+            <p id="room-charge-note" class="status-text resident-agreement-note">
+              Charge setup summary will load here.
+            </p>
+          </article>
+
+          <article class="package-card">
+            <div class="panel-head">
+              <h2>Resident + Agreement</h2>
+            </div>
+            <div id="room-profile-grid" class="resident-agreement-overview"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Billing Holds</h2>
+        </div>
+        <form id="room-billing-hold-form" class="room-billing-hold-form">
+          <label>
+            Hold
+            <select id="room-billing-hold-scope">
+              <option value="utilities">Utilities</option>
+              <option value="rent">Rent</option>
+              <option value="all">Rent + Utilities</option>
+            </select>
+          </label>
+          <label id="room-billing-hold-utility-wrap">
+            Utility
+            <select id="room-billing-hold-utility">
+              <option value="">All utilities</option>
+              <option value="water">Water</option>
+              <option value="electricity">Electricity</option>
+            </select>
+          </label>
+          <label>
+            From
+            <input id="room-billing-hold-start" type="month" required />
+          </label>
+          <label>
+            To
+            <input id="room-billing-hold-end" type="month" required />
+          </label>
+          <label class="room-billing-hold-reason">
+            Reason
+            <input id="room-billing-hold-reason" type="text" maxlength="280" placeholder="Tenant away / landlord approved" />
+          </label>
+          <button id="room-billing-hold-submit" type="submit">Pause Billing</button>
+        </form>
+        <div id="room-billing-holds" class="room-billing-holds">
+          <p class="status-text">No billing holds loaded yet.</p>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Anomalies</h2>
+        </div>
+        <div id="room-anomalies" class="resident-ledger-flags">
+          <p class="status-text resident-ledger-flag">No room anomalies loaded yet.</p>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Account Audit</h2>
+        </div>
+        <div id="room-audit-events" class="stack-list">
+          <p class="status-text">No account audit events loaded yet.</p>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Utility Bills</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Utility</th>
+                <th>Billing Month</th>
+                <th>Amount</th>
+                <th>Balance</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody id="room-bills-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Rent Payments</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Paid For</th>
+                <th>Provider</th>
+                <th>Reference</th>
+                <th>Amount</th>
+                <th>Paid On</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="room-rent-payments-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Utility Payments</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Utility</th>
+                <th>Paid For</th>
+                <th>Provider</th>
+                <th>Reference</th>
+                <th>Amount</th>
+                <th>Paid On</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="room-payments-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Room Charges</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Created</th>
+                <th>Category</th>
+                <th>Title</th>
+                <th>Amount</th>
+                <th>Resident Charge</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody id="room-charges-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel wide-panel">
+        <div class="panel-head">
+          <h2>Room Issues</h2>
+        </div>
+        <div id="room-issues" class="stack-list">
+          <p class="status-text">No room issues loaded yet.</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/room-account.js?v=20260517e"></script>
+  </body>
+</html>

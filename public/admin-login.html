@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Housing Admin Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin.css?v=20260310a" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="tag">Private Recovery</p>
+          <h1>Owner Recovery Sign-In</h1>
+          <p class="subtitle">
+            Sign in with token or username/password only when owner/staff access
+            needs private support.
+          </p>
+        </div>
+        <div class="action-row">
+          <a href="/landlord/login" class="home-link">Landlord Sign-In</a>
+          <a href="/" class="home-link">Back to Portal</a>
+        </div>
+      </header>
+
+      <section class="panel auth-panel" style="grid-template-columns: 1fr; max-width: 700px;">
+        <form id="admin-login-form" class="package-card">
+          <label>
+            Access Token (optional)
+            <input
+              id="admin-access-token"
+              type="password"
+              autocomplete="off"
+              placeholder="WIFI_ADMIN_TOKEN or WIFI_ROOT_ADMIN_TOKEN"
+            />
+          </label>
+
+          <div class="inline-fields">
+            <label>
+              Username (optional)
+              <input
+                id="admin-username"
+                type="text"
+                autocomplete="username"
+                placeholder="ADMIN_USERNAME"
+              />
+            </label>
+            <label>
+              Password (optional)
+              <input
+                id="admin-password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="ADMIN_PASSWORD"
+              />
+            </label>
+          </div>
+
+          <p class="panel-note" style="margin: 0;">
+            Provide either token, or username + password.
+          </p>
+
+          <button id="admin-login-btn" type="submit">Sign In</button>
+        </form>
+        <p id="login-status" class="status-text">Session not established.</p>
+      </section>
+
+      <section id="login-error" class="error-box hidden"></section>
+    </main>
+
+    <script type="module" src="/admin-login.js?v=20260516a"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "id": "/resident",
+  "name": "Resident Portal",
+  "short_name": "Resident",
+  "description": "Resident workspace for rent, utility, and support updates.",
+  "start_url": "/resident",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eef4f5",
+  "theme_color": "#0f7b76",
+  "icons": [
+    {
+      "src": "/icons/housing-app.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/housing-badge.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "monochrome"
+    }
+  ]
+}

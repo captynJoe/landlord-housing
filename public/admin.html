@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Housing Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin.css?v=20260404c" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="tag">Housing Admin</p>
+          <h1>Platform Admin</h1>
+          <p class="subtitle">
+            Building registry, landlord access, password recovery, and ownership oversight across
+            the full housing portfolio.
+          </p>
+          <p id="auth-status" class="status-text">Checking admin session...</p>
+        </div>
+        <div class="action-row">
+          <a href="/landlord" class="home-link">Landlord Portal</a>
+          <a href="/resident" class="home-link">Resident Portal</a>
+          <span id="admin-role" class="status-text">role: -</span>
+          <button id="refresh-all-btn" type="button">Refresh All</button>
+          <button id="admin-logout-btn" type="button">Sign Out</button>
+        </div>
+      </header>
+
+      <section class="panel metrics-panel">
+        <div class="panel-head">
+          <h2>Portfolio Overview</h2>
+        </div>
+        <div class="metrics-grid">
+          <article class="metric-card">
+            <p>Buildings</p>
+            <strong id="metric-buildings">-</strong>
+          </article>
+          <article class="metric-card">
+            <p>Active Landlords</p>
+            <strong id="metric-active-landlords">-</strong>
+          </article>
+          <article class="metric-card">
+            <p>Unassigned Buildings</p>
+            <strong id="metric-unassigned-buildings">-</strong>
+          </article>
+          <article class="metric-card">
+            <p>Pending Landlord Access</p>
+            <strong id="metric-pending-landlord-access">-</strong>
+          </article>
+          <article class="metric-card">
+            <p>Resident Recoveries</p>
+            <strong id="metric-resident-recovery">-</strong>
+          </article>
+          <article class="metric-card">
+            <p>Account Recoveries</p>
+            <strong id="metric-account-recovery">-</strong>
+          </article>
+        </div>
+        <p id="platform-summary" class="panel-note">
+          Platform coverage is loading.
+        </p>
+      </section>
+
+      <section class="layout">
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Platform Role Boundaries</h2>
+          </div>
+          <p class="panel-note">
+            Admin owns platform governance first, and can now step into billing recovery when a
+            building needs central support.
+          </p>
+          <p class="status-text">
+            Landlords still handle day-to-day operations in their own portal, but platform admin
+            can now post utility bills, record utility payments, and adjust room utility charging
+            from this page when recovery or oversight is needed.
+          </p>
+        </section>
+
+        <section id="admin-access-panel" class="panel wide-panel hidden">
+          <div class="panel-head">
+            <h2>Admin Access</h2>
+          </div>
+          <p class="panel-note">
+            Root-admin only. Reset the standard admin username and password here without changing
+            the separate root-admin recovery credentials.
+          </p>
+          <p id="admin-access-summary" class="status-text">
+            Admin sign-in details are loading.
+          </p>
+
+          <form id="admin-access-form" class="package-card">
+            <div class="panel-head">
+              <h3>Reset Standard Admin Sign-In</h3>
+            </div>
+            <p class="panel-note">
+              Current admin username:
+              <strong id="admin-access-current-username">-</strong>
+            </p>
+            <div class="inline-fields compact-fields">
+              <label>
+                Admin Username
+                <input
+                  id="admin-access-username"
+                  type="text"
+                  maxlength="80"
+                  autocomplete="username"
+                  placeholder="admin"
+                  required
+                />
+              </label>
+              <label>
+                New Password
+                <input
+                  id="admin-access-password"
+                  type="password"
+                  maxlength="120"
+                  autocomplete="new-password"
+                  placeholder="At least 8 characters"
+                  required
+                />
+              </label>
+            </div>
+            <label>
+              Confirm New Password
+              <input
+                id="admin-access-confirm-password"
+                type="password"
+                maxlength="120"
+                autocomplete="new-password"
+                placeholder="Repeat the new password"
+                required
+              />
+            </label>
+            <p class="status-text">
+              Saving new credentials signs out existing standard admin sessions. Root-admin access
+              remains separate for recovery.
+            </p>
+            <button type="submit">Update Admin Credentials</button>
+          </form>
+        </section>
+
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Billing Console</h2>
+            <div class="action-row">
+              <select id="admin-billing-building-select"></select>
+              <button id="refresh-admin-billing" type="button">Refresh</button>
+              <button id="delete-admin-billing-building" type="button" class="btn-danger">
+                Delete Building
+              </button>
+            </div>
+          </div>
+          <p id="admin-billing-summary" class="panel-note">
+            Select a building to manage room-level utility charging, post bills, and record
+            payments from admin.
+          </p>
+          <p class="status-text">
+            Use room utility amounts or fixed charges to bill a room higher or lower. Enter
+            <strong>0</strong> in the room defaults to suspend fixed or combined utility charging
+            for that room until you change it again.
+          </p>
+
+          <form id="admin-monthly-combined-charge-form" class="package-card">
+            <div class="panel-head">
+              <h3>Building Monthly Combined Charge</h3>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Billing Month
+                <input id="admin-monthly-combined-charge-month" type="month" required />
+              </label>
+              <label>
+                Amount (KSh)
+                <input id="admin-monthly-combined-charge-amount" type="number" min="1" step="1" required />
+              </label>
+            </div>
+            <button type="submit">Save Monthly Combined Charge</button>
+          </form>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>House</th>
+                  <th>Resident</th>
+                  <th>Water Fixed (KSh)</th>
+                  <th>Electric Fixed (KSh)</th>
+                  <th>Room Utility Amount (KSh)</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="admin-utility-registry-body"></tbody>
+            </table>
+          </div>
+
+          <form id="admin-utility-bill-form" class="package-card">
+            <div class="panel-head">
+              <h3>Post Utility Bill</h3>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Utility Type
+                <select id="admin-utility-bill-type" required>
+                  <option value="water">water</option>
+                  <option value="electricity">electricity</option>
+                </select>
+              </label>
+              <label>
+                House
+                <input id="admin-utility-bill-house" type="text" maxlength="24" placeholder="31" required />
+              </label>
+              <label>
+                Billing Month
+                <input id="admin-utility-bill-month" type="month" required />
+              </label>
+              <label>
+                Due Date
+                <input id="admin-utility-bill-due-date" type="datetime-local" required />
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Fixed Charge (KSh)
+                <input id="admin-utility-bill-fixed-charge" type="number" min="0" step="1" placeholder="0" />
+              </label>
+              <label>
+                Previous Reading
+                <input id="admin-utility-bill-previous-reading" type="number" min="0" step="0.01" />
+              </label>
+              <label>
+                Current Reading
+                <input id="admin-utility-bill-current-reading" type="number" min="0" step="0.01" />
+              </label>
+              <label>
+                Rate / Unit (KSh)
+                <input id="admin-utility-bill-rate" type="number" min="0" step="0.01" />
+              </label>
+            </div>
+            <label>
+              Note (optional)
+              <input id="admin-utility-bill-note" type="text" maxlength="280" placeholder="Manual utility bill posted by admin." />
+            </label>
+            <button type="submit">Post Utility Bill</button>
+          </form>
+
+          <form id="admin-utility-payment-form" class="package-card">
+            <div class="panel-head">
+              <h3>Record Utility Payment</h3>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Utility Type
+                <select id="admin-utility-payment-type" required>
+                  <option value="water">water</option>
+                  <option value="electricity">electricity</option>
+                </select>
+              </label>
+              <label>
+                House
+                <input id="admin-utility-payment-house" type="text" maxlength="24" placeholder="31" required />
+              </label>
+              <label>
+                Billing Month (optional)
+                <input id="admin-utility-payment-month" type="month" />
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Amount (KSh)
+                <input id="admin-utility-payment-amount" type="number" min="1" step="1" required />
+              </label>
+              <label>
+                Provider
+                <select id="admin-utility-payment-provider">
+                  <option value="cash">cash</option>
+                  <option value="mpesa">mpesa</option>
+                  <option value="bank">bank</option>
+                  <option value="card">card</option>
+                </select>
+              </label>
+              <label>
+                Paid At (optional)
+                <input id="admin-utility-payment-paid-at" type="datetime-local" />
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Reference (optional)
+                <input id="admin-utility-payment-reference" type="text" maxlength="120" placeholder="CASH-WATER-31-2026-03" />
+              </label>
+              <label>
+                Note (optional)
+                <input id="admin-utility-payment-note" type="text" maxlength="280" placeholder="Manual utility payment recorded by admin." />
+              </label>
+            </div>
+            <button type="submit">Record Utility Payment</button>
+          </form>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Utility</th>
+                  <th>House</th>
+                  <th>Paid For</th>
+                  <th>Paid Month</th>
+                  <th>Provider</th>
+                  <th>Reference</th>
+                  <th>Amount</th>
+                  <th>Paid On</th>
+                </tr>
+              </thead>
+              <tbody id="admin-utility-payments-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Landlord Access Approvals</h2>
+            <button id="refresh-landlord-access" type="button">Refresh</button>
+          </div>
+          <p class="panel-note">
+            Tenants request landlord access by email. Approve after ownership verification.
+            Approved landlords can also be revoked here.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Requested</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Reason</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="landlord-access-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Resident Password Recovery</h2>
+            <button id="refresh-password-recovery" type="button">Refresh</button>
+          </div>
+          <p class="panel-note">
+            Residents submit forgot-password requests with building, house, and phone. Verify
+            identity before issuing a temporary password.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Requested</th>
+                  <th>Building</th>
+                  <th>House</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Resident Note</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="password-recovery-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Account Password Recovery</h2>
+            <button id="refresh-account-password-recovery" type="button">Refresh</button>
+          </div>
+          <p class="panel-note">
+            Landlord-side account recovery is reviewed here. Issue temporary passwords only after
+            identity verification.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Requested</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Identifier</th>
+                  <th>Status</th>
+                  <th>User Note</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="account-password-recovery-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Landlord Portfolio</h2>
+            <button id="refresh-portfolios" type="button">Refresh</button>
+          </div>
+          <p class="panel-note">
+            Aggregated ownership view for scale. Use this to see how many buildings and tracked
+            units each landlord currently carries.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Landlord</th>
+                  <th>Role</th>
+                  <th>Buildings</th>
+                  <th>Units</th>
+                  <th>Latest Update</th>
+                  <th>Portfolio</th>
+                </tr>
+              </thead>
+              <tbody id="landlord-portfolios-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Ownership Gaps</h2>
+            <button id="refresh-ownership-gaps" type="button">Refresh</button>
+          </div>
+          <p class="panel-note">
+            Buildings without an assigned landlord should be resolved quickly so complaints and
+            resident workflows always have a responsible owner.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>County</th>
+                  <th>Units</th>
+                  <th>CCTV</th>
+                  <th>Updated</th>
+                  <th>Next Action</th>
+                </tr>
+              </thead>
+              <tbody id="ownership-gap-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel wide-panel">
+          <div class="panel-head">
+            <h2>Building Registry</h2>
+            <button id="refresh-buildings" type="button">Refresh</button>
+          </div>
+          <p id="registry-summary" class="panel-note">
+            Registered buildings are loading.
+          </p>
+
+          <form id="building-create-form" class="package-card">
+            <div class="inline-fields compact-fields">
+              <label>
+                Building Name
+                <input
+                  id="building-name"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Nyota Heights"
+                  required
+                />
+              </label>
+              <label>
+                County
+                <input
+                  id="building-county"
+                  type="text"
+                  maxlength="80"
+                  placeholder="Nairobi"
+                  required
+                />
+              </label>
+            </div>
+
+            <label>
+              Address
+              <input
+                id="building-address"
+                type="text"
+                maxlength="200"
+                placeholder="Mirema Drive, Nairobi"
+                required
+              />
+            </label>
+
+            <div class="inline-fields compact-fields">
+              <label>
+                Units (optional)
+                <input id="building-units" type="number" min="1" placeholder="24" />
+              </label>
+              <label>
+                CCTV Status
+                <select id="building-cctv-status" required>
+                  <option value="none">none</option>
+                  <option value="partial">partial</option>
+                  <option value="verified">verified</option>
+                </select>
+              </label>
+            </div>
+
+            <button type="submit">Add Building</button>
+          </form>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>County</th>
+                  <th>Address</th>
+                  <th>Units</th>
+                  <th>Landlord Owner</th>
+                  <th>CCTV</th>
+                  <th>Updated</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="buildings-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="admin-error" class="error-box hidden"></section>
+    </main>
+
+    <script type="module" src="/admin.js?v=20260516b"></script>
+  </body>
+</html>

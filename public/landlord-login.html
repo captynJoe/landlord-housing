@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Management Portal Sign-In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin.css?v=20260323b" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="tag">Property Management</p>
+          <h1>Landlord Sign-In</h1>
+          <p class="subtitle">
+            Sign in with your property account (email or phone + password)
+            to manage buildings, approve tenant applications, and publish utility bills.
+          </p>
+        </div>
+        <a href="/" class="home-link">Back to Portal</a>
+      </header>
+
+      <section class="panel auth-panel" style="grid-template-columns: 1fr; max-width: 700px;">
+        <form id="landlord-login-form" class="package-card">
+          <p class="status-text">
+            Landlord login: use email/phone + password.
+            House manager login: enable house manager mode and use phone + house number.
+            First-time house managers leave password empty, set a new password once, then future sign-ins use that password.
+          </p>
+          <label>
+            Email or Phone
+            <input
+              id="landlord-email"
+              type="text"
+              autocomplete="username"
+              placeholder="manager@example.com or 07XXXXXXXX"
+              required
+            />
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input id="landlord-caretaker-mode" type="checkbox" />
+            Use house manager sign-in (phone + house number)
+          </label>
+          <label>
+            House Number (House manager only)
+            <input
+              id="landlord-house-number"
+              type="text"
+              maxlength="24"
+              autocomplete="off"
+              placeholder="A-12 (house manager only)"
+            />
+          </label>
+          <label>
+            Password
+            <input
+              id="landlord-password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Your password (leave empty for first-time house manager setup)"
+            />
+          </label>
+          <label>
+            New Password (House manager first-time setup)
+            <input
+              id="landlord-caretaker-new-password"
+              type="password"
+              minlength="8"
+              maxlength="128"
+              autocomplete="new-password"
+              placeholder="Minimum 8 characters"
+            />
+          </label>
+
+          <button id="landlord-login-btn" type="submit">Sign In</button>
+          <section
+            id="login-error"
+            class="error-box hidden inline-error-box"
+            role="alert"
+            aria-live="polite"
+            tabindex="-1"
+          ></section>
+        </form>
+        <p id="login-status" class="status-text">Session not established.</p>
+      </section>
+
+      <section class="panel auth-panel" style="grid-template-columns: 1fr; max-width: 700px; align-items: start;">
+        <form id="landlord-forgot-form" class="package-card">
+          <h2 style="margin: 0;">Forgot Password</h2>
+          <p class="status-text">
+            Enter email or phone. Management will verify identity and issue a temporary password.
+          </p>
+          <label>
+            Email or Phone
+            <input
+              id="landlord-forgot-identifier"
+              type="text"
+              maxlength="160"
+              autocomplete="username"
+              placeholder="manager@example.com or 07XXXXXXXX"
+              required
+            />
+          </label>
+          <button id="landlord-forgot-btn" type="submit">Request Reset</button>
+        </form>
+        <section
+          id="landlord-secondary-error"
+          class="error-box hidden inline-error-box"
+          role="alert"
+          aria-live="polite"
+          tabindex="-1"
+        ></section>
+      </section>
+    </main>
+
+    <script type="module" src="/landlord-login.js?v=20260323b"></script>
+  </body>
+</html>

@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resident Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0f7b76" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Resident Portal" />
+    <link rel="icon" href="/icons/housing-app.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/users.css?v=20260509a" />
+  </head>
+  <body class="app-loading">
+    <div class="ambient" aria-hidden="true"></div>
+    <main class="shell">
+      <header class="topbar">
+        <a id="resident-brand" class="brand" href="/">Resident Portal</a>
+        <div class="user-menu">
+          <button
+            id="user-menu-toggle"
+            class="user-link"
+            type="button"
+            aria-label="Open session menu"
+            aria-expanded="false"
+            aria-controls="user-menu-panel"
+          >
+            <span aria-hidden="true">👤</span>
+          </button>
+          <div id="user-menu-panel" class="user-panel hidden" role="dialog" aria-label="Session menu">
+            <div class="user-panel-meta">
+              <span>API <strong id="api-status">Checking...</strong></span>
+              <span>Session <strong id="auth-state">Signed out</strong></span>
+            </div>
+            <section id="resident-session-panel" class="user-session hidden">
+              <div class="user-panel-head">
+                <p class="user-panel-title">Current session</p>
+                <button id="resident-logout-btn" type="button" class="ghost-btn">
+                  Sign Out
+                </button>
+              </div>
+              <p id="resident-session-summary" class="item-details"></p>
+            </section>
+            <a class="user-panel-link" href="/resident">Open resident workspace</a>
+          </div>
+        </div>
+      </header>
+
+      <header class="hero portal-header">
+        <div class="portal-copy">
+          <h1 id="resident-hero-title">Resident Portal</h1>
+        </div>
+
+        <div class="hero-workspace portal-nav" aria-label="Workspace quick navigation">
+          <p class="hero-workspace-label">Workspace</p>
+          <div class="hero-workspace-nav">
+            <button type="button" class="hero-workspace-btn active" data-resident-view="overview">
+              Overview
+            </button>
+            <button type="button" class="hero-workspace-btn" data-resident-view="support">
+              Support
+              <span class="nav-dot hidden" data-dot="support" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="hero-workspace-btn" data-resident-view="payments">
+              Payments
+              <span class="nav-dot hidden" data-dot="payments" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="hero-workspace-btn" data-resident-view="notices">
+              Notices
+              <span class="nav-dot hidden" data-dot="notices" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <section id="feedback-box" class="feedback hidden"></section>
+
+      <section id="resident-auth-panel" class="panel-card auth-stack">
+        <section class="section-head">
+          <h2>Resident access</h2>
+          <p>
+            Sign in with phone number and password. Add room details only for access requests or password recovery.
+          </p>
+        </section>
+
+        <form id="resident-auth-form" class="report-form">
+          <label>
+            Phone Number
+            <input
+              id="auth-phone-number"
+              type="tel"
+              inputmode="tel"
+              placeholder="07XXXXXXXX"
+              required
+            />
+          </label>
+
+          <label>
+            Password
+            <input
+              id="auth-password"
+              type="password"
+              minlength="8"
+              maxlength="128"
+              placeholder="Enter password"
+              required
+            />
+          </label>
+
+          <section
+            id="resident-auth-feedback"
+            class="feedback hidden"
+            role="alert"
+            aria-live="polite"
+            tabindex="-1"
+          ></section>
+
+          <div class="action-row auth-primary-actions">
+            <button id="resident-login-btn" type="submit">Sign In</button>
+            <button id="resident-forgot-btn" type="button" class="ghost-btn">
+              Forgot Password
+            </button>
+          </div>
+          <label class="remember-device-toggle">
+            <input id="resident-remember-device" type="checkbox" />
+            Remember this device for faster sign-in next time
+          </label>
+
+          <section class="section-head">
+            <h2>Room details</h2>
+            <p>Used for access requests and password recovery.</p>
+          </section>
+
+          <div class="field-grid">
+            <label>
+              Building
+              <select id="auth-building-id"></select>
+            </label>
+            <label>
+              House Number
+              <input
+                id="auth-house-number"
+                type="text"
+                maxlength="24"
+                placeholder="A-12"
+              />
+            </label>
+          </div>
+
+          <section class="section-head">
+            <h2>Access request details</h2>
+            <p>Optional details. You can add them now or skip them and continue with access request.</p>
+          </section>
+
+          <div class="field-grid">
+            <label>
+              ID Type
+              <select id="signup-identity-type">
+                <option value="">Select ID type</option>
+                <option value="national_id">National ID</option>
+                <option value="passport">Passport</option>
+                <option value="alien_id">Alien ID</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>
+              ID Number
+              <input
+                id="signup-identity-number"
+                type="text"
+                maxlength="80"
+                placeholder="Enter ID or passport number"
+              />
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <label>
+              Occupation Status
+              <select id="signup-occupation-status">
+                <option value="">Select occupation status</option>
+                <option value="employed">Employed</option>
+                <option value="self_employed">Self-employed</option>
+                <option value="student">Student</option>
+                <option value="sponsored">Sponsored</option>
+                <option value="unemployed">Unemployed</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>
+              Occupation
+              <input
+                id="signup-occupation-label"
+                type="text"
+                maxlength="120"
+                placeholder="Teacher, electrician, student, trader"
+              />
+            </label>
+          </div>
+          <p class="item-guidance">
+            These details help management complete your resident profile, but they are not required to sign in or request access.
+          </p>
+
+          <div class="action-row auth-request-actions">
+            <button id="resident-signup-btn" type="button" class="ghost-btn">
+              Request Access
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section id="resident-password-change-panel" class="panel-card hidden">
+        <section class="section-head">
+          <h2>Update temporary password</h2>
+        </section>
+        <p class="item-details password-change-note">
+          For security, set a new password before continuing to your resident dashboard.
+        </p>
+        <form id="resident-password-change-form" class="report-form">
+          <label>
+            New password
+            <input
+              id="resident-password-new"
+              type="password"
+              minlength="8"
+              maxlength="128"
+              placeholder="Enter new password"
+              required
+            />
+          </label>
+          <label>
+            Confirm new password
+            <input
+              id="resident-password-confirm"
+              type="password"
+              minlength="8"
+              maxlength="128"
+              placeholder="Confirm new password"
+              required
+            />
+          </label>
+          <div class="action-row">
+            <button id="resident-password-change-btn" type="submit">
+              Save New Password
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section id="resident-layout" class="resident-workspace hidden">
+        <section class="resident-content">
+          <section class="resident-view" data-resident-view-panel="overview">
+            <article class="panel-card">
+              <section class="section-head">
+                <h2>Overview</h2>
+              </section>
+
+              <section class="overview-grid">
+                <article class="overview-card">
+                  <p class="subheading">Building</p>
+                  <p id="overview-building" class="overview-value">-</p>
+                </article>
+                <article class="overview-card">
+                  <p class="subheading">House Number</p>
+                  <p id="overview-house-number" class="overview-value">-</p>
+                </article>
+              </section>
+
+              <p id="overview-session-expiry" class="item-details"></p>
+            </article>
+          </section>
+
+          <section class="resident-view hidden" data-resident-view-panel="support">
+            <article class="panel-card">
+              <section class="section-head">
+                <h2>Open a support request</h2>
+                <button id="refresh-all-btn" type="button" class="ghost-btn">
+                  Refresh Data
+                </button>
+              </section>
+
+              <form id="report-form" class="report-form">
+                <div class="field-grid">
+                  <label>
+                    Building
+                    <input id="bound-building" type="text" readonly />
+                  </label>
+                  <label>
+                    House Number
+                    <input id="bound-house-number" type="text" readonly />
+                  </label>
+                </div>
+
+                <div class="field-grid">
+                  <label>
+                    Request Type
+                    <select id="report-type" required>
+                      <option value="room_issue">Room Issue</option>
+                      <option value="stolen_item">Stolen Item</option>
+                      <option value="general">General</option>
+                    </select>
+                  </label>
+                  <label>
+                    Title
+                    <input
+                      id="report-title"
+                      name="title"
+                      type="text"
+                      maxlength="100"
+                      placeholder="Toilet flush not working"
+                      required
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  Details
+                  <textarea
+                    id="report-details"
+                    name="details"
+                    minlength="5"
+                    maxlength="1500"
+                    placeholder="Describe the issue clearly so the team can help quickly."
+                    required
+                  ></textarea>
+                </label>
+
+                <label>
+                  Attach Photos (optional)
+                  <input
+                    id="report-attachments"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                  />
+                  <p class="item-details">
+                    Upload up to 4 photos of the issue or damaged item before submitting.
+                  </p>
+                </label>
+                <div
+                  id="report-attachment-preview"
+                  class="upload-preview-grid"
+                  aria-live="polite"
+                >
+                  <p class="upload-preview-empty">No photos selected.</p>
+                </div>
+
+                <section id="theft-workflow-fields" class="theft-workflow hidden">
+                  <p class="item-details">
+                    Theft reports route directly to security and require incident timeline details.
+                  </p>
+                  <div class="field-grid">
+                    <label>
+                      Stolen Item
+                      <input
+                        id="report-stolen-item"
+                        name="stolenItem"
+                        type="text"
+                        maxlength="120"
+                        placeholder="Phone, wallet, laptop"
+                      />
+                    </label>
+                    <label>
+                      Incident Location
+                      <input
+                        id="report-incident-location"
+                        name="incidentLocation"
+                        type="text"
+                        maxlength="120"
+                        placeholder="Kitchen, corridor, parking slot"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="field-grid">
+                    <label>
+                      Incident Start
+                      <input
+                        id="report-incident-start"
+                        name="incidentWindowStartAt"
+                        type="datetime-local"
+                      />
+                    </label>
+                    <label>
+                      Incident End
+                      <input
+                        id="report-incident-end"
+                        name="incidentWindowEndAt"
+                        type="datetime-local"
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    Police/Case Reference (optional)
+                    <input
+                      id="report-case-reference"
+                      name="caseReference"
+                      type="text"
+                      maxlength="80"
+                      placeholder="OB-12345/26"
+                    />
+                  </label>
+                </section>
+
+                <div class="action-row">
+                  <button id="submit-btn" type="submit">Submit Request</button>
+                </div>
+              </form>
+            </article>
+
+            <article class="panel-card">
+              <section class="section-head">
+                <h2>Recent support requests</h2>
+                <p id="reports-count">0 tickets</p>
+              </section>
+              <section id="reports-list" class="stack-list"></section>
+            </article>
+          </section>
+
+          <section class="resident-view hidden" data-resident-view-panel="payments">
+            <article class="panel-card payments-shell">
+              <section class="section-head">
+                <h2>Payments</h2>
+              </section>
+              <section class="payment-summary-card">
+                <div class="payment-summary-copy">
+                  <p class="subheading">Payment plan</p>
+                  <h3>Pay any amount today</h3>
+                  <p id="payments-summary-action" class="item-details">
+                    Even a small payment is recorded instantly and reduces what you owe.
+                  </p>
+                </div>
+                <dl class="payment-summary-grid">
+                  <div>
+                    <dt>Total outstanding</dt>
+                    <dd id="payments-total-outstanding">KSh 0</dd>
+                  </div>
+                  <div>
+                    <dt>Rent</dt>
+                    <dd id="payments-rent-outstanding">KSh 0</dd>
+                  </div>
+                  <div>
+                    <dt>Utilities</dt>
+                    <dd id="payments-utility-outstanding">KSh 0</dd>
+                  </div>
+                  <div>
+                    <dt>Paid This Month</dt>
+                    <dd id="payments-month-paid">KSh 0</dd>
+                  </div>
+                </dl>
+                <div class="payment-summary-actions">
+                  <button type="button" data-payment-shortcut="utility-full">
+                    Use full utility balance
+                  </button>
+                  <button type="button" data-payment-shortcut="rent-full">
+                    Use full rent balance
+                  </button>
+                  <button type="button" data-payment-shortcut="suggested-start">
+                    Use suggested starter
+                  </button>
+                </div>
+                <p class="quick-pay-note payment-summary-note">
+                  Pick a shortcut and the form below fills in for you. Rent and utilities still
+                  pay separately.
+                </p>
+              </section>
+              <div class="payments-grid">
+                <div class="payments-column">
+                  <section class="payment-cluster">
+                    <div class="payment-cluster-head">
+                      <p class="subheading">Utilities</p>
+                      <p id="utility-bills-summary" class="item-details">Loading balances...</p>
+                    </div>
+                    <section id="utility-bills-list" class="stack-list"></section>
+
+                    <section id="utility-payment-section" class="payment-section mpesa-section">
+                      <div class="payment-priority-bar">
+                        <div class="payment-priority-brand">
+                          <img
+                            src="/mpesa-icon.svg"
+                            alt=""
+                            class="payment-priority-icon"
+                            width="44"
+                            height="44"
+                          />
+                          <div class="payment-priority-copy">
+                            <p class="subheading">Pay utility via M-PESA</p>
+                            <p class="item-details">
+                              Confirm the phone number first, then approve the STK prompt on your
+                              phone.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <p id="utility-payment-state" class="item-details payment-state">Active.</p>
+                      <form id="utility-payment-form" class="report-form">
+                        <div class="field-grid payment-channel-grid">
+                          <label class="payment-phone-field">
+                            M-PESA Number
+                            <input
+                              id="utility-payment-phone"
+                              type="tel"
+                              inputmode="tel"
+                              placeholder="07XXXXXXXX"
+                            />
+                          </label>
+                          <label class="payment-provider-field hidden">
+                            Payment Method
+                            <select id="utility-payment-provider" required>
+                              <option value="mpesa">M-PESA</option>
+                            </select>
+                          </label>
+                        </div>
+                        <p class="item-details payment-inline-note">
+                          The M-PESA prompt will be sent to this phone number. Payment applies to
+                          the oldest open balance first.
+                        </p>
+                        <div class="field-grid">
+                          <label>
+                            Utility
+                            <select id="utility-payment-type" required>
+                              <option value="water">Water</option>
+                              <option value="electricity">Electricity</option>
+                            </select>
+                          </label>
+                          <label class="hidden">
+                            Bill Month
+                            <select id="utility-payment-month">
+                              <option value="">No open bill</option>
+                            </select>
+                          </label>
+                        </div>
+                        <p id="utility-payment-balance" class="item-details">
+                          Select a utility to load the current balance.
+                        </p>
+                        <p class="item-details payment-encouragement">
+                          Pay any amount today. You do not need to clear the full utility balance at
+                          once.
+                        </p>
+
+                        <label>
+                          Amount (KSh)
+                          <input id="utility-payment-amount" type="number" min="1" required />
+                        </label>
+                        <p id="utility-payment-remaining" class="item-details payment-remaining">
+                          Enter any amount to preview what will remain after payment.
+                        </p>
+                        <div class="quick-pay-row" data-quick-pay="utility">
+                          <button type="button" data-quick="half">Start with half</button>
+                          <button type="button" data-quick="finish">Clear full balance</button>
+                          <button type="button" data-quick="weekly">Small weekly step</button>
+                        </div>
+                        <div class="quick-pay-row quick-pay-row-fixed" data-fixed-pay="utility">
+                          <button type="button" data-fixed="100">KSh 100</button>
+                          <button type="button" data-fixed="200">KSh 200</button>
+                          <button type="button" data-fixed="500">KSh 500</button>
+                        </div>
+                        <p class="quick-pay-note">
+                          Use a shortcut or type your own amount. Every payment reduces your balance
+                          immediately.
+                        </p>
+
+                        <label>
+                          Reference (optional)
+                          <input
+                            id="utility-payment-reference"
+                            type="text"
+                            maxlength="120"
+                            placeholder="QWE123"
+                          />
+                        </label>
+
+                        <div class="action-row">
+                          <button id="utility-payment-btn" type="submit">Pay Utility Bill</button>
+                        </div>
+                      </form>
+                    </section>
+                  </section>
+
+                  <section class="payment-cluster payment-cluster-rent">
+                    <section id="rent-due" class="rent-wrap"></section>
+
+                    <section id="rent-payment-section" class="payment-section mpesa-section">
+                      <p class="subheading">Pay rent (M-PESA)</p>
+                      <p id="rent-payment-state" class="item-details payment-state">
+                        Active for your building.
+                      </p>
+                      <form id="rent-payment-form" class="report-form">
+                        <p class="item-details payment-encouragement">
+                          Pay any amount today. You do not need to clear the full rent balance at
+                          once.
+                        </p>
+                        <div class="field-grid payment-channel-grid">
+                          <label class="hidden">
+                            Rent Month
+                            <select id="rent-payment-month">
+                              <option value="">Current due month</option>
+                            </select>
+                          </label>
+                          <label class="payment-provider-field hidden">
+                            Payment Method
+                            <select id="rent-payment-method" required>
+                              <option value="mpesa">M-PESA</option>
+                            </select>
+                          </label>
+                          <label class="payment-phone-field">
+                            M-PESA Number (optional)
+                            <input
+                              id="rent-payment-phone"
+                              type="tel"
+                              inputmode="tel"
+                              placeholder="07XXXXXXXX"
+                            />
+                          </label>
+                        </div>
+                        <p class="item-details payment-inline-note">
+                          Your rent payment reduces the open balance immediately and the receipt
+                          month stays in sync automatically.
+                        </p>
+                        <label>
+                          Amount (KSh)
+                          <input id="rent-payment-amount" type="number" min="1" required />
+                        </label>
+                        <p id="rent-payment-remaining" class="item-details payment-remaining">
+                          Enter any amount to preview what will remain after payment.
+                        </p>
+                        <div class="quick-pay-row" data-quick-pay="rent">
+                          <button type="button" data-quick="half">Start with half</button>
+                          <button type="button" data-quick="finish">Clear full balance</button>
+                          <button type="button" data-quick="weekly">Small weekly step</button>
+                        </div>
+                        <div class="quick-pay-row quick-pay-row-fixed" data-fixed-pay="rent">
+                          <button type="button" data-fixed="100">KSh 100</button>
+                          <button type="button" data-fixed="200">KSh 200</button>
+                          <button type="button" data-fixed="500">KSh 500</button>
+                        </div>
+                        <p class="quick-pay-note">
+                          Use a shortcut or type your own amount. Every payment reduces your balance
+                          immediately.
+                        </p>
+
+                        <div class="action-row">
+                          <button id="rent-payment-btn" type="submit">Pay with M-PESA</button>
+                        </div>
+                      </form>
+                    </section>
+                  </section>
+                </div>
+
+                <aside class="payments-column payments-history-column">
+                  <section class="payment-history-group">
+                    <section class="section-head compact-head">
+                      <h2>Utility history</h2>
+                      <p id="utility-payments-count">0 payments</p>
+                    </section>
+                    <section id="utility-payments-list" class="stack-list"></section>
+                  </section>
+
+                  <section class="payment-history-group">
+                    <section class="section-head compact-head">
+                      <h2>Rent history</h2>
+                      <p id="rent-payments-count">0 payments</p>
+                    </section>
+                    <section id="rent-payments-list" class="stack-list"></section>
+                  </section>
+                </aside>
+              </div>
+            </article>
+          </section>
+
+          <section class="resident-view hidden" data-resident-view-panel="notices">
+            <article class="panel-card">
+              <section class="section-head">
+                <h2>Building notices</h2>
+                <p id="notification-count">0 alerts</p>
+              </section>
+              <section class="notification-control-card">
+                <div class="notification-control-copy">
+                  <p class="subheading">App & alerts</p>
+                  <p id="install-app-status" class="item-details">
+                    Install this portal for faster access on your phone.
+                  </p>
+                  <p id="push-status-text" class="item-details">
+                    Sign in to enable browser alerts for rent, utility, and support updates.
+                  </p>
+                </div>
+                <div class="action-row notification-control-actions">
+                  <button id="install-app-btn" type="button" class="ghost-btn hidden">
+                    Install App
+                  </button>
+                  <button id="push-enable-btn" type="button" class="ghost-btn">
+                    Enable Alerts
+                  </button>
+                  <button id="push-disable-btn" type="button" class="ghost-btn hidden">
+                    Turn Off Alerts
+                  </button>
+                </div>
+              </section>
+              <section class="notification-control-card">
+                <div class="notification-control-copy">
+                  <p class="subheading">SMS updates</p>
+                  <p id="sms-status-text" class="item-details">
+                    Sign in to manage SMS alerts for rent and utility updates.
+                  </p>
+                  <div class="notification-toggle-grid">
+                    <label class="notification-toggle">
+                      <input id="sms-rent-toggle" type="checkbox" />
+                      <span>Rent updates</span>
+                    </label>
+                    <label class="notification-toggle">
+                      <input id="sms-utility-toggle" type="checkbox" />
+                      <span>Utility updates</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="action-row notification-control-actions">
+                  <button id="sms-enable-btn" type="button" class="ghost-btn">
+                    Enable SMS
+                  </button>
+                  <button id="sms-disable-btn" type="button" class="ghost-btn hidden">
+                    Pause SMS
+                  </button>
+                </div>
+              </section>
+              <section id="notification-list" class="stack-list"></section>
+            </article>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <template id="report-item-template">
+      <article class="stack-item">
+        <div class="stack-top">
+          <strong class="item-title"></strong>
+          <span class="item-chip"></span>
+        </div>
+        <p class="item-meta"></p>
+        <p class="item-details"></p>
+        <p class="item-guidance"></p>
+      </article>
+    </template>
+
+    <template id="notification-item-template">
+      <article class="stack-item">
+        <div class="stack-top">
+          <strong class="item-title"></strong>
+          <span class="item-chip"></span>
+        </div>
+        <p class="item-details"></p>
+        <p class="item-meta"></p>
+      </article>
+    </template>
+
+    <section
+      id="mpesa-status-modal"
+      class="modal-shell hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mpesa-status-title"
+    >
+      <button id="mpesa-status-backdrop" class="modal-backdrop" type="button" aria-label="Close"></button>
+      <article class="modal-card payment-modal-card">
+        <div class="modal-head">
+          <div class="payment-modal-brand">
+            <img
+              src="/mpesa-icon.svg"
+              alt=""
+              class="payment-priority-icon"
+              width="40"
+              height="40"
+            />
+            <div>
+              <p class="subheading">M-PESA checkout</p>
+              <h2 id="mpesa-status-title">Confirm payment on your phone</h2>
+            </div>
+          </div>
+          <button id="mpesa-status-close" type="button" class="ghost-btn">Close</button>
+        </div>
+
+        <div class="payment-modal-status">
+          <span id="mpesa-status-badge" class="item-chip chip-mpesa">Waiting for PIN</span>
+          <p id="mpesa-status-copy" class="item-details">
+            An M-PESA prompt has been sent. Enter your PIN on your phone to continue.
+          </p>
+        </div>
+
+        <dl id="mpesa-status-meta" class="receipt-grid"></dl>
+        <p id="mpesa-status-note" class="item-details payment-modal-note"></p>
+
+        <div class="action-row modal-actions">
+          <button id="mpesa-status-check-btn" type="button">Check status</button>
+          <button id="mpesa-status-retry-btn" type="button" class="ghost-btn">Try again</button>
+          <button id="mpesa-status-close-btn" type="button" class="ghost-btn">Close</button>
+        </div>
+      </article>
+    </section>
+
+    <section
+      id="payment-receipt-modal"
+      class="modal-shell hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payment-receipt-title"
+    >
+      <button
+        id="payment-receipt-backdrop"
+        class="modal-backdrop"
+        type="button"
+        aria-label="Close receipt"
+      ></button>
+      <article class="modal-card receipt-modal-card">
+        <div class="modal-head">
+          <div>
+            <p class="subheading">Payment receipt</p>
+            <h2 id="payment-receipt-title">Receipt ready</h2>
+          </div>
+          <button id="payment-receipt-close" type="button" class="ghost-btn">Close</button>
+        </div>
+
+        <section id="payment-receipt-card" class="receipt-card"></section>
+
+        <div class="action-row modal-actions">
+          <button id="payment-receipt-save-btn" type="button">Save receipt</button>
+          <button id="payment-receipt-dismiss-btn" type="button" class="ghost-btn">Done</button>
+        </div>
+      </article>
+    </section>
+
+    <script type="module" src="/users.js?v=20260516b"></script>
+  </body>
+</html>

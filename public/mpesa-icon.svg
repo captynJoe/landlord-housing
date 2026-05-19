@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="M-PESA icon">
+  <defs>
+    <clipPath id="mpesa-circle">
+      <circle cx="32" cy="32" r="32" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#mpesa-circle)">
+    <circle cx="32" cy="32" r="32" fill="#0AA83A" />
+    <path d="M27 20h6v3h8.5l19.5 19.5V64H36z" fill="#087F2B" opacity="0.95" />
+    <rect x="24" y="23" width="9.5" height="23.5" rx="2.2" fill="#9AD068" />
+    <rect x="24" y="24.5" width="7.8" height="9.2" rx="1.1" fill="#0E8E34" />
+    <path d="M20.5 35.2c4.8 0.2 8.2-1.5 11.2-5 2.7 2.1 4.9 2.9 8.1 3.4-1.7 2.7-4.5 4.5-8 4.8-4.2 0.4-7.9-0.6-11.3-3.2z" fill="#F91414" />
+    <path d="M9 39V26.5h4.2l3.4 6.7 3.4-6.7H24V39h-4v-5.6l-2.5 4.9h-1.9l-2.5-4.9V39z" fill="#fff" />
+    <path d="M37.5 39V26.5h5.1c3.6 0 5.3 1.8 5.3 4.6 0 2.8-1.8 4.6-5.3 4.6h-1.2V39zm4-6.8h1.1c1 0 1.5-0.4 1.5-1.1 0-0.7-0.5-1.1-1.5-1.1h-1.1z" fill="#fff" />
+    <path d="M49.2 39V26.5h9.2v3.3h-5.2v1.5h4.8v3.1h-4.8v1.4h5.3V39z" fill="#fff" />
+    <path d="M56 39l4.3-12.5h5.1L64 39h-4.1l-0.5-1.9H56.8L56.3 39zm1.6-4.8h1.6l-0.8-3.1z" fill="#fff" transform="translate(-1 0)" />
+  </g>
+</svg>

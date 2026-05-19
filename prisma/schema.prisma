@@ -1,0 +1,454 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CCTVStatus {
+  none
+  partial
+  verified
+}
+
+enum IncidentSeverity {
+  low
+  medium
+  high
+}
+
+enum IncidentStatus {
+  open
+  resolved
+}
+
+enum UserRole {
+  tenant
+  landlord
+  admin
+  root_admin
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum TenantApplicationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum LandlordAccessRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+enum TenantIdentityType {
+  national_id
+  passport
+  alien_id
+  other
+}
+
+enum TenantOccupationStatus {
+  employed
+  self_employed
+  student
+  sponsored
+  unemployed
+  other
+}
+
+enum UtilityBillingMode {
+  metered
+  fixed_charge
+  combined_charge
+  disabled
+}
+
+enum WifiAccessMode {
+  disabled
+  voucher_packages
+}
+
+model Building {
+  id                       String              @id
+  name                     String
+  address                  String
+  county                   String
+  cctvStatus               CCTVStatus
+  units                    Int?
+  landlordUserId           String?
+  mediaImageUrls           Json
+  mediaVideoUrls           Json
+  mediaFloorPlanUrl        String?
+  mediaNeighborhoodNotes   String?
+  incidents                Incident[]
+  maintenanceRecords       MaintenanceRecord[]
+  vacancySnapshots         VacancySnapshot[]
+  landlordUser             HousingUser?        @relation("BuildingLandlord", fields: [landlordUserId], references: [id], onDelete: SetNull)
+  configuration            BuildingConfiguration?
+  houseUnits               HouseUnit[]
+  tenantApplications       TenantApplication[]
+  tenantAgreements         TenantAgreement[]
+  tenancies                Tenancy[]
+  roomAccountAuditEvents   RoomAccountAuditEvent[]
+  roomBillingHolds         RoomBillingHold[]
+  residentMoveOutSettlements ResidentMoveOutSettlement[]
+  wifiPackages             BuildingWifiPackage[]
+  householdMemberRegistries HouseholdMemberRegistry[]
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+
+  @@index([landlordUserId])
+}
+
+model Incident {
+  id              String           @id @default(uuid())
+  buildingId      String
+  building        Building         @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  title           String
+  details         String
+  severity        IncidentSeverity
+  status          IncidentStatus   @default(open)
+  createdAt       DateTime         @default(now())
+  resolvedAt      DateTime?
+  resolutionNotes String?
+
+  @@index([buildingId, status])
+}
+
+model MaintenanceRecord {
+  id          String   @id @default(uuid())
+  buildingId  String
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  details     String
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([buildingId])
+}
+
+model VacancySnapshot {
+  id                String   @id @default(uuid())
+  buildingId        String
+  building          Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  movedOutAt        DateTime
+  beforeImageUrls   Json
+  afterImageUrls    Json
+  videoUrls         Json
+  structuralChanges Json
+  damages           Json
+  repairs           Json
+  notes             String?
+  createdAt         DateTime @default(now())
+
+  @@index([buildingId, movedOutAt])
+}
+
+model HousingUser {
+  id                    String              @id @default(uuid())
+  fullName              String
+  email                 String              @unique
+  phone                 String              @unique
+  passwordHash          String
+  requirePasswordChange Boolean             @default(false)
+  role                  UserRole            @default(tenant)
+  status                UserStatus          @default(active)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  ownedBuildings        Building[]          @relation("BuildingLandlord")
+  sessions              UserSession[]
+  tenantApplications    TenantApplication[]
+  tenantAgreements      TenantAgreement[]
+  reviewedApplications  TenantApplication[] @relation("TenantApplicationReviewer")
+  tenancies             Tenancy[]
+  roomAccountAuditEvents RoomAccountAuditEvent[] @relation("RoomAccountAuditActor")
+  landlordAccessRequests LandlordAccessRequest[] @relation("LandlordAccessRequester")
+  reviewedLandlordAccessRequests LandlordAccessRequest[] @relation("LandlordAccessReviewer")
+
+  @@index([role])
+}
+
+model LandlordAccessRequest {
+  id               String                      @id @default(uuid())
+  userId           String
+  status           LandlordAccessRequestStatus @default(pending)
+  reason           String?
+  reviewerNote     String?
+  requestedAt      DateTime                    @default(now())
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  user             HousingUser                 @relation("LandlordAccessRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy       HousingUser?                @relation("LandlordAccessReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, requestedAt])
+  @@index([userId, status])
+}
+
+model UserSession {
+  id                String      @id @default(uuid())
+  userId            String
+  residentTenancyId String?
+  tokenHash         String      @unique
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime    @default(now())
+  user              HousingUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  residentTenancy   Tenancy?    @relation("ResidentTenancySession", fields: [residentTenancyId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+  @@index([residentTenancyId])
+  @@index([expiresAt])
+}
+
+model HouseUnit {
+  id                 String              @id @default(uuid())
+  buildingId         String
+  houseNumber        String
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  building           Building            @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  tenantApplications TenantApplication[]
+  tenancies          Tenancy[]
+
+  @@unique([buildingId, houseNumber])
+  @@index([buildingId, isActive])
+}
+
+model TenantApplication {
+  id               String                  @id @default(uuid())
+  userId           String
+  buildingId       String
+  unitId           String?
+  houseNumber      String
+  identityType     TenantIdentityType?
+  identityNumber   String?
+  occupationStatus TenantOccupationStatus?
+  occupationLabel  String?
+  status           TenantApplicationStatus @default(pending)
+  note             String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  user             HousingUser             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  building         Building                @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unit             HouseUnit?              @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  reviewedBy       HousingUser?            @relation("TenantApplicationReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, buildingId, houseNumber])
+  @@index([buildingId, status])
+  @@index([userId, status])
+}
+
+model Tenancy {
+  id         String      @id @default(uuid())
+  userId     String
+  buildingId String
+  unitId     String
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  endedAt    DateTime?
+  user       HousingUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  building   Building    @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  unit       HouseUnit   @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  agreement  TenantAgreement?
+  sessions   UserSession[] @relation("ResidentTenancySession")
+  auditEvents RoomAccountAuditEvent[] @relation("RoomAccountAuditTenancy")
+
+  @@index([userId, active])
+  @@index([buildingId, active])
+}
+
+model RoomAccountAuditEvent {
+  id          String       @id @default(uuid())
+  buildingId  String
+  houseNumber String
+  tenancyId   String?
+  actorUserId String?
+  actorRole   String?
+  actorName   String?
+  action      String
+  summary     String
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  building    Building     @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  tenancy     Tenancy?     @relation("RoomAccountAuditTenancy", fields: [tenancyId], references: [id], onDelete: SetNull)
+  actor       HousingUser? @relation("RoomAccountAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([buildingId, houseNumber, createdAt])
+  @@index([tenancyId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model RoomBillingHold {
+  id               String   @id @default(uuid())
+  buildingId       String
+  houseNumber      String
+  scope            String
+  utilityType      String?
+  startMonth       String
+  endMonth         String
+  reason           String?
+  createdByUserId  String?
+  createdByRole    String?
+  createdByName    String?
+  canceledAt       DateTime?
+  canceledByUserId String?
+  canceledByRole   String?
+  canceledByName   String?
+  cancelReason     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  building         Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId, houseNumber, startMonth, endMonth])
+  @@index([buildingId, canceledAt])
+  @@index([createdByUserId, createdAt])
+}
+
+model ResidentMoveOutSettlement {
+  id                String   @id @default(uuid())
+  buildingId        String
+  houseNumber       String
+  residentUserId    String?
+  tenancyId         String?
+  action            String
+  status            String   @default("recorded")
+  amountKsh         Int
+  rentKsh           Int      @default(0)
+  utilityKsh        Int      @default(0)
+  roomChargesKsh    Int      @default(0)
+  reason            String?
+  metadata          Json?
+  createdByUserId   String?
+  createdByRole     String?
+  createdByName     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  building          Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId, houseNumber, createdAt])
+  @@index([residentUserId, createdAt])
+  @@index([tenancyId, createdAt])
+  @@index([action, createdAt])
+}
+
+model TenantAgreement {
+  id                        String                 @id @default(uuid())
+  tenancyId                 String                 @unique
+  buildingId                String
+  houseNumber               String
+  residentUserId            String
+  identityType              TenantIdentityType?
+  identityNumber            String?
+  occupationStatus          TenantOccupationStatus?
+  occupationLabel           String?
+  organizationName          String?
+  organizationLocation      String?
+  studentRegistrationNumber String?
+  sponsorName               String?
+  sponsorPhone              String?
+  emergencyContactName      String?
+  emergencyContactPhone     String?
+  leaseStartDate            DateTime?
+  leaseEndDate              DateTime?
+  monthlyRentKsh            Int?
+  depositKsh                Int?
+  paymentDueDay             Int?
+  specialTerms              String?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  building                  Building               @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  resident                  HousingUser            @relation(fields: [residentUserId], references: [id], onDelete: Cascade)
+  tenancy                   Tenancy                @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId, houseNumber, updatedAt])
+  @@index([residentUserId])
+}
+
+model HouseholdMemberRegistry {
+  id         String   @id @default(uuid())
+  buildingId String
+  houseNumber String
+  members    Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@unique([buildingId, houseNumber])
+  @@index([buildingId, updatedAt])
+}
+
+model BuildingConfiguration {
+  id                         String             @id @default(uuid())
+  buildingId                 String             @unique
+  rentEnabled                Boolean            @default(true)
+  waterEnabled               Boolean            @default(true)
+  electricityEnabled         Boolean            @default(true)
+  wifiEnabled                Boolean            @default(false)
+  tenantApplicationsEnabled  Boolean            @default(true)
+  tenantAgreementsEnabled    Boolean            @default(true)
+  incidentsEnabled           Boolean            @default(true)
+  maintenanceEnabled         Boolean            @default(true)
+  caretakerEnabled           Boolean            @default(false)
+  expenditureTrackingEnabled Boolean            @default(false)
+  utilityBillingMode         UtilityBillingMode @default(metered)
+  defaultWaterRatePerUnitKsh Float?
+  defaultElectricityRatePerUnitKsh Float?
+  defaultWaterFixedChargeKsh Float?
+  defaultElectricityFixedChargeKsh Float?
+  defaultCombinedUtilityChargeKsh Int?
+  utilityBalanceVisibleDays  Int                @default(7)
+  rentGraceDays              Int                @default(0)
+  allowManualRentPosting     Boolean            @default(true)
+  allowManualUtilityPosting  Boolean            @default(true)
+  wifiAccessMode             WifiAccessMode     @default(disabled)
+  reminderPolicy             Json?
+  onboardingPolicy           Json?
+  agreementPolicy            Json?
+  metadata                   Json?
+  updatedByRole              String?
+  updatedByUserId            String?
+  note                       String?
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+  building                   Building           @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([utilityBillingMode])
+  @@index([updatedAt])
+}
+
+model BuildingWifiPackage {
+  id          String   @id @default(uuid())
+  buildingId  String
+  packageCode String
+  name        String
+  hours       Int
+  priceKsh    Int
+  profile     String
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@unique([buildingId, packageCode])
+  @@index([buildingId, enabled])
+}
+
+model AppState {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}

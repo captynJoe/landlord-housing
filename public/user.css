@@ -1,0 +1,72 @@
+body.app-loading #user-auth-panel,
+body.app-loading #user-layout {
+  visibility: hidden;
+}
+
+.profile-overview {
+  display: grid;
+  gap: 18px;
+}
+
+.profile-summary-grid,
+.agreement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.summary-card,
+.key-value-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 123, 118, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.summary-card strong,
+.key-value-card strong {
+  color: #162231;
+  font-size: 1.15rem;
+}
+
+.summary-label {
+  color: #5d7288;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.agreement-terms {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 123, 118, 0.14);
+  background: rgba(248, 251, 250, 0.92);
+}
+
+.agreement-empty {
+  min-height: 48px;
+}
+
+.user-auth-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 960px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+}

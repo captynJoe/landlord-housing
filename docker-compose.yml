@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: landlord-housing-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: captyn
+      POSTGRES_PASSWORD: captyn
+      POSTGRES_DB: landlord_housing
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U captyn -d landlord_housing"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - landlord_housing_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  landlord_housing_postgres_data:

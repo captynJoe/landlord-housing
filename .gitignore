@@ -1,0 +1,17 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+uploads/
+
+# Prisma client output is generated locally by `npm run prisma:generate`.
+generated/prisma/
+
+# Runtime state is mutated by the app and should stay local.
+data/*.json

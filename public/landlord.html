@@ -1,0 +1,1580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Management Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/admin.css?v=20260322b" />
+    <link rel="stylesheet" href="/landlord.css?v=20260517h" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="shell">
+      <section class="panel landlord-navbar-panel">
+        <div class="landlord-navbar-head">
+          <div class="landlord-navbar-copy">
+            <p id="landlord-brand-tag" class="tag landlord-navbar-tag">Property Portfolio</p>
+            <h1 id="landlord-brand-title" class="landlord-navbar-title">Management Portal</h1>
+            <p class="sidebar-label">Workspace</p>
+            <p id="auth-status" class="status-text landlord-navbar-status">
+              Checking landlord session...
+            </p>
+          </div>
+          <div class="landlord-navbar-actions">
+            <a href="/resident" class="home-link">Resident Portal</a>
+            <span id="landlord-role" class="status-text">role: -</span>
+            <button id="refresh-all-btn" type="button">Refresh All</button>
+            <button id="landlord-logout-btn" type="button">Sign Out</button>
+            <button
+              type="button"
+              class="landlord-primary-cta"
+              data-action="open-create-building-drawer"
+            >
+              + New Building
+            </button>
+          </div>
+        </div>
+        <form id="landlord-global-search-form" class="landlord-global-search">
+          <label class="landlord-global-search-field">
+            Quick Room Search
+            <input
+              id="landlord-global-search-input"
+              type="search"
+              maxlength="120"
+              placeholder="Name, phone, house"
+            />
+          </label>
+          <label class="landlord-global-search-field">
+            Building
+            <select id="landlord-global-search-building"></select>
+          </label>
+          <button id="landlord-global-search-btn" type="submit">Open Room</button>
+        </form>
+        <nav class="landlord-nav" aria-label="Landlord sections">
+          <button
+            type="button"
+            class="landlord-nav-btn"
+            data-landlord-view="tenants"
+            data-landlord-section-target="residents-section"
+          >
+            Tenants
+          </button>
+          <button
+            type="button"
+            class="landlord-nav-btn"
+            data-landlord-view="overview"
+            data-landlord-section-target="overview-collections-panel"
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            class="landlord-nav-btn"
+            data-landlord-view="buildings"
+            data-landlord-section-target="buildings-section"
+          >
+            Manage
+          </button>
+          <button
+            type="button"
+            class="landlord-nav-btn"
+            data-landlord-view="applications"
+            data-landlord-section-target="applications-section"
+          >
+            <span class="landlord-nav-label">Requests</span>
+            <span
+              id="applications-nav-badge"
+              class="landlord-nav-badge hidden"
+              aria-live="polite"
+            ></span>
+          </button>
+          <button
+            type="button"
+            class="landlord-nav-btn"
+            data-landlord-view="expenses"
+            data-landlord-section-target="utilities-expenditures-section"
+          >
+            Expenses
+          </button>
+        </nav>
+      </section>
+
+      <section class="panel metrics-panel">
+        <div class="panel-head">
+          <h2>Overview</h2>
+        </div>
+        <div class="metrics-grid">
+          <button type="button" class="metric-card metric-card-btn" data-metric-target="meters"><p>Meters</p><strong id="metric-meters">-</strong></button>
+          <button type="button" class="metric-card metric-card-btn" data-metric-target="users"><p>Tenants</p><strong id="metric-users">-</strong></button>
+          <button type="button" class="metric-card metric-card-btn" data-metric-target="posted-bills"><p>Posted Bills</p><strong id="metric-bills">-</strong></button>
+          <button type="button" class="metric-card metric-card-btn" data-metric-target="unpaid-bills"><p>Unpaid Bills</p><strong id="metric-unpaid">-</strong></button>
+          <button type="button" class="metric-card metric-card-btn" data-metric-target="overdue-bills"><p>Overdue Bills</p><strong id="metric-overdue">-</strong></button>
+          <button type="button" class="metric-card metric-card-btn" data-metric-target="payments"><p>Collected This Month</p><strong id="metric-payments">-</strong></button>
+          <button type="button" class="metric-card metric-card-btn" data-metric-target="outstanding"><p>Resident Outstanding</p><strong id="metric-balance">-</strong></button>
+        </div>
+      </section>
+
+      <section class="panel landlord-focus-panel">
+        <div class="panel-head">
+          <h2>Current Building Focus</h2>
+          <div class="action-row landlord-focus-actions">
+            <button
+              type="button"
+              data-landlord-focus-target-view="buildings"
+              data-landlord-focus-target-section="buildings-section"
+            >
+              Manage
+            </button>
+            <button
+              type="button"
+              data-landlord-focus-target-view="tenants"
+              data-landlord-focus-target-section="residents-section"
+            >
+              Tenants
+            </button>
+            <button
+              type="button"
+              data-landlord-focus-target-view="tenants"
+              data-landlord-focus-target-section="utility-room-status-section"
+            >
+              Utility Status
+            </button>
+            <button
+              type="button"
+              data-landlord-focus-target-view="applications"
+              data-landlord-focus-target-section="overview-issues-section"
+            >
+              Requests
+            </button>
+          </div>
+        </div>
+        <div class="landlord-focus-grid">
+          <label class="landlord-focus-field">
+            Working Building
+            <select id="landlord-focus-building-select"></select>
+          </label>
+          <div class="landlord-focus-summary" aria-live="polite">
+            <div class="landlord-focus-stat">
+              <span>Units</span>
+              <strong id="landlord-focus-units">-</strong>
+            </div>
+            <div class="landlord-focus-stat">
+              <span>Resident users</span>
+              <strong id="landlord-focus-residents">-</strong>
+            </div>
+            <div class="landlord-focus-stat">
+              <span>Open utility bills</span>
+              <strong id="landlord-focus-open-bills">-</strong>
+            </div>
+            <div class="landlord-focus-stat">
+              <span>Outstanding</span>
+              <strong id="landlord-focus-outstanding">-</strong>
+            </div>
+          </div>
+        </div>
+        <p id="landlord-focus-note" class="status-text landlord-focus-note">
+          Choose a building to keep the workspace aligned.
+        </p>
+      </section>
+
+      <div class="landlord-workspace">
+        <section class="layout landlord-content">
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="overview"
+          id="overview-collections-panel"
+        >
+          <div class="panel-head">
+            <h2>Collections Dashboard</h2>
+            <div class="action-row">
+              <label class="dashboard-lookup-field">
+                Room Lookup
+                <input
+                  id="overview-room-search-input"
+                  type="search"
+                  maxlength="120"
+                  placeholder="Name, phone, house"
+                />
+              </label>
+              <label class="dashboard-lookup-field">
+                Building
+                <select id="overview-room-building-select"></select>
+              </label>
+              <button id="overview-open-room-btn" type="button">Open Room</button>
+              <button id="refresh-overview-dashboard" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="table-wrap" id="overview-collections-section">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>House</th>
+                  <th>Status</th>
+                  <th>Monthly Rent</th>
+                  <th>Paid This Month</th>
+                  <th>Due This Month</th>
+                  <th>Total Outstanding</th>
+                  <th>Latest Payment</th>
+                  <th>Last Receipt</th>
+                </tr>
+              </thead>
+              <tbody id="overview-collections-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
+          id="overview-payment-access-section"
+        >
+          <div class="panel-head">
+            <h2>Resident Payment Access</h2>
+            <button id="refresh-payment-access" type="button">Refresh</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>Rent</th>
+                  <th>Water</th>
+                  <th>Electricity</th>
+                  <th>Updated</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="payment-access-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
+          id="overview-wifi-packages-section"
+        >
+          <div class="panel-head">
+            <h2>Wi-Fi Package Controls</h2>
+            <button id="refresh-wifi-packages" type="button">Refresh</button>
+          </div>
+          <div class="inline-fields compact-fields">
+            <label>
+              Building
+              <select id="wifi-package-building-select"></select>
+            </label>
+          </div>
+          <div id="wifi-package-list" class="package-list"></div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="buildings"
+          id="buildings-section"
+        >
+          <div class="panel-head">
+            <h2>Manage Buildings & Rooms</h2>
+            <div class="action-row">
+              <button
+                type="button"
+                data-action="open-create-building-drawer"
+              >
+                + New Building
+              </button>
+              <button id="refresh-buildings" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="landlord-manage-tools">
+            <label class="landlord-manage-search">
+              Find Building
+              <input
+                id="building-management-search"
+                type="search"
+                maxlength="120"
+                placeholder="Name, ID, county, address"
+              />
+            </label>
+            <p id="building-management-summary" class="status-text">
+              Showing all buildings in your portfolio.
+            </p>
+          </div>
+
+          <div class="package-card">
+            <div class="panel-head">
+              <h3>Building Profile Photo</h3>
+            </div>
+            <form id="building-photo-form" class="inline-fields compact-fields">
+              <label>
+                Building
+                <select id="building-photo-building-select"></select>
+              </label>
+              <label>
+                Front Photo
+                <input
+                  id="building-photo-file"
+                  type="file"
+                  accept="image/*"
+                />
+              </label>
+              <button type="submit">Save Photo</button>
+            </form>
+            <div
+              id="building-photo-preview"
+              class="upload-preview-grid building-photo-preview"
+              aria-live="polite"
+            >
+              <p class="upload-preview-empty">No building photo selected.</p>
+            </div>
+          </div>
+
+          <div id="owner-staff-management-panel" class="package-card">
+            <div class="panel-head">
+              <h3>Owner / Staff Access</h3>
+              <button id="refresh-owner-staff" type="button">Refresh</button>
+            </div>
+            <p id="owner-staff-summary" class="status-text">
+              Owner/staff access is loading.
+            </p>
+            <form id="owner-staff-form" class="inline-fields compact-fields">
+              <label>
+                Full Name
+                <input
+                  id="owner-staff-name"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Owner Staff"
+                  required
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  id="owner-staff-email"
+                  type="email"
+                  maxlength="160"
+                  placeholder="owner@example.com"
+                  required
+                />
+              </label>
+              <label>
+                Phone
+                <input
+                  id="owner-staff-phone"
+                  type="tel"
+                  placeholder="+254711111111"
+                  required
+                />
+              </label>
+              <label>
+                Temporary Password
+                <input
+                  id="owner-staff-password"
+                  type="password"
+                  minlength="8"
+                  maxlength="128"
+                  autocomplete="new-password"
+                  required
+                />
+              </label>
+              <label>
+                Note (optional)
+                <input id="owner-staff-note" type="text" maxlength="280" />
+              </label>
+              <button id="owner-staff-submit-btn" type="submit">Add Owner/Staff</button>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Password</th>
+                    <th>Added</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="owner-staff-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="caretaker-management-panel" class="package-card">
+            <div class="panel-head">
+              <h3>House Manager Access</h3>
+              <button id="refresh-caretakers" type="button">Refresh</button>
+            </div>
+            <form id="caretaker-form" class="inline-fields compact-fields">
+              <label>
+                Building
+                <select id="caretaker-building-select"></select>
+              </label>
+              <label>
+                House Manager Phone/Email
+                <input
+                  id="caretaker-identifier"
+                  type="text"
+                  maxlength="160"
+                  placeholder="+254711111111 or name@email.com"
+                  required
+                />
+              </label>
+              <label>
+                Verification House
+                <input
+                  id="caretaker-house-number"
+                  type="text"
+                  maxlength="24"
+                  placeholder="A-12"
+                  required
+                />
+              </label>
+              <label>
+                Note (optional)
+                <input id="caretaker-note" type="text" maxlength="280" placeholder="Night shift manager" />
+              </label>
+              <button type="submit">Approve House Manager</button>
+            </form>
+            <section class="section-head">
+              <h4>Pending House Manager Requests</h4>
+            </section>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Requested</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>House</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="caretaker-requests-body"></tbody>
+              </table>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>House</th>
+                    <th>Approved</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="caretakers-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Photo</th>
+                  <th>Name</th>
+                  <th>Address</th>
+                  <th>County</th>
+                  <th>Units</th>
+                  <th>Updated</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="buildings-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="applications"
+          id="overview-issues-section"
+        >
+          <div class="panel-head">
+            <h2>Resident Issues</h2>
+            <div class="action-row">
+              <label>
+                Status
+                <select id="landlord-ticket-filter-status">
+                  <option value="">all</option>
+                  <option value="open">open</option>
+                  <option value="triaged">triaged</option>
+                  <option value="in_progress">in_progress</option>
+                  <option value="resolved">resolved</option>
+                </select>
+              </label>
+              <label>
+                Queue
+                <select id="landlord-ticket-filter-queue">
+                  <option value="">all</option>
+                  <option value="maintenance">maintenance</option>
+                  <option value="security">security</option>
+                </select>
+              </label>
+              <label>
+                Building
+                <select id="landlord-ticket-building-select"></select>
+              </label>
+              <button id="refresh-landlord-tickets" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ticket</th>
+                  <th>House</th>
+                  <th>Queue</th>
+                  <th>Status</th>
+                  <th>SLA</th>
+                  <th>Created</th>
+                  <th>Reply</th>
+                </tr>
+              </thead>
+              <tbody id="landlord-tickets-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="applications"
+          id="applications-section"
+        >
+          <div class="panel-head">
+            <h2>Tenant Applications</h2>
+            <div class="action-row">
+              <label>
+                Status
+                <select id="application-status-filter">
+                  <option value="pending">pending</option>
+                  <option value="approved">approved</option>
+                  <option value="rejected">rejected</option>
+                </select>
+              </label>
+              <button id="refresh-applications" type="button">Refresh</button>
+            </div>
+          </div>
+          <p id="applications-summary" class="status-text">Auto-refreshing.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Building</th>
+                  <th>House</th>
+                  <th>Tenant</th>
+                  <th>Contact</th>
+                  <th>ID / Passport</th>
+                  <th>Occupation</th>
+                  <th>Status</th>
+                  <th>Note</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="applications-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
+          id="overview-rent-status-section"
+        >
+          <div class="panel-head">
+            <h2>Rent Collection + Manual Payments</h2>
+            <button id="refresh-rent-status" type="button">Refresh</button>
+          </div>
+          <details id="rent-payment-details" class="landlord-inline-details">
+            <summary>Record offline rent payment</summary>
+            <form id="rent-payment-form" class="package-card">
+              <div class="inline-fields compact-fields">
+                <label>
+                  Building
+                  <select id="rent-payment-building-select"></select>
+                </label>
+                <label>
+                  House
+                  <input id="rent-payment-house" type="text" maxlength="24" placeholder="A-12" required />
+                </label>
+                <label>
+                  Month (optional)
+                  <input id="rent-payment-month" type="month" />
+                </label>
+              </div>
+              <div class="inline-fields compact-fields">
+                <label>
+                  Amount (KSh)
+                  <input id="rent-payment-amount" type="number" min="1" required />
+                </label>
+                <label>
+                  Provider
+                  <select id="rent-payment-provider">
+                    <option value="cash">cash</option>
+                    <option value="mpesa">mpesa</option>
+                    <option value="bank">bank</option>
+                    <option value="card">card</option>
+                  </select>
+                </label>
+                <label>
+                  Paid At (optional)
+                  <input id="rent-payment-paid-at" type="datetime-local" />
+                </label>
+              </div>
+              <label>
+                Reference
+                <input
+                  id="rent-payment-reference"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Optional for cash"
+                />
+              </label>
+              <button id="rent-payment-submit" type="submit">Record Rent Payment</button>
+            </form>
+            <p id="rent-payment-help" class="status-text">Manual rent payment.</p>
+          </details>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>House</th>
+                  <th>Status</th>
+                  <th>Monthly Rent</th>
+                  <th>Paid This Month</th>
+                  <th>Due This Month</th>
+                  <th>Arrears</th>
+                  <th>Due Date</th>
+                  <th>Latest Reference</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="rent-status-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
+          id="residents-section"
+        >
+          <div class="panel-head">
+            <h2>Tenants</h2>
+            <div class="action-row">
+              <label>
+                Building
+                <select id="residents-building-select"></select>
+              </label>
+              <label>
+                Filter
+                <select id="residents-status-filter">
+                  <option value="all">All rooms</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="current_due">Current due</option>
+                  <option value="awaiting_readings">Awaiting readings</option>
+                  <option value="clear">Clear</option>
+                  <option value="with_balance">With balance</option>
+                  <option value="vacant">Vacant rooms</option>
+                  <option value="occupied">Occupied rooms</option>
+                  <option value="pending_review">Pending review</option>
+                </select>
+              </label>
+              <label class="resident-search-field">
+                Search Resident / House
+                <input
+                  id="residents-search-input"
+                  type="search"
+                  maxlength="120"
+                  placeholder="Name, phone, house, status"
+                />
+              </label>
+              <button id="residents-open-match-btn" type="button">Open Account</button>
+              <button id="refresh-residents" type="button">Refresh</button>
+            </div>
+          </div>
+          <div id="residents-overview" class="resident-overview-cards"></div>
+          <p id="residents-search-summary" class="status-text">
+            Showing all rooms for the selected building filter.
+          </p>
+          <div id="utility-room-status-section" class="utility-summary-card">
+            <div class="panel-head">
+              <h3>Utility Room Status</h3>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>House</th>
+                    <th>Overdue Months</th>
+                    <th>Overdue</th>
+                    <th>Payable Months</th>
+                    <th>Payable</th>
+                    <th>Awaiting Readings</th>
+                    <th>Total Open</th>
+                    <th>Status</th>
+                    <th>Summary</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="utility-room-summary-body" data-utility-room-summary-body></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view"
+          data-landlord-view-panel="tenants"
+          id="utilities-registry-section"
+        >
+          <div class="panel-head">
+            <h2>Meters + Bulk Utility Setup</h2>
+            <div class="action-row">
+              <button id="open-utility-setup-btn" type="button">Open Setup</button>
+            </div>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
+          id="utilities-bills-section"
+        >
+          <div class="panel-head">
+            <h2>Post Monthly Utility Bill</h2>
+            <button id="refresh-bills" type="button">Refresh</button>
+          </div>
+
+          <form id="utility-bill-form" class="package-card">
+            <div class="inline-fields compact-fields">
+              <label>
+                Utility Type
+                <select id="utility-bill-type" required>
+                  <option value="water">water</option>
+                  <option value="electricity">electricity</option>
+                </select>
+              </label>
+              <label>
+                House
+                <input id="utility-bill-house" type="text" placeholder="A-12" required />
+              </label>
+              <label>
+                Billing Month
+                <input id="utility-bill-month" type="month" required />
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Previous Reading (optional)
+                <input id="utility-bill-previous-reading" type="number" min="0" step="0.001" />
+              </label>
+              <label>
+                Current Reading
+                <input id="utility-bill-current-reading" type="number" min="0" step="0.001" />
+              </label>
+              <label>
+                Rate/Unit (KSh)
+                <input id="utility-bill-rate" type="number" min="0" step="0.01" />
+              </label>
+              <label>
+                Fixed Charge (KSh)
+                <input id="utility-bill-fixed" type="number" min="0" step="0.01" value="0" />
+              </label>
+            </div>
+            <p id="utility-bill-input-guidance" class="status-text">
+              Metered or fixed charge.
+            </p>
+            <div class="inline-fields compact-fields">
+              <label>
+                Due Date
+                <input id="utility-bill-due-date" type="datetime-local" required />
+              </label>
+              <label>
+                Note (optional)
+                <input id="utility-bill-note" type="text" maxlength="280" placeholder="Monthly read posted by landlord." />
+              </label>
+            </div>
+            <button type="submit">Post Monthly Bill</button>
+          </form>
+
+          <details class="secondary-ledger-panel">
+            <summary>Monthly Bill Details</summary>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Utility</th>
+                    <th>House</th>
+                    <th>Month</th>
+                    <th>Meter</th>
+                    <th>Units</th>
+                    <th>Amount</th>
+                    <th>Balance</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="utility-bills-body"></tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
+          id="utilities-payments-section"
+        >
+          <div class="panel-head">
+            <h2>Utility Payments</h2>
+            <button id="refresh-payments" type="button">Refresh</button>
+          </div>
+
+          <form id="utility-payment-form" class="package-card">
+            <div class="inline-fields compact-fields">
+              <label>
+                Utility Type
+                <select id="utility-payment-type" required>
+                  <option value="water">water</option>
+                  <option value="electricity">electricity</option>
+                </select>
+              </label>
+              <label>
+                House
+                <input id="utility-payment-house" type="text" maxlength="24" placeholder="A-12" required />
+              </label>
+              <label>
+                Billing Month (optional)
+                <input id="utility-payment-month" type="month" />
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Amount (KSh)
+                <input id="utility-payment-amount" type="number" min="1" step="0.01" required />
+              </label>
+              <label>
+                Provider
+                <select id="utility-payment-provider">
+                  <option value="cash">cash</option>
+                  <option value="mpesa">mpesa</option>
+                  <option value="bank">bank</option>
+                  <option value="card">card</option>
+                </select>
+              </label>
+              <label>
+                Paid At (optional)
+                <input id="utility-payment-paid-at" type="datetime-local" />
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Reference (optional)
+                <input
+                  id="utility-payment-reference"
+                  type="text"
+                  maxlength="120"
+                  placeholder="CASH-WATER-1-2026-02"
+                />
+              </label>
+              <label>
+                Note (optional)
+                <input
+                  id="utility-payment-note"
+                  type="text"
+                  maxlength="280"
+                  placeholder="Manual payment recorded by landlord."
+                />
+              </label>
+            </div>
+            <button id="utility-payment-submit" type="submit">Record Utility Payment</button>
+          </form>
+          <p id="utility-payment-help" class="status-text">
+            Click an overdue status to prefill.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Utility</th>
+                  <th>House</th>
+                  <th>Paid For</th>
+                  <th>Paid Month</th>
+                  <th>Provider</th>
+                  <th>Reference</th>
+                  <th>Amount</th>
+                  <th>Paid On</th>
+                </tr>
+              </thead>
+              <tbody id="utility-payments-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="expenses"
+          id="utilities-expenditures-section"
+        >
+          <div class="panel-head">
+            <h2>Expenditure Log</h2>
+            <button id="refresh-expenditures" type="button">Refresh</button>
+          </div>
+
+          <form id="expenditure-form" class="package-card">
+            <div class="inline-fields compact-fields">
+              <label>
+                Room / House (optional)
+                <input id="expenditure-house-number" type="text" maxlength="24" placeholder="A-12" />
+              </label>
+              <label>
+                Category
+                <select id="expenditure-category" required>
+                  <option value="maintenance">Maintenance</option>
+                  <option value="utilities">Utilities</option>
+                  <option value="cleaning">Cleaning</option>
+                  <option value="security">Security</option>
+                  <option value="supplies">Supplies</option>
+                  <option value="staff">Staff</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                Amount (KSh)
+                <input id="expenditure-amount" type="number" min="1" max="2000000" step="0.01" required />
+              </label>
+            </div>
+            <label>
+              Title
+              <input id="expenditure-title" type="text" maxlength="120" placeholder="Plumber callout" required />
+            </label>
+            <label>
+              Note (optional)
+              <textarea id="expenditure-note" rows="3" maxlength="500" placeholder="Pipe leak repair for bathroom line"></textarea>
+            </label>
+            <label class="checkbox-row">
+              <input id="expenditure-chargeable" type="checkbox" />
+              Charge this room's resident
+            </label>
+            <button id="expenditure-submit-btn" type="submit">Record Expenditure</button>
+          </form>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Building</th>
+                  <th>House</th>
+                  <th>Category</th>
+                  <th>Title</th>
+                  <th>Amount</th>
+                  <th>Resident Charge</th>
+                  <th>Recorded By</th>
+                  <th>Note</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="expenditures-body"></tbody>
+            </table>
+          </div>
+
+          <div class="section-head move-out-report-head">
+            <h4>Move-Out Losses + Resident Debt</h4>
+            <button id="refresh-move-out-settlements" type="button" class="ghost-btn">
+              Refresh
+            </button>
+          </div>
+          <div
+            id="move-out-settlement-report-summary"
+            class="move-out-report-summary"
+          ></div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Building</th>
+                  <th>House</th>
+                  <th>Resident</th>
+                  <th>Outcome</th>
+                  <th>Total</th>
+                  <th>Rent</th>
+                  <th>Utilities</th>
+                  <th>Room Charges</th>
+                  <th>Recorded By</th>
+                  <th>Reason</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="move-out-settlements-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+      </div>
+
+      <div id="utility-setup-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="utility-setup-modal"
+        class="landlord-sheet-modal utility-setup-modal hidden"
+        aria-label="Meters and bulk utility setup"
+      >
+        <header class="landlord-drawer-head">
+          <h2>Meters + Bulk Utility Setup</h2>
+          <button id="close-utility-setup-btn" type="button" class="ghost-btn">
+            Close
+          </button>
+        </header>
+
+        <div class="utility-setup-modal-body">
+          <details class="secondary-ledger-panel utility-setup-panel" open>
+            <summary>Bulk Utility Setup</summary>
+            <div class="utility-setup-controls">
+              <label>
+                Building
+                <select id="registry-building-select"></select>
+              </label>
+              <label>
+                Readings Month
+                <input id="registry-reading-month" type="month" />
+              </label>
+              <button id="registry-load-btn" type="button">Load</button>
+              <button id="open-utility-sheet-btn" type="button">Bulk Utility Sheet</button>
+              <button id="registry-save-btn" type="button">Save All</button>
+            </div>
+            <div id="registry-charge-summary" class="landlord-generator registry-charge-summary">
+              Select a building to review default and custom room charge rules.
+            </div>
+            <div class="table-wrap utility-registry-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>House</th>
+                    <th>Resident</th>
+                    <th>Phone</th>
+                    <th>Members</th>
+                    <th>Water Meter</th>
+                    <th>Electricity Meter</th>
+                    <th>Water Reading</th>
+                    <th>Electricity Reading</th>
+                    <th>Water Fixed (KSh)</th>
+                    <th>Electric Fixed (KSh)</th>
+                    <th>Room Utility Amount (KSh)</th>
+                    <th>Charge Setup</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="registry-body"></tbody>
+              </table>
+            </div>
+          </details>
+
+          <details class="secondary-ledger-panel utility-setup-panel">
+            <summary>Manual Meter Entry</summary>
+            <form id="utility-meter-form" class="package-card utility-meter-modal-form">
+              <div class="inline-fields compact-fields">
+                <label>
+                  Utility Type
+                  <select id="utility-meter-type" required>
+                    <option value="water">water</option>
+                    <option value="electricity">electricity</option>
+                  </select>
+                </label>
+                <label>
+                  House
+                  <input id="utility-meter-house" type="text" placeholder="A-12" required />
+                </label>
+              </div>
+              <label>
+                Meter Number
+                <input id="utility-meter-number" type="text" maxlength="80" placeholder="WTR-10291" required />
+              </label>
+              <button type="submit">Save Meter</button>
+            </form>
+          </details>
+
+          <details class="secondary-ledger-panel utility-setup-panel">
+            <summary>Registered Meters</summary>
+            <div class="utility-setup-section-head">
+              <button id="refresh-meters" type="button" class="ghost-btn">Refresh</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Utility</th>
+                    <th>House</th>
+                    <th>Meter Number</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="meters-body"></tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </aside>
+
+      <div id="utility-sheet-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside id="utility-sheet-modal" class="landlord-sheet-modal hidden" aria-label="Bulk utility sheet">
+        <header class="landlord-drawer-head">
+          <h2>Bulk Utility Sheet</h2>
+          <button id="close-utility-sheet-btn" type="button" class="ghost-btn">Close</button>
+        </header>
+
+        <form id="utility-sheet-form" class="package-card landlord-sheet-form">
+          <p class="status-text">
+            Spreadsheet-style entry for all houses in the selected building. Fill meter numbers,
+            then add readings or fixed charges where needed and submit once.
+          </p>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Building
+              <select id="utility-sheet-building-select"></select>
+            </label>
+            <label>
+              Billing Month
+              <input id="utility-sheet-billing-month" type="month" required />
+            </label>
+            <label>
+              Due Date
+              <input id="utility-sheet-due-date" type="datetime-local" required />
+            </label>
+          </div>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Building Default Water Rate (KSh/unit)
+              <input id="utility-sheet-water-rate" type="number" min="0" step="0.01" />
+            </label>
+            <label>
+              Building Default Electricity Rate (KSh/unit)
+              <input id="utility-sheet-electric-rate" type="number" min="0" step="0.01" />
+            </label>
+            <label>
+              Building Default Water Fixed Charge (KSh)
+              <input
+                id="utility-sheet-water-fixed-default"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Leave blank to use room/default entry only"
+              />
+            </label>
+          </div>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Building Default Electricity Fixed Charge (KSh)
+              <input
+                id="utility-sheet-electric-fixed-default"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Leave blank to use room/default entry only"
+              />
+            </label>
+            <label>
+              Building Default Combined Charge (KSh)
+              <input
+                id="utility-sheet-building-combined-charge"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Leave blank to disable"
+              />
+            </label>
+          </div>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Monthly Combined Charge Override (KSh)
+              <input
+                id="utility-sheet-combined-charge"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Leave blank to use building default"
+              />
+            </label>
+          </div>
+
+          <label>
+            Note (optional, added to posted bills)
+            <input
+              id="utility-sheet-note"
+              type="text"
+              maxlength="280"
+              placeholder="Monthly bulk posting by landlord."
+            />
+          </label>
+
+          <div class="table-wrap utility-sheet-table-wrap">
+            <table class="utility-sheet-table">
+              <thead>
+                <tr>
+                  <th>House</th>
+                  <th>Water Meter</th>
+                  <th>Water Prev</th>
+                  <th>Water Current</th>
+                  <th>Water Fixed</th>
+                  <th>Electric Meter</th>
+                  <th>Electric Prev</th>
+                  <th>Electric Current</th>
+                  <th>Electric Fixed</th>
+                </tr>
+              </thead>
+              <tbody id="utility-sheet-body"></tbody>
+            </table>
+          </div>
+
+          <div class="action-row">
+            <button id="utility-sheet-submit-btn" type="submit">Save Meters + Post Bills</button>
+            <button id="utility-sheet-reload-btn" type="button" class="ghost-btn">Reload Houses</button>
+          </div>
+        </form>
+      </aside>
+
+      <div id="overview-utility-payment-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="overview-utility-payment-modal"
+        class="landlord-sheet-modal hidden"
+        aria-label="Quick utility payment"
+      >
+        <header class="landlord-drawer-head">
+          <h2>Quick Utility Payment</h2>
+          <button id="close-overview-utility-payment-btn" type="button" class="ghost-btn">
+            Close
+          </button>
+        </header>
+
+        <form id="overview-utility-payment-form" class="package-card landlord-sheet-form">
+          <p id="overview-utility-payment-summary" class="status-text">
+            Utility payment.
+          </p>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Building
+              <input id="overview-utility-payment-building" type="text" readonly />
+            </label>
+            <label>
+              House
+              <input id="overview-utility-payment-house" type="text" readonly />
+            </label>
+            <label>
+              Utility
+              <input id="overview-utility-payment-type-label" type="text" readonly />
+            </label>
+          </div>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Payment Month
+              <input id="overview-utility-payment-month" type="month" required />
+            </label>
+            <label>
+              Amount Paid (KSh)
+              <input id="overview-utility-payment-amount" type="number" min="1" step="1" required />
+            </label>
+            <label>
+              Paid At (optional)
+              <input id="overview-utility-payment-paid-at" type="datetime-local" />
+            </label>
+          </div>
+
+          <label>
+            Receipt / Note (optional)
+            <input
+              id="overview-utility-payment-reference"
+              type="text"
+              maxlength="120"
+              placeholder="Optional for cash"
+            />
+          </label>
+
+          <p id="overview-utility-payment-help" class="status-text">
+            The bill and overdue totals refresh after save.
+          </p>
+
+          <div class="action-row">
+            <button id="overview-utility-payment-submit-btn" type="submit">
+              Record Cash Payment
+            </button>
+          </div>
+        </form>
+      </aside>
+
+      <div id="move-out-settlement-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="move-out-settlement-modal"
+        class="landlord-sheet-modal move-out-settlement-modal hidden"
+        aria-label="Move-out settlement"
+      >
+        <header class="landlord-drawer-head">
+          <h2>Move-Out Settlement</h2>
+          <button id="close-move-out-settlement-btn" type="button" class="ghost-btn">
+            Close
+          </button>
+        </header>
+
+        <form id="move-out-settlement-form" class="package-card landlord-sheet-form">
+          <p id="move-out-settlement-summary" class="status-text">
+            Loading settlement...
+          </p>
+
+          <div id="move-out-settlement-totals" class="move-out-settlement-totals"></div>
+
+          <fieldset class="move-out-settlement-options">
+            <legend>Settlement Action</legend>
+            <label>
+              <input type="radio" name="moveOutSettlementAction" value="collect_before_move_out" />
+              <span>
+                <strong>Collect before move-out</strong>
+                Keep the resident active until the balance is paid.
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="moveOutSettlementAction" value="write_off" checked />
+              <span>
+                <strong>Write off as loss</strong>
+                Clear the room and record the unpaid balance as landlord loss.
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="moveOutSettlementAction" value="transfer_to_resident_debt" />
+              <span>
+                <strong>Transfer to resident debt</strong>
+                Clear the room, but keep the amount attached to this resident.
+              </span>
+            </label>
+          </fieldset>
+
+          <label>
+            Settlement Note
+            <input
+              id="move-out-settlement-note"
+              type="text"
+              maxlength="280"
+              placeholder="Reason, agreement, or follow-up note"
+            />
+          </label>
+
+          <p id="move-out-settlement-help" class="status-text">
+            Room balances will not carry to the next resident after settlement.
+          </p>
+
+          <div class="action-row">
+            <button id="move-out-settlement-submit-btn" type="submit">
+              Confirm Settlement
+            </button>
+          </div>
+        </form>
+      </aside>
+
+      <div id="building-drawer-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="create-building-drawer"
+        class="landlord-drawer hidden"
+        aria-label="Create building"
+      >
+        <header class="landlord-drawer-head">
+          <h2>New Building</h2>
+          <button id="close-create-building-drawer-btn" type="button" class="ghost-btn">
+            Close
+          </button>
+        </header>
+
+        <form id="create-building-form" class="package-card landlord-drawer-form">
+          <div class="inline-fields compact-fields">
+            <label>
+              Building Name
+              <input
+                id="create-building-name"
+                type="text"
+                maxlength="120"
+                placeholder="Sunrise Apartments"
+                required
+              />
+            </label>
+            <label>
+              County
+              <input
+                id="create-building-county"
+                type="text"
+                maxlength="80"
+                placeholder="Nairobi"
+                required
+              />
+            </label>
+          </div>
+
+          <label>
+            Address
+            <input
+              id="create-building-address"
+              type="text"
+              maxlength="160"
+              placeholder="Westlands, Nairobi"
+              required
+            />
+          </label>
+
+          <label>
+            Starting Room/House Numbers
+            <textarea
+              id="create-building-house-numbers"
+              rows="5"
+              placeholder="A1-A20, B1-B16"
+              required
+            ></textarea>
+          </label>
+
+          <label>
+            Front Building Photo (optional)
+            <input
+              id="create-building-photo"
+              type="file"
+              accept="image/*"
+            />
+          </label>
+
+          <p class="status-text">
+            Landlord-created buildings must start with at least one room/house number. You can add
+            more rooms after creation.
+          </p>
+
+          <button type="submit">Create Building</button>
+        </form>
+      </aside>
+      <aside id="building-drawer" class="landlord-drawer hidden" aria-label="Add rooms">
+        <header class="landlord-drawer-head">
+          <h2>Add Rooms</h2>
+          <button id="close-building-drawer-btn" type="button" class="ghost-btn">Close</button>
+        </header>
+
+        <form id="building-form" class="package-card landlord-drawer-form">
+          <div class="inline-fields compact-fields">
+            <label>
+              Building
+              <select id="room-target-building" required></select>
+            </label>
+            <div class="status-text">
+              Rooms/houses are generated in bulk and added to the selected building.
+            </div>
+          </div>
+
+          <section class="landlord-generator">
+            <h3>Auto-generate room numbers</h3>
+            <div class="inline-fields compact-fields">
+              <label>
+                Format
+                <select id="building-house-format">
+                  <option value="prefix_number">Prefix + number (A1, A2)</option>
+                  <option value="numbers">Numbers only (1, 2, 3)</option>
+                </select>
+              </label>
+              <label>
+                Prefix/block(s)
+                <input
+                  id="building-house-prefix"
+                  type="text"
+                  maxlength="80"
+                  placeholder="A:1-20, B:1-16"
+                />
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Separator
+                <select id="building-house-separator">
+                  <option value="">None</option>
+                  <option value="-">Dash (-)</option>
+                </select>
+              </label>
+              <label>
+                Order
+                <select id="building-house-order">
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-fields compact-fields">
+              <label>
+                Start number
+                <input id="building-house-start" type="number" min="1" value="1" required />
+              </label>
+              <label>
+                Count
+                <input id="building-house-count" type="number" min="1" max="1000" value="12" required />
+              </label>
+              <label>
+                Step
+                <input id="building-house-step" type="number" min="1" value="1" required />
+              </label>
+            </div>
+            <div class="action-row">
+              <button id="generate-house-numbers-btn" type="button">Generate</button>
+            </div>
+            <p id="building-house-preview" class="status-text">
+              Preview: A1, A2, A3...
+            </p>
+            <div class="building-room-preview">
+              <div class="building-room-preview-head">
+                <h4>Rooms to add</h4>
+                <span id="building-candidate-rooms-count">0</span>
+              </div>
+              <div id="building-candidate-rooms" class="building-room-chip-list"></div>
+            </div>
+          </section>
+
+          <label>
+            Room/House Numbers or Ranges
+            <textarea id="building-house-numbers" rows="5" placeholder="A1-A20, B1-B16" required></textarea>
+          </label>
+          <details class="building-room-list" open>
+            <summary>
+              <span>Show rooms</span>
+              <small id="building-existing-rooms-summary">0 rooms</small>
+            </summary>
+            <div id="building-existing-rooms" class="building-room-chip-list"></div>
+          </details>
+          <button type="submit">Add Rooms To Building</button>
+        </form>
+      </aside>
+
+      <div id="resident-drawer-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside id="resident-drawer" class="landlord-drawer hidden" aria-label="Resident status">
+        <header class="landlord-drawer-head">
+          <h2>Resident Status</h2>
+          <button id="close-resident-drawer-btn" type="button" class="ghost-btn">Close</button>
+        </header>
+        <div id="resident-drawer-body" class="package-card landlord-drawer-form"></div>
+      </aside>
+
+      <section id="landlord-error" class="error-box hidden"></section>
+    </main>
+
+    <script type="module" src="/landlord.js?v=20260517h"></script>
+  </body>
+</html>

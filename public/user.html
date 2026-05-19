@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resident Profile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0f7b76" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Resident Profile" />
+    <link rel="icon" href="/icons/housing-app.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/users.css?v=20260315g" />
+    <link rel="stylesheet" href="/user.css?v=20260315g" />
+  </head>
+  <body class="app-loading">
+    <div class="ambient" aria-hidden="true"></div>
+    <main class="shell">
+      <header class="topbar">
+        <a id="profile-brand" class="brand" href="/resident">Resident Profile</a>
+        <div class="user-menu">
+          <button
+            id="user-menu-toggle"
+            class="user-link"
+            type="button"
+            aria-label="Open session menu"
+            aria-expanded="false"
+            aria-controls="user-menu-panel"
+          >
+            <span aria-hidden="true">👤</span>
+          </button>
+          <div id="user-menu-panel" class="user-panel hidden" role="dialog" aria-label="Session menu">
+            <div class="user-panel-meta">
+              <span>API <strong id="api-status">Checking...</strong></span>
+              <span>Session <strong id="auth-state">Signed out</strong></span>
+            </div>
+            <section id="resident-session-panel" class="user-session hidden">
+              <div class="user-panel-head">
+                <p class="user-panel-title">Current session</p>
+                <button id="resident-logout-btn" type="button" class="ghost-btn">
+                  Sign Out
+                </button>
+              </div>
+              <p id="resident-session-summary" class="item-details"></p>
+            </section>
+            <a class="user-panel-link" href="/resident">Open workspace</a>
+          </div>
+        </div>
+      </header>
+
+      <header class="hero portal-header">
+        <div class="portal-copy">
+          <h1 id="profile-hero-title">Resident Profile</h1>
+          <p>
+            Review your tenancy details, fill in your identification information,
+            and confirm the agreement details tied to your active room.
+          </p>
+        </div>
+      </header>
+
+      <section id="feedback-box" class="feedback hidden"></section>
+
+      <section id="user-auth-panel" class="panel-card hidden">
+        <section class="section-head">
+          <h2>Resident sign-in required</h2>
+          <p>
+            This page uses your resident session. Sign in from the resident workspace
+            first, then return here to complete your tenant profile.
+          </p>
+        </section>
+        <div class="user-auth-actions">
+          <a class="ghost-btn" href="/resident">Open resident workspace</a>
+        </div>
+      </section>
+
+      <section id="user-layout" class="hidden">
+        <section class="panel-card profile-overview">
+          <section class="section-head">
+            <h2 id="profile-tenant-name">Tenant profile</h2>
+            <p id="profile-session-copy" class="item-details"></p>
+          </section>
+          <div class="profile-summary-grid">
+            <article class="summary-card">
+              <span class="summary-label">Building</span>
+              <strong id="profile-building-name">-</strong>
+              <p id="profile-building-address" class="item-details"></p>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">House</span>
+              <strong id="profile-house-number">-</strong>
+              <p class="item-details">Active tenancy assignment</p>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">Phone</span>
+              <strong id="profile-phone-number">-</strong>
+              <p class="item-details">Resident account contact</p>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">Email</span>
+              <strong id="profile-email-address">-</strong>
+              <p class="item-details">Optional account email</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="profile-grid">
+          <section class="panel-card">
+            <section class="section-head">
+              <h2>Resident details</h2>
+              <p>
+                Fill in the identity and contact information management needs for
+                your active tenancy.
+              </p>
+            </section>
+
+            <form id="resident-profile-form" class="report-form">
+              <div class="field-grid">
+                <label>
+                  ID Type
+                  <select id="profile-identity-type">
+                    <option value="">Select ID type</option>
+                    <option value="national_id">National ID</option>
+                    <option value="passport">Passport</option>
+                    <option value="alien_id">Alien ID</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label>
+                  ID Number
+                  <input
+                    id="profile-identity-number"
+                    type="text"
+                    maxlength="80"
+                    placeholder="Enter ID or passport number"
+                  />
+                </label>
+              </div>
+
+              <div class="field-grid">
+                <label>
+                  Occupation Status
+                  <select id="profile-occupation-status">
+                    <option value="">Select occupation status</option>
+                    <option value="employed">Employed</option>
+                    <option value="self_employed">Self-employed</option>
+                    <option value="student">Student</option>
+                    <option value="sponsored">Sponsored</option>
+                    <option value="unemployed">Unemployed</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label>
+                  Occupation
+                  <input
+                    id="profile-occupation-label"
+                    type="text"
+                    maxlength="120"
+                    placeholder="Teacher, electrician, student, trader"
+                  />
+                </label>
+              </div>
+
+              <div class="field-grid">
+                <label>
+                  Employer, business, or school
+                  <input
+                    id="profile-organization-name"
+                    type="text"
+                    maxlength="160"
+                    placeholder="Organization name"
+                  />
+                </label>
+                <label>
+                  Organization location
+                  <input
+                    id="profile-organization-location"
+                    type="text"
+                    maxlength="160"
+                    placeholder="Town, campus, or branch"
+                  />
+                </label>
+              </div>
+
+              <div class="field-grid">
+                <label>
+                  Student registration number
+                  <input
+                    id="profile-student-registration-number"
+                    type="text"
+                    maxlength="80"
+                    placeholder="Optional"
+                  />
+                </label>
+                <label>
+                  Sponsor name
+                  <input
+                    id="profile-sponsor-name"
+                    type="text"
+                    maxlength="120"
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
+
+              <div class="field-grid">
+                <label>
+                  Sponsor phone
+                  <input
+                    id="profile-sponsor-phone"
+                    type="tel"
+                    inputmode="tel"
+                    placeholder="07XXXXXXXX"
+                  />
+                </label>
+                <label>
+                  Emergency contact name
+                  <input
+                    id="profile-emergency-contact-name"
+                    type="text"
+                    maxlength="120"
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
+
+              <label>
+                Emergency contact phone
+                <input
+                  id="profile-emergency-contact-phone"
+                  type="tel"
+                  inputmode="tel"
+                  placeholder="07XXXXXXXX"
+                />
+              </label>
+
+              <p class="item-guidance">
+                Contract values such as rent, deposit, and lease dates are shown below
+                for review and are managed from the tenancy record.
+              </p>
+
+              <div class="action-row">
+                <button id="profile-save-btn" type="submit">Save details</button>
+                <a class="ghost-btn" href="/resident">Back to workspace</a>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel-card">
+            <section class="section-head">
+              <h2>Tenant agreement</h2>
+              <p id="agreement-status-copy">
+                Review the agreement details currently tied to your room.
+              </p>
+            </section>
+
+            <div class="agreement-grid">
+              <article class="key-value-card">
+                <span class="summary-label">Lease start</span>
+                <strong id="agreement-lease-start">Not set</strong>
+              </article>
+              <article class="key-value-card">
+                <span class="summary-label">Lease end</span>
+                <strong id="agreement-lease-end">Not set</strong>
+              </article>
+              <article class="key-value-card">
+                <span class="summary-label">Monthly rent</span>
+                <strong id="agreement-rent">Not set</strong>
+              </article>
+              <article class="key-value-card">
+                <span class="summary-label">Deposit</span>
+                <strong id="agreement-deposit">Not set</strong>
+              </article>
+              <article class="key-value-card">
+                <span class="summary-label">Payment due day</span>
+                <strong id="agreement-due-day">Not set</strong>
+              </article>
+              <article class="key-value-card">
+                <span class="summary-label">Last updated</span>
+                <strong id="agreement-updated-at">Not set</strong>
+              </article>
+            </div>
+
+            <section class="agreement-terms">
+              <span class="summary-label">Special terms</span>
+              <p id="agreement-special-terms" class="item-details agreement-empty">
+                No special terms have been added yet.
+              </p>
+            </section>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/user.js?v=20260516b"></script>
+  </body>
+</html>
