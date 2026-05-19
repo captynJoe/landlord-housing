@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Housing Admin</title>
+    <title>EstateDesk Recovery</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -11,23 +11,23 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260404c" />
+    <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
     <div class="backdrop"></div>
     <main class="shell">
       <header class="hero">
         <div>
-          <p class="tag">Housing Admin</p>
-          <h1>Platform Admin</h1>
+          <p class="tag">Private Recovery</p>
+          <h1>EstateDesk Recovery</h1>
           <p class="subtitle">
-            Building registry, landlord access, password recovery, and ownership oversight across
-            the full housing portfolio.
+            Private support access for resident recovery and owner/staff account repair.
           </p>
           <p id="auth-status" class="status-text">Checking admin session...</p>
         </div>
         <div class="action-row">
-          <a href="/landlord" class="home-link">Landlord Portal</a>
-          <a href="/resident" class="home-link">Resident Portal</a>
+          <a href="/landlord" class="home-link">Manager Workspace</a>
+          <a href="/resident" class="home-link">Resident Desk</a>
           <span id="admin-role" class="status-text">role: -</span>
           <button id="refresh-all-btn" type="button">Refresh All</button>
           <button id="admin-logout-btn" type="button">Sign Out</button>
@@ -44,7 +44,7 @@
             <strong id="metric-buildings">-</strong>
           </article>
           <article class="metric-card">
-            <p>Active Landlords</p>
+            <p>Owner Staff</p>
             <strong id="metric-active-landlords">-</strong>
           </article>
           <article class="metric-card">
@@ -52,7 +52,7 @@
             <strong id="metric-unassigned-buildings">-</strong>
           </article>
           <article class="metric-card">
-            <p>Pending Landlord Access</p>
+            <p>Access Requests</p>
             <strong id="metric-pending-landlord-access">-</strong>
           </article>
           <article class="metric-card">
@@ -72,16 +72,15 @@
       <section class="layout">
         <section class="panel wide-panel">
           <div class="panel-head">
-            <h2>Platform Role Boundaries</h2>
+            <h2>Recovery Boundaries</h2>
           </div>
           <p class="panel-note">
-            Admin owns platform governance first, and can now step into billing recovery when a
-            building needs central support.
+            Recovery access stays private and should only be used when owner/staff accounts need
+            support.
           </p>
           <p class="status-text">
-            Landlords still handle day-to-day operations in their own portal, but platform admin
-            can now post utility bills, record utility payments, and adjust room utility charging
-            from this page when recovery or oversight is needed.
+            Owner/staff accounts handle day-to-day operations in the manager workspace. Recovery
+            access can help with resident passwords, billing repair, and account support when needed.
           </p>
         </section>
 
@@ -326,12 +325,12 @@
 
         <section class="panel wide-panel">
           <div class="panel-head">
-            <h2>Landlord Access Approvals</h2>
+            <h2>Owner Access Approvals</h2>
             <button id="refresh-landlord-access" type="button">Refresh</button>
           </div>
           <p class="panel-note">
-            Tenants request landlord access by email. Approve after ownership verification.
-            Approved landlords can also be revoked here.
+            Public owner onboarding is disabled in this dedicated app. Keep this section private for
+            emergency account repair only.
           </p>
           <div class="table-wrap">
             <table>
@@ -384,7 +383,7 @@
             <button id="refresh-account-password-recovery" type="button">Refresh</button>
           </div>
           <p class="panel-note">
-            Landlord-side account recovery is reviewed here. Issue temporary passwords only after
+            Manager-side account recovery is reviewed here. Issue temporary passwords only after
             identity verification.
           </p>
           <div class="table-wrap">
@@ -407,18 +406,18 @@
 
         <section class="panel wide-panel">
           <div class="panel-head">
-            <h2>Landlord Portfolio</h2>
+            <h2>Owner Portfolio</h2>
             <button id="refresh-portfolios" type="button">Refresh</button>
           </div>
           <p class="panel-note">
-            Aggregated ownership view for scale. Use this to see how many buildings and tracked
-            units each landlord currently carries.
+            Aggregated building view for recovery checks. Day-to-day management stays in the
+            manager workspace.
           </p>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Landlord</th>
+                  <th>Owner</th>
                   <th>Role</th>
                   <th>Buildings</th>
                   <th>Units</th>
@@ -527,7 +526,7 @@
                   <th>County</th>
                   <th>Address</th>
                   <th>Units</th>
-                  <th>Landlord Owner</th>
+                  <th>Owner Account</th>
                   <th>CCTV</th>
                   <th>Updated</th>
                   <th>Action</th>

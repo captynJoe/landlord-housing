@@ -499,12 +499,12 @@ function renderLandlordAccessRequests(requests) {
             );
             setStatus(
               action === "approve"
-                ? `Landlord request ${request.id.slice(0, 8)} approved.`
-                : `Landlord request ${request.id.slice(0, 8)} rejected.`
+                ? `Owner request ${request.id.slice(0, 8)} approved.`
+                : `Owner request ${request.id.slice(0, 8)} rejected.`
             );
             await Promise.all([loadOverview(), loadLandlordAccessRequests(), loadBuildings()]);
           } catch (error) {
-            handleAdminError(error, "Failed to review landlord access request.");
+            handleAdminError(error, "Failed to review owner access request.");
           } finally {
             approveButton.disabled = false;
             rejectButton.disabled = false;
@@ -532,7 +532,7 @@ function renderLandlordAccessRequests(requests) {
           <td><strong>${escapeHtml(request.status)}</strong></td>
           <td>${escapeHtml(reason)}</td>
           <td>
-            <button data-action="revoke-landlord" type="button" class="btn-danger">Remove Landlord</button>
+            <button data-action="revoke-landlord" type="button" class="btn-danger">Remove Owner Role</button>
             <br /><small>${escapeHtml(reviewedAt)} • ${escapeHtml(reviewedBy)}</small>
           </td>
         `;
@@ -1287,7 +1287,7 @@ function renderBuildings(rows) {
             data-building-name="${escapeHtml(building.name)}"
             data-owner-phone="${escapeHtml(building.landlordOwnerPhone ?? "")}"
           >
-            ${building.landlordUserId ? "Reassign Landlord" : "Assign Landlord"}
+            ${building.landlordUserId ? "Reassign Owner" : "Assign Owner"}
           </button>
           <button
             type="button"

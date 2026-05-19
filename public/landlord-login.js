@@ -54,7 +54,7 @@ function normalizeLandlordSignInError(error, { caretakerMode = false } = {}) {
   if (!(error instanceof Error)) {
     return caretakerMode
       ? "House manager sign-in failed. Check your phone number, house number, and password."
-      : "Landlord sign-in failed. Check your email or phone number and password.";
+      : "Manager sign-in failed. Check your email or phone number and password.";
   }
 
   const message = error.message || "";
@@ -68,7 +68,7 @@ function normalizeLandlordSignInError(error, { caretakerMode = false } = {}) {
   if (error.status === 401) {
     return caretakerMode
       ? "House manager sign-in failed. Check your phone number, house number, and password."
-      : "Landlord sign-in failed. Check your email or phone number and password.";
+      : "Manager sign-in failed. Check your email or phone number and password.";
   }
 
   return message;
@@ -340,7 +340,7 @@ async function signIn(event) {
       caretakerMode: caretakerPhoneLogin
     });
     showPanelError(loginErrorEl, message, { reveal: true });
-    setStatus(caretakerPhoneLogin ? "House manager sign-in failed." : "Landlord sign-in failed.");
+    setStatus(caretakerPhoneLogin ? "House manager sign-in failed." : "Manager sign-in failed.");
   } finally {
     loginBtnEl.disabled = false;
   }

@@ -1,8 +1,8 @@
-const DEFAULT_RESIDENT_BRAND = "Resident Portal";
-const DEFAULT_RESIDENT_PROFILE = "Resident Profile";
-const DEFAULT_LANDLORD_BRAND = "Management Portal";
-const DEFAULT_PUBLIC_HOME = "Property Portal";
-const DEFAULT_PORTFOLIO_BRAND = "Property Portfolio";
+const DEFAULT_RESIDENT_BRAND = "EstateDesk Resident";
+const DEFAULT_RESIDENT_PROFILE = "EstateDesk Profile";
+const DEFAULT_LANDLORD_BRAND = "EstateDesk Manager";
+const DEFAULT_PUBLIC_HOME = "EstateDesk Resident";
+const DEFAULT_PORTFOLIO_BRAND = "EstateDesk";
 
 export function normalizeBuildingBrand(value) {
   const normalized = String(value ?? "").trim();
@@ -15,7 +15,7 @@ export function getResidentShellBrand(buildingName) {
 
 export function getResidentPortalTitle(buildingName) {
   const brand = normalizeBuildingBrand(buildingName);
-  return brand ? `${brand} Resident Portal` : DEFAULT_RESIDENT_BRAND;
+  return brand ? `${brand} Resident Desk` : DEFAULT_RESIDENT_BRAND;
 }
 
 export function getResidentProfileTitle(buildingName) {
@@ -29,12 +29,12 @@ export function getLandlordShellBrand(buildingName) {
 
 export function getLandlordPortalTitle(buildingName) {
   const brand = normalizeBuildingBrand(buildingName);
-  return brand ? `${brand} Management Portal` : DEFAULT_LANDLORD_BRAND;
+  return brand ? `${brand} Manager Workspace` : DEFAULT_LANDLORD_BRAND;
 }
 
 export function getPublicHomeTitle(buildingName) {
   const brand = normalizeBuildingBrand(buildingName);
-  return brand ? `${brand} Resident Portal` : DEFAULT_PUBLIC_HOME;
+  return brand ? `${brand} Resident Desk` : DEFAULT_PUBLIC_HOME;
 }
 
 export function applyDocumentBranding(title, appTitle = title) {

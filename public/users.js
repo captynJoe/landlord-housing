@@ -11,10 +11,10 @@ import {
   getResidentShellBrand
 } from "./portal-branding.js";
 
-const RESIDENT_TOKEN_KEY = "captyn_resident_session_token";
-const RESIDENT_SESSION_TOKEN_KEY = "captyn_resident_session_token_session";
-const RESIDENT_REMEMBER_DEVICE_KEY = "captyn_resident_remember_device";
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260516a";
+const RESIDENT_TOKEN_KEY = "estatedesk_resident_session_token";
+const RESIDENT_SESSION_TOKEN_KEY = "estatedesk_resident_session_token_session";
+const RESIDENT_REMEMBER_DEVICE_KEY = "estatedesk_resident_remember_device";
+const RESIDENT_SW_URL = "/resident-sw.js?v=20260519a";
 
 let deferredInstallPrompt = null;
 let residentSwRegistrationPromise = null;
@@ -1672,7 +1672,7 @@ function downloadActiveReceipt() {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `captyn-housing-${state.activeReceipt.kind}-receipt-${fileSafeReference || "payment"}.html`;
+  anchor.download = `estatedesk-${state.activeReceipt.kind}-receipt-${fileSafeReference || "payment"}.html`;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
@@ -3740,7 +3740,7 @@ async function loginResident(event) {
     } else {
       showFeedback(
         isResidentPendingReview()
-          ? "Signed in. Landlord verification is still pending. Payments and balances unlock after approval."
+          ? "Signed in. Management verification is still pending. Payments and balances unlock after approval."
           : "Signed in successfully.",
         "success"
       );

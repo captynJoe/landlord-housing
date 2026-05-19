@@ -1,9 +1,10 @@
-const CACHE_NAME = "resident-portal-v20260516a";
+const CACHE_NAME = "estatedesk-resident-v20260519a";
 const RESIDENT_SHELL_URL = "/resident";
 const APP_ASSETS = [
   RESIDENT_SHELL_URL,
   "/users.css?v=20260509a",
-  "/users.js?v=20260516a",
+  "/dedicated-theme.css?v=20260519a",
+  "/users.js?v=20260519a",
   "/password-visibility.js",
   "/manifest.webmanifest",
   "/icons/housing-app.svg",
@@ -117,12 +118,12 @@ self.addEventListener("push", (event) => {
     };
   }
 
-  const title = data.title || "Resident Portal";
+  const title = data.title || "EstateDesk Resident";
   const options = {
     body: data.body || "New resident update available.",
     icon: "/icons/housing-app.svg",
     badge: "/icons/housing-badge.svg",
-    tag: data.tag || "captyn-housing-resident",
+    tag: data.tag || "estatedesk-resident",
     data: {
       url: data.url || "/resident"
     }

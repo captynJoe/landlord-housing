@@ -1,0 +1,325 @@
+:root {
+  --estate-ink: #182421;
+  --estate-ink-soft: #40554f;
+  --estate-forest: #2f5d50;
+  --estate-forest-dark: #1f453b;
+  --estate-sage: #7f9b78;
+  --estate-copper: #b8792f;
+  --estate-clay: #b94f3f;
+  --estate-paper: #fbfcf8;
+  --estate-mist: #edf5f1;
+  --estate-blue: #d9e8ea;
+  --estate-line: rgba(24, 36, 33, 0.14);
+  --estate-shadow: 0 18px 36px rgba(24, 36, 33, 0.11);
+
+  --ink-950: var(--estate-ink);
+  --ink-900: var(--estate-ink);
+  --ink-800: var(--estate-ink);
+  --ink-700: var(--estate-ink-soft);
+  --ink-600: var(--estate-ink-soft);
+  --mist-100: var(--estate-mist);
+  --sand-100: #f5f3ea;
+  --teal-500: var(--estate-forest);
+  --teal-600: var(--estate-forest);
+  --teal-700: var(--estate-forest-dark);
+  --danger-500: var(--estate-clay);
+  --danger-bg: #fbe9e5;
+  --ok-600: #2d6b45;
+  --ok-bg: #e3f3e4;
+  --warn-700: #8a5c17;
+  --warn-bg: #fff1d4;
+  --line: var(--estate-line);
+  --radius-xl: 8px;
+  --radius-lg: 8px;
+  --radius-md: 8px;
+  --shadow: var(--estate-shadow);
+}
+
+html {
+  background: var(--estate-paper);
+}
+
+body {
+  color: var(--estate-ink);
+  font-family: Inter, "Aptos", "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0;
+  background:
+    linear-gradient(rgba(47, 93, 80, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 93, 80, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, #fbfcf8 0%, #edf5f1 48%, #f5f3ea 100%) !important;
+  background-size: 34px 34px, 34px 34px, auto !important;
+}
+
+.backdrop,
+.ambient {
+  opacity: 0.42;
+  background-image:
+    linear-gradient(rgba(47, 93, 80, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47, 93, 80, 0.07) 1px, transparent 1px) !important;
+  background-size: 34px 34px !important;
+  mask-image: none;
+}
+
+.shell {
+  max-width: 1240px;
+}
+
+.hero,
+.panel,
+.panel-card,
+.feedback,
+.package-card,
+.metric-card,
+.status-chip,
+.card,
+.cctv-card,
+.feature-card,
+.steps,
+.user-panel,
+.room-billing-hold-card,
+.upload-preview-item,
+.empty-state {
+  border-radius: 8px !important;
+  border-color: var(--estate-line) !important;
+  background: rgba(255, 255, 255, 0.91) !important;
+  box-shadow: 0 10px 28px rgba(24, 36, 33, 0.07);
+}
+
+.hero h1,
+.panel-head h2,
+.section-head h2,
+.section-head h3,
+.section-head h4,
+.package-card h2,
+.package-card h3,
+.feature-card h3,
+.steps h2,
+.hero-panel h2,
+.landlord-navbar-title {
+  font-family: Inter, "Aptos", "Segoe UI", Arial, sans-serif !important;
+  letter-spacing: 0;
+}
+
+.hero h1,
+.landlord-navbar-title {
+  font-size: 2rem !important;
+  line-height: 1.1;
+}
+
+.tag,
+.eyebrow,
+.brand,
+.feature-tag,
+.sidebar-label,
+.user-panel-title,
+.metric-card p,
+thead th,
+label {
+  color: var(--estate-forest) !important;
+  letter-spacing: 0.045em;
+}
+
+.subtitle,
+.status-text,
+.panel-note,
+.section-head p,
+.item-details,
+.ticket-details,
+.hero-panel ul,
+.feature-card p,
+tbody td {
+  color: var(--estate-ink-soft);
+}
+
+a,
+.home-link,
+.user-panel-link,
+.mode-pill,
+.module-tab {
+  color: var(--estate-forest-dark);
+}
+
+button,
+.btn,
+.btn-primary,
+#refresh-btn,
+#submit-btn,
+#resident-setup-btn,
+#resident-login-btn,
+#resident-password-change-btn,
+.module-tab.active,
+.mode-pill.active {
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, var(--estate-forest), var(--estate-forest-dark)) !important;
+  color: #fff !important;
+  box-shadow: none;
+}
+
+button:hover,
+.btn:hover,
+.module-tab:hover,
+.mode-pill:hover,
+.metric-card-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(31, 69, 59, 0.13);
+}
+
+button:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.ghost-btn,
+.btn-secondary,
+.home-link,
+.landlord-navbar-actions > a,
+.landlord-navbar-actions > span {
+  border-radius: 8px !important;
+  border: 1px solid var(--estate-line) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  color: var(--estate-forest-dark) !important;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--estate-clay), #933d31) !important;
+  color: #fff !important;
+}
+
+input,
+select,
+textarea {
+  border-color: rgba(47, 93, 80, 0.23) !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: var(--estate-ink);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(184, 121, 47, 0.55);
+  outline-offset: 2px;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead th {
+  background: rgba(217, 232, 234, 0.48);
+  border-bottom-color: rgba(47, 93, 80, 0.22);
+}
+
+tbody td {
+  border-bottom-color: rgba(47, 93, 80, 0.11);
+}
+
+.metric-card strong,
+.landlord-focus-stat strong,
+.resident-agreement-overview strong,
+.status-chip strong {
+  color: var(--estate-copper);
+}
+
+.error-box,
+.feedback.error,
+.resident-alert-danger {
+  border-color: rgba(185, 79, 63, 0.22) !important;
+  background: #fbe9e5 !important;
+  color: #8e352a !important;
+}
+
+.landlord-navbar-panel,
+.room-account-hero {
+  background:
+    linear-gradient(135deg, rgba(24, 36, 33, 0.96), rgba(47, 93, 80, 0.96)) !important;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.landlord-navbar-panel .tag,
+.landlord-navbar-panel .sidebar-label,
+.landlord-navbar-panel .status-text,
+.landlord-navbar-panel label,
+.room-account-hero .tag,
+.room-account-hero .sidebar-note,
+.room-account-hero .status-text {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.landlord-navbar-panel .landlord-navbar-title,
+.room-account-hero .landlord-navbar-title {
+  color: #fff;
+}
+
+.landlord-global-search-field input,
+.landlord-global-search-field select {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
+  color: #fff !important;
+}
+
+.landlord-global-search-field input::placeholder {
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.landlord-nav {
+  border-radius: 8px !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.landlord-nav-btn {
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #fff !important;
+}
+
+.landlord-nav-btn.active,
+.landlord-nav-btn.has-alert {
+  background: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: inset 0 -2px 0 var(--estate-copper);
+}
+
+.landlord-nav-badge,
+.nav-dot {
+  background: var(--estate-copper) !important;
+  color: var(--estate-ink) !important;
+}
+
+.hero-workspace-btn.active,
+.resident-nav-btn.active,
+button.resident-overview-card.is-active {
+  border-color: rgba(184, 121, 47, 0.42) !important;
+  background: rgba(184, 121, 47, 0.12) !important;
+  color: var(--estate-forest-dark) !important;
+}
+
+.mode-switch,
+.hero-workspace,
+.resident-session,
+.user-link {
+  border-radius: 8px !important;
+  border-color: var(--estate-line) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+}
+
+.room-billing-hold-card.is-active {
+  border-left-color: var(--estate-copper) !important;
+  background: #fff8ed !important;
+}
+
+@media (max-width: 680px) {
+  .hero h1,
+  .landlord-navbar-title {
+    font-size: 1.55rem !important;
+  }
+
+  .shell {
+    padding-inline: 12px;
+  }
+}
+

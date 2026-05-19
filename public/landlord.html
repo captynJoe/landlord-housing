@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Management Portal</title>
+    <title>EstateDesk Manager</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -12,6 +12,7 @@
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
     <link rel="stylesheet" href="/landlord.css?v=20260517h" />
+    <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
     <div class="backdrop"></div>
@@ -19,15 +20,15 @@
       <section class="panel landlord-navbar-panel">
         <div class="landlord-navbar-head">
           <div class="landlord-navbar-copy">
-            <p id="landlord-brand-tag" class="tag landlord-navbar-tag">Property Portfolio</p>
-            <h1 id="landlord-brand-title" class="landlord-navbar-title">Management Portal</h1>
+            <p id="landlord-brand-tag" class="tag landlord-navbar-tag">EstateDesk</p>
+            <h1 id="landlord-brand-title" class="landlord-navbar-title">Manager Workspace</h1>
             <p class="sidebar-label">Workspace</p>
             <p id="auth-status" class="status-text landlord-navbar-status">
               Checking landlord session...
             </p>
           </div>
           <div class="landlord-navbar-actions">
-            <a href="/resident" class="home-link">Resident Portal</a>
+            <a href="/resident" class="home-link">Resident Desk</a>
             <span id="landlord-role" class="status-text">role: -</span>
             <button id="refresh-all-btn" type="button">Refresh All</button>
             <button id="landlord-logout-btn" type="button">Sign Out</button>
@@ -1459,7 +1460,7 @@
           </label>
 
           <p class="status-text">
-            Landlord-created buildings must start with at least one room/house number. You can add
+            Manager-created buildings must start with at least one room/house number. You can add
             more rooms after creation.
           </p>
 

@@ -4518,7 +4518,7 @@ function downloadUtilityBulkAuditCsv(record) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = [
-    "captyn-housing",
+    "estatedesk",
     String(record.buildingId || "").trim().toLowerCase(),
     String(record.billingMonth || "").trim(),
     "bulk-utility-audit.csv"
@@ -5068,7 +5068,7 @@ async function ensureSession() {
     setStatus(`Signed in as ${formatRoleLabel(role)}.`);
     return true;
   } catch (error) {
-    handleLandlordError(error, "Landlord session is not available.");
+    handleLandlordError(error, "Manager session is not available.");
     return false;
   }
 }
@@ -7428,7 +7428,7 @@ function renderResidentDrawer(resident) {
             : `<p class="status-text">
                 ${
                   hasResident
-                    ? "Only landlord and root-level accounts can record rent payments here."
+                    ? "Only manager and root-level accounts can record rent payments here."
                     : "Assign an active resident before recording a rent payment."
                 }
               </p>`
@@ -7442,7 +7442,7 @@ function renderResidentDrawer(resident) {
         ? `<details class="resident-drawer-panel" ${rentProfileOpenAttr}>
       <summary>
         <span>Rent Overdue Settings</span>
-        <small>${canEditRentProfile ? "Landlord can edit" : "Read only"}</small>
+        <small>${canEditRentProfile ? "Manager can edit" : "Read only"}</small>
       </summary>
       <div class="resident-drawer-panel-body">
         <div class="resident-grid resident-grid-secondary">
@@ -7503,7 +7503,7 @@ function renderResidentDrawer(resident) {
       <summary>
         <span>Tenant Agreement</span>
         <small>${
-          canEditAgreement ? "Landlord can edit" : hasResident ? "Read only" : "No active resident"
+          canEditAgreement ? "Manager can edit" : hasResident ? "Read only" : "No active resident"
         }</small>
       </summary>
       <div class="resident-drawer-panel-body">
@@ -8935,8 +8935,8 @@ async function loadDataLegacy() {
     await loadResidents();
     setStatus(`Signed in as ${formatRoleLabel(state.role)}. Data refreshed.`);
   } catch (error) {
-    handleLandlordError(error, "Unable to load landlord data.");
-    setStatus("Landlord data load failed.");
+    handleLandlordError(error, "Unable to load manager data.");
+    setStatus("Manager data load failed.");
   }
 }
 
@@ -8953,8 +8953,8 @@ async function loadData() {
       return;
     }
 
-    handleLandlordError(error, "Unable to load landlord data.");
-    setStatus("Landlord data load failed.");
+    handleLandlordError(error, "Unable to load manager data.");
+    setStatus("Manager data load failed.");
   }
 }
 
