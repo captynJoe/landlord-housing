@@ -76,7 +76,9 @@ EstateDesk can deploy like CAPTYN Housing without sharing its runtime:
 - VPS1 public Nginx proxies `/api`, `/uploads`, and `/health` to the VPS2 API.
 
 Use `docs/production-deployment-runbook.md` for the full deploy sequence and
-copy the environment templates from `deploy/vps1/` and `deploy/vps2/`.
+copy the environment templates from `deploy/vps1/` and `deploy/vps2/`. The
+`deploy/vps1/check-env.sh`, `deploy/vps1/deploy.sh`, `deploy/vps2/check-env.sh`,
+and `deploy/vps2/deploy.sh` helpers validate env files before running compose.
 
 ## Auth + security controls
 

@@ -30,6 +30,8 @@ CAPTYN Housing backend on `4100`.
 - `deploy/vps1/estatedesk-web.conf`: static Nginx config for the frontend routes.
 - `deploy/vps1/estatedesk.vps1.conf.template`: public reverse proxy template.
 - `deploy/vps1/env.estatedesk.example`: VPS1 environment template.
+- `deploy/vps2/check-env.sh` and `deploy/vps2/deploy.sh`: VPS2 validation and deploy helpers.
+- `deploy/vps1/check-env.sh` and `deploy/vps1/deploy.sh`: VPS1 validation and deploy helpers.
 
 ## VPS2 Backend Deploy
 
@@ -58,13 +60,14 @@ ESTATEDESK_SEED_OWNER_PASSWORD=<temporary-owner-password>
 Start the service:
 
 ```bash
-docker compose --env-file .env.vps2 -f docker-compose.vps2.yml up -d --build
+deploy/vps2/check-env.sh
+deploy/vps2/deploy.sh
 ```
 
 Apply the seed once after the first successful migration:
 
 ```bash
-docker compose --env-file .env.vps2 -f docker-compose.vps2.yml run --rm landlord_housing_api npm run prisma:seed
+deploy/vps2/deploy.sh --seed
 ```
 
 Keep `ESTATEDESK_RUN_SEED_ON_START=false` for normal operation. Set it to
@@ -107,20 +110,38 @@ ESTATEDESK_SSL_CERTIFICATE_KEY=/etc/letsencrypt/live/captyn.shop/privkey.pem
 Then run the compose override from the existing frontend stack:
 
 ```bash
+deploy/vps1/check-env.sh
+deploy/vps1/deploy.sh
+```
+
+The VPS1 helper expects the frontend stack at
+`/home/captyn/captyn_ecommerce/byg-global/docker-compose.vps1.yml`. If that
+path changes, set `ESTATEDESK_VPS1_BASE_COMPOSE` before running it. The helper
+also loads `.env`, `.env.common`, `.env.backend`, and `.env.frontend` from the
+frontend stack when those files exist, because the base compose file needs those
+values during interpolation.
+
+Manual equivalent:
+
+```bash
 cd /home/captyn/captyn_ecommerce/byg-global
-docker compose --env-file /home/captyn/landlord-housing/.env.vps1 \
+docker compose --env-file .env \
+  --env-file .env.common \
+  --env-file .env.backend \
+  --env-file .env.frontend \
+  --env-file /home/captyn/landlord-housing/.env.vps1 \
   -f docker-compose.vps1.yml \
   -f /home/captyn/landlord-housing/deploy/vps1/docker-compose.estatedesk.yml \
   up -d estatedesk_web nginx
-```
 
-Validate the public Nginx config:
-
-```bash
-docker compose --env-file /home/captyn/landlord-housing/.env.vps1 \
+docker compose --env-file .env \
+  --env-file .env.common \
+  --env-file .env.backend \
+  --env-file .env.frontend \
+  --env-file /home/captyn/landlord-housing/.env.vps1 \
   -f docker-compose.vps1.yml \
   -f /home/captyn/landlord-housing/deploy/vps1/docker-compose.estatedesk.yml \
-  exec nginx nginx -t
+  exec -T nginx nginx -t
 ```
 
 Public health check:
