@@ -1,0 +1,125 @@
+x-default-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-external-dns: &external-dns
+  dns:
+    - ${DOCKER_DNS_1:-1.1.1.1}
+    - ${DOCKER_DNS_2:-8.8.8.8}
+  dns_opt:
+    - timeout:2
+    - attempts:3
+
+services:
+  landlord_housing_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: landlord_housing
+      POSTGRES_USER: landlord_housing
+      POSTGRES_PASSWORD: ${LANDLORD_HOUSING_DB_PASSWORD:?LANDLORD_HOUSING_DB_PASSWORD must be set}
+    volumes:
+      - landlord_housing_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    cpus: 0.35
+    mem_limit: 320m
+    mem_reservation: 160m
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U landlord_housing -d landlord_housing"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - landlord_housing_network
+
+  landlord_housing_api:
+    <<: *external-dns
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: landlord-housing-api:latest
+    environment:
+      NODE_ENV: production
+      PORT: 4100
+      BASE_URL: ${ESTATEDESK_BASE_URL:?ESTATEDESK_BASE_URL must be set}
+      CORS_ORIGIN: ${ESTATEDESK_CORS_ORIGIN:?ESTATEDESK_CORS_ORIGIN must be set}
+      DATABASE_URL: postgresql://landlord_housing:${LANDLORD_HOUSING_DB_PASSWORD:?LANDLORD_HOUSING_DB_PASSWORD must be set}@landlord_housing_db:5432/landlord_housing?schema=public
+      ALLOW_MEMORY_FALLBACK_ON_DB_ERROR: "false"
+      UPLOADS_DIR: /var/lib/landlord-housing/uploads
+      USER_SESSION_COOKIE_NAME: ${ESTATEDESK_USER_SESSION_COOKIE_NAME:-estatedesk_user_session}
+      ADMIN_SESSION_COOKIE_NAME: ${ESTATEDESK_ADMIN_SESSION_COOKIE_NAME:-estatedesk_admin_session}
+      HOUSING_COOKIE_SECURE: ${ESTATEDESK_COOKIE_SECURE:-true}
+      HOUSING_COOKIE_DOMAIN: ${ESTATEDESK_COOKIE_DOMAIN:-}
+      WIFI_PAYMENT_CALLBACK_TOKEN: ${ESTATEDESK_WIFI_PAYMENT_CALLBACK_TOKEN:?ESTATEDESK_WIFI_PAYMENT_CALLBACK_TOKEN must be set}
+      MPESA_RENT_CALLBACK_TOKEN: ${ESTATEDESK_MPESA_RENT_CALLBACK_TOKEN:?ESTATEDESK_MPESA_RENT_CALLBACK_TOKEN must be set}
+      MPESA_STK_ENABLED: ${ESTATEDESK_MPESA_STK_ENABLED:-false}
+      MPESA_ENVIRONMENT: ${ESTATEDESK_MPESA_ENVIRONMENT:-sandbox}
+      MPESA_BASE_URL: ${ESTATEDESK_MPESA_BASE_URL:-https://sandbox.safaricom.co.ke}
+      MPESA_CONSUMER_KEY: ${ESTATEDESK_MPESA_CONSUMER_KEY:-}
+      MPESA_CONSUMER_SECRET: ${ESTATEDESK_MPESA_CONSUMER_SECRET:-}
+      MPESA_BUSINESS_SHORT_CODE: ${ESTATEDESK_MPESA_BUSINESS_SHORT_CODE:-}
+      MPESA_PARTY_B: ${ESTATEDESK_MPESA_PARTY_B:-}
+      MPESA_PASSKEY: ${ESTATEDESK_MPESA_PASSKEY:-}
+      MPESA_CALLBACK_URL: ${ESTATEDESK_MPESA_CALLBACK_URL:-}
+      MPESA_STK_TRANSACTION_TYPE: ${ESTATEDESK_MPESA_STK_TRANSACTION_TYPE:-CustomerPayBillOnline}
+      MPESA_HTTP_TIMEOUT_MS: ${ESTATEDESK_MPESA_HTTP_TIMEOUT_MS:-12000}
+      MPESA_DEBUG_LOGS: ${ESTATEDESK_MPESA_DEBUG_LOGS:-false}
+      LANDLORD_USERNAME: ${ESTATEDESK_RECOVERY_LANDLORD_USERNAME:-ownerops}
+      LANDLORD_PASSWORD: ${ESTATEDESK_RECOVERY_LANDLORD_PASSWORD:?ESTATEDESK_RECOVERY_LANDLORD_PASSWORD must be set}
+      ADMIN_USERNAME: ${ESTATEDESK_RECOVERY_ADMIN_USERNAME:-opsadmin}
+      ADMIN_PASSWORD: ${ESTATEDESK_RECOVERY_ADMIN_PASSWORD:?ESTATEDESK_RECOVERY_ADMIN_PASSWORD must be set}
+      ROOT_ADMIN_USERNAME: ${ESTATEDESK_RECOVERY_ROOT_USERNAME:-rootops}
+      ROOT_ADMIN_PASSWORD: ${ESTATEDESK_RECOVERY_ROOT_PASSWORD:?ESTATEDESK_RECOVERY_ROOT_PASSWORD must be set}
+      AFRICASTALKING_API_KEY: ${ESTATEDESK_AFRICASTALKING_API_KEY:-}
+      AFRICASTALKING_USERNAME: ${ESTATEDESK_AFRICASTALKING_USERNAME:-}
+      AFRICASTALKING_SENDER_ID: ${ESTATEDESK_AFRICASTALKING_SENDER_ID:-}
+      NOTIFICATION_SWEEP_TOKEN: ${ESTATEDESK_NOTIFICATION_SWEEP_TOKEN:-}
+      PUSH_VAPID_PUBLIC_KEY: ${ESTATEDESK_PUSH_VAPID_PUBLIC_KEY:-}
+      PUSH_VAPID_PRIVATE_KEY: ${ESTATEDESK_PUSH_VAPID_PRIVATE_KEY:-}
+      PUSH_VAPID_SUBJECT: ${ESTATEDESK_PUSH_VAPID_SUBJECT:-mailto:support@example.com}
+      GOOGLE_CLIENT_ID: ${ESTATEDESK_GOOGLE_CLIENT_ID:-}
+      MIKROTIK_API_URL: ${ESTATEDESK_MIKROTIK_API_URL:-}
+      MIKROTIK_USERNAME: ${ESTATEDESK_MIKROTIK_USERNAME:-}
+      MIKROTIK_PASSWORD: ${ESTATEDESK_MIKROTIK_PASSWORD:-}
+      MIKROTIK_HOTSPOT_PROFILE: ${ESTATEDESK_MIKROTIK_HOTSPOT_PROFILE:-default}
+      SEED_OWNER_NAME: ${ESTATEDESK_SEED_OWNER_NAME:-Primary Owner}
+      SEED_OWNER_EMAIL: ${ESTATEDESK_SEED_OWNER_EMAIL:-owner@landlord.housing}
+      SEED_OWNER_PHONE: ${ESTATEDESK_SEED_OWNER_PHONE:-+254700000001}
+      SEED_OWNER_PASSWORD: ${ESTATEDESK_SEED_OWNER_PASSWORD:-ChangeMeNow123!}
+      SEED_BUILDING_ID: ${ESTATEDESK_SEED_BUILDING_ID:-LANDLORD-BLDG-00001}
+      SEED_BUILDING_NAME: ${ESTATEDESK_SEED_BUILDING_NAME:-Main Building}
+      SEED_BUILDING_ADDRESS: ${ESTATEDESK_SEED_BUILDING_ADDRESS:-Set building address}
+      SEED_BUILDING_COUNTY: ${ESTATEDESK_SEED_BUILDING_COUNTY:-Nairobi}
+      RUN_SEED_ON_START: ${ESTATEDESK_RUN_SEED_ON_START:-false}
+    volumes:
+      - landlord_housing_uploads:/var/lib/landlord-housing/uploads
+    depends_on:
+      landlord_housing_db:
+        condition: service_healthy
+    restart: unless-stopped
+    cpus: 0.60
+    mem_limit: 640m
+    mem_reservation: 320m
+    logging: *default-logging
+    expose:
+      - "4100"
+    ports:
+      - "${ESTATEDESK_PRIVATE_BIND_IP:?ESTATEDESK_PRIVATE_BIND_IP must be set}:4110:4100"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 3 --spider http://localhost:4100/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - landlord_housing_network
+
+volumes:
+  landlord_housing_postgres_data:
+  landlord_housing_uploads:
+
+networks:
+  landlord_housing_network:
+    driver: bridge

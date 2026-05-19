@@ -1,0 +1,104 @@
+limit_req_zone $binary_remote_addr zone=estatedesk_auth_per_ip:20m rate=3r/s;
+limit_req_zone $binary_remote_addr zone=estatedesk_api_per_ip:20m rate=8r/s;
+limit_req_zone $binary_remote_addr zone=estatedesk_site_per_ip:20m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=estatedesk_conn_per_ip:20m;
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name ${ESTATEDESK_SERVER_NAME};
+    return 301 https://${ESTATEDESK_SERVER_NAME}$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+
+    server_name ${ESTATEDESK_SERVER_NAME};
+    client_max_body_size 32M;
+
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    ssl_certificate ${ESTATEDESK_SSL_CERTIFICATE};
+    ssl_certificate_key ${ESTATEDESK_SSL_CERTIFICATE_KEY};
+    include /etc/nginx/snippets/ssl-common.conf;
+
+    if ($http_cf_ray = "") {
+        return 403;
+    }
+    real_ip_header CF-Connecting-IP;
+
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; block-all-mixed-content; upgrade-insecure-requests" always;
+
+    limit_req_status 429;
+    limit_conn_status 429;
+    limit_conn estatedesk_conn_per_ip 20;
+
+    location = /health {
+        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $estatedesk_api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 86400;
+    }
+
+    location ^~ /api/auth/ {
+        limit_req zone=estatedesk_auth_per_ip burst=12 nodelay;
+        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $estatedesk_api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 86400;
+    }
+
+    location ^~ /api/ {
+        limit_req zone=estatedesk_api_per_ip burst=24 nodelay;
+        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $estatedesk_api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 86400;
+    }
+
+    location ^~ /uploads/ {
+        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $estatedesk_api_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        limit_req zone=estatedesk_site_per_ip burst=40 nodelay;
+        set $estatedesk_web_upstream ${ESTATEDESK_WEB_UPSTREAM};
+        proxy_pass $estatedesk_web_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_read_timeout 86400;
+    }
+}
+

@@ -66,6 +66,18 @@ npm run db:down
 npm run db:logs
 ```
 
+## Split VPS Docker deploy
+
+EstateDesk can deploy like CAPTYN Housing without sharing its runtime:
+
+- VPS2 runs `landlord_housing_api` and `landlord_housing_db` from `docker-compose.vps2.yml`.
+- VPS2 binds the API privately on `<vps2-private-ip>:4110`, leaving CAPTYN Housing's `4100` path alone.
+- VPS1 runs `estatedesk_web` from `deploy/vps1/docker-compose.estatedesk.yml`.
+- VPS1 public Nginx proxies `/api`, `/uploads`, and `/health` to the VPS2 API.
+
+Use `docs/production-deployment-runbook.md` for the full deploy sequence and
+copy the environment templates from `deploy/vps1/` and `deploy/vps2/`.
+
 ## Auth + security controls
 
 - `WIFI_ADMIN_TOKEN`: admin login token
