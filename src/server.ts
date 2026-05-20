@@ -19,7 +19,6 @@ import {
   upsertCaptynPayoutProfile
 } from "./lib/captynWallet.js";
 import { DarajaClient, formatDarajaMsisdn } from "./lib/mpesa/darajaClient.js";
-import { getMpesaConfig } from "./lib/mpesa/config.js";
 import { createRepositoryContext } from "./repositories/createRepositoryContext.js";
 import {
   AdminAuthService,
@@ -64,6 +63,11 @@ import {
   PaymentAccessService,
   type PaymentAccessPersistedState
 } from "./services/paymentAccessService.js";
+import {
+  PaymentProfileService,
+  buildRentAccountReference,
+  type PaymentProfilePersistedState
+} from "./services/paymentProfileService.js";
 import {
   NotificationDeliveryService,
   SmsNotificationService
@@ -126,6 +130,7 @@ import {
   adminAssignBuildingLandlordSchema,
   landlordBuildingConfigurationUpdateSchema,
   landlordPaymentAccessUpdateSchema,
+  landlordPaymentProfileUpdateSchema,
   landlordExpenditureCreateSchema,
   landlordUtilityBulkSubmissionAuditCreateSchema,
   landlordUtilityBulkSubmissionAuditFinalizeSchema,
@@ -274,6 +279,7 @@ const UTILITY_BULK_SUBMISSION_AUDIT_STATE_KEY = "utility_bulk_submission_audit_v
 const USER_SUPPORT_STATE_KEY = "user_support_v1";
 const WIFI_ACCESS_STATE_KEY = "wifi_access_v1";
 const PAYMENT_ACCESS_STATE_KEY = "payment_access_v1";
+const PAYMENT_PROFILE_STATE_KEY = "payment_profiles_v1";
 const CARETAKER_ACCESS_STATE_KEY = "caretaker_access_v1";
 const BUILDING_EXPENDITURE_STATE_KEY = "building_expenditure_v1";
 const RUNTIME_QUEUES_STATE_KEY = "runtime_queues_v1";
@@ -307,6 +313,10 @@ interface PendingRentStkRequest {
   initiatedAt: string;
   tenantUserId?: string;
   tenantName?: string;
+  paymentProfileId?: string;
+  paymentProfileName?: string;
+  paymentAccountReference?: string;
+  paymentShortCode?: string;
 }
 
 interface PendingUtilityStkRequest {
@@ -317,6 +327,10 @@ interface PendingUtilityStkRequest {
   amountKsh: number;
   billingMonth: string;
   initiatedAt: string;
+  paymentProfileId?: string;
+  paymentProfileName?: string;
+  paymentAccountReference?: string;
+  paymentShortCode?: string;
 }
 
 type ResidentPasswordRecoveryStatus = "pending" | "approved" | "rejected";
@@ -2400,6 +2414,7 @@ async function bootstrap() {
     }
 
     paymentAccessService.removeBuilding(normalizedBuildingId);
+    paymentProfileService.removeBuilding(normalizedBuildingId);
 
     if (runtimeQueuesChanged) {
       syncCombinedUtilityChargeDefaultsToService();
@@ -2720,6 +2735,7 @@ async function bootstrap() {
   const rentLedgerService = new RentLedgerService();
   const utilityBillingService = new UtilityBillingService();
   const paymentAccessService = new PaymentAccessService();
+  const paymentProfileService = new PaymentProfileService();
   const residentNotificationPreferenceService =
     new ResidentNotificationPreferenceService();
   const appStateService = repositoryContext.prisma
@@ -3356,6 +3372,7 @@ async function bootstrap() {
         userSupportState,
         wifiState,
         paymentAccessState,
+        paymentProfileState,
         caretakerAccessState,
         buildingExpenditureState,
         runtimeQueuesState,
@@ -3371,6 +3388,9 @@ async function bootstrap() {
         loadAppStateJsonSafely<WifiAccessPersistedState>(WIFI_ACCESS_STATE_KEY),
         loadAppStateJsonSafely<PaymentAccessPersistedState>(
           PAYMENT_ACCESS_STATE_KEY
+        ),
+        loadAppStateJsonSafely<PaymentProfilePersistedState>(
+          PAYMENT_PROFILE_STATE_KEY
         ),
         loadAppStateJsonSafely<CaretakerAccessPersistedState>(
           CARETAKER_ACCESS_STATE_KEY
@@ -3393,6 +3413,7 @@ async function bootstrap() {
       userSupportService.importState(userSupportState);
       wifiService.importState(wifiState);
       paymentAccessService.importState(paymentAccessState);
+      paymentProfileService.importState(paymentProfileState);
       pushNotificationService.importState(pushSubscriptionState);
       residentNotificationPreferenceService.importState(
         residentNotificationPreferenceState
@@ -3551,6 +3572,9 @@ async function bootstrap() {
       paymentAccessService.setStateChangeHandler((state) =>
         queuePersist(PAYMENT_ACCESS_STATE_KEY, state)
       );
+      paymentProfileService.setStateChangeHandler((state) =>
+        queuePersist(PAYMENT_PROFILE_STATE_KEY, state)
+      );
       pushNotificationService.setStateChangeHandler((state) =>
         queuePersist(PUSH_SUBSCRIPTIONS_STATE_KEY, state)
       );
@@ -3593,6 +3617,10 @@ async function bootstrap() {
       void queuePersist(
         PAYMENT_ACCESS_STATE_KEY,
         paymentAccessService.exportState()
+      );
+      void queuePersist(
+        PAYMENT_PROFILE_STATE_KEY,
+        paymentProfileService.exportState()
       );
       void queuePersist(
         PUSH_SUBSCRIPTIONS_STATE_KEY,
@@ -5379,6 +5407,20 @@ async function bootstrap() {
       ...paymentAccessService.getForBuilding(building.id),
       buildingName: building.name
     }));
+    const paymentProfiles = paymentProfileService.listProfiles(
+      "/api/payments/mpesa/rent-callback"
+    );
+    const buildingPaymentProfiles = paymentProfileService
+      .listAssignments(
+        buildings.map((building) => building.id),
+        "/api/payments/mpesa/rent-callback"
+      )
+      .map((item) => ({
+        ...item,
+        buildingName:
+          buildings.find((building) => building.id === item.buildingId)?.name ??
+          item.buildingId
+      }));
     const paymentAccessByBuildingId = new Map(
       paymentAccess.map((item) => [item.buildingId, item])
     );
@@ -5540,6 +5582,8 @@ async function bootstrap() {
       pendingApplicationsCount: applications.length,
       rentStatus,
       paymentAccess,
+      paymentProfiles,
+      buildingPaymentProfiles,
       wifiPackages,
       wifiPackagesUnavailableReason,
       ownerStaff,
@@ -8379,6 +8423,52 @@ async function bootstrap() {
     }
   });
 
+  app.get("/api/landlord/payment-profiles", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      const queryBuildingId =
+        typeof req.query.buildingId === "string" ? req.query.buildingId.trim() : "";
+      const requestedBuildingId = queryBuildingId || undefined;
+
+      let visibleBuildings = await listVisibleBuildingsForLandlordContext(context);
+
+      if (requestedBuildingId) {
+        visibleBuildings = visibleBuildings.filter(
+          (item) => item.id === requestedBuildingId
+        );
+      }
+
+      const profiles = paymentProfileService.listProfiles(
+        "/api/payments/mpesa/rent-callback"
+      );
+      const assignments = paymentProfileService
+        .listAssignments(
+          visibleBuildings.map((building) => building.id),
+          "/api/payments/mpesa/rent-callback"
+        )
+        .map((item) => ({
+          ...item,
+          buildingName:
+            visibleBuildings.find((building) => building.id === item.buildingId)?.name ??
+            item.buildingId
+        }));
+
+      return res.json({
+        data: {
+          profiles,
+          assignments
+        },
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   app.get(
     "/api/landlord/buildings/:buildingId/configuration",
     async (req, res, next) => {
@@ -9176,6 +9266,80 @@ async function bootstrap() {
           data: {
             ...data,
             buildingName: building.name
+          },
+          role: context.role
+        });
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
+  app.patch(
+    "/api/landlord/payment-profiles/:buildingId",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "Caretaker accounts cannot change payment routing."
+          });
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(
+          context,
+          building.id
+        );
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const parsed = landlordPaymentProfileUpdateSchema.parse(req.body ?? {});
+        let assignment;
+        try {
+          assignment = paymentProfileService.updateAssignment(
+            building.id,
+            {
+              profileId: parsed.profileId,
+              accountReference: parsed.accountReference,
+              note: parsed.note
+            },
+            {
+              role: context.role,
+              userId: context.userId
+            },
+            "/api/payments/mpesa/rent-callback"
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Unable to update payment profile.";
+          if (message === "PAYMENT_PROFILE_NOT_FOUND") {
+            return res.status(404).json({ error: "Payment profile not found." });
+          }
+          throw error;
+        }
+
+        const resolved = paymentProfileService.resolveForBuilding(
+          building.id,
+          "/api/payments/mpesa/rent-callback"
+        );
+
+        return res.json({
+          data: {
+            ...assignment,
+            buildingName: building.name,
+            profile: resolved.publicProfile,
+            effectiveProfileId: resolved.publicProfile?.id ?? "default"
           },
           role: context.role
         });
@@ -10379,16 +10543,27 @@ async function bootstrap() {
       }
 
       const parsed = initializeRentMpesaPaymentSchema.parse(req.body);
-      const mpesaConfig = getMpesaConfig("/api/payments/mpesa/rent-callback");
+      const buildingPaymentProfile = paymentProfileService.resolveForBuilding(
+        session.buildingId,
+        "/api/payments/mpesa/rent-callback"
+      );
+      const mpesaConfig = buildingPaymentProfile.config;
+      if (!buildingPaymentProfile.publicProfile || !mpesaConfig) {
+        return res.status(503).json({
+          error:
+            "M-PESA payment profile is not available for this building. Ask management to update payment routing."
+        });
+      }
+
       if (!mpesaConfig.enabled) {
         return res.status(503).json({
-          error: "M-PESA STK is disabled. Set MPESA_STK_ENABLED=true to activate."
+          error: "M-PESA STK is disabled for this building payment profile."
         });
       }
 
       if (!mpesaConfig.isConfigured) {
         return res.status(503).json({
-          error: "M-PESA STK is not fully configured.",
+          error: "M-PESA STK is not fully configured for this building payment profile.",
           missing: mpesaConfig.missing
         });
       }
@@ -10415,8 +10590,11 @@ async function bootstrap() {
       const building = await store.getBuilding(session.buildingId);
       const buildingLabel =
         building?.name?.trim() || session.buildingId?.trim() || "Rent";
-      const accountReference =
-        session.houseNumber.replace(/[^A-Za-z0-9]/g, "").slice(0, 12) || "RENTPAY";
+      const accountReference = buildRentAccountReference({
+        houseNumber: session.houseNumber,
+        assignment: buildingPaymentProfile.assignment,
+        profile: buildingPaymentProfile.publicProfile
+      });
       const client = new DarajaClient(mpesaConfig);
       const result = await client.initiateStkPush({
         amount: Math.round(parsed.amountKsh),
@@ -10448,7 +10626,11 @@ async function bootstrap() {
         billingMonth,
         initiatedAt,
         tenantUserId: userSession?.userId,
-        tenantName: userSession?.fullName
+        tenantName: userSession?.fullName,
+        paymentProfileId: buildingPaymentProfile.publicProfile.id,
+        paymentProfileName: buildingPaymentProfile.publicProfile.name,
+        paymentAccountReference: accountReference,
+        paymentShortCode: buildingPaymentProfile.publicProfile.shortCode
       });
 
       return res.status(202).json({
@@ -10464,7 +10646,14 @@ async function bootstrap() {
           customerMessage: result.CustomerMessage,
           billingMonth,
           amountKsh: Math.round(parsed.amountKsh),
-          phoneMask: maskPhone(normalizeKenyaPhone(paymentPhone))
+          phoneMask: maskPhone(normalizeKenyaPhone(paymentPhone)),
+          paymentProfile: {
+            id: buildingPaymentProfile.publicProfile.id,
+            name: buildingPaymentProfile.publicProfile.name,
+            shortCode: buildingPaymentProfile.publicProfile.shortCode,
+            partyB: buildingPaymentProfile.publicProfile.partyB,
+            accountReference
+          }
         }
       });
     } catch (error) {
@@ -10516,10 +10705,19 @@ async function bootstrap() {
         });
       }
 
-      const mpesaConfig = getMpesaConfig("/api/payments/mpesa/rent-callback");
+      const paymentProfile = paymentProfileService.resolveProfile(
+        pending.paymentProfileId,
+        "/api/payments/mpesa/rent-callback"
+      );
+      const mpesaConfig = paymentProfile.config;
+      if (!paymentProfile.publicProfile || !mpesaConfig) {
+        return res.status(503).json({
+          error: "M-PESA payment profile is not available for this request."
+        });
+      }
       if (!mpesaConfig.enabled || !mpesaConfig.isConfigured) {
         return res.status(503).json({
-          error: "M-PESA STK is not configured.",
+          error: "M-PESA STK is not configured for this payment profile.",
           missing: mpesaConfig.missing
         });
       }
@@ -10638,6 +10836,10 @@ async function bootstrap() {
         `${new Date(paidAt).getUTCFullYear()}-${String(
           new Date(paidAt).getUTCMonth() + 1
         ).padStart(2, "0")}`;
+      const buildingPaymentProfile = paymentProfileService.resolveForBuilding(
+        session.buildingId,
+        "/api/payments/mpesa/rent-callback"
+      );
 
       const outcome = rentLedgerService.recordMpesaPayment({
         buildingId: session.buildingId,
@@ -10648,7 +10850,10 @@ async function bootstrap() {
         billingMonth,
         paidAt,
         tenantUserId,
-        tenantName
+        tenantName,
+        paymentProfileId: buildingPaymentProfile.publicProfile?.id,
+        paymentProfileName: buildingPaymentProfile.publicProfile?.name,
+        paymentAccountReference: buildingPaymentProfile.assignment.accountReference
       });
 
       userSupportService.enqueueSystemNotifications(session.buildingId, session.houseNumber, [
@@ -10898,16 +11103,27 @@ async function bootstrap() {
           }))
         });
 
-        const mpesaConfig = getMpesaConfig("/api/payments/mpesa/rent-callback");
+        const buildingPaymentProfile = paymentProfileService.resolveForBuilding(
+          session.buildingId,
+          "/api/payments/mpesa/rent-callback"
+        );
+        const mpesaConfig = buildingPaymentProfile.config;
+        if (!buildingPaymentProfile.publicProfile || !mpesaConfig) {
+          return res.status(503).json({
+            error:
+              "M-PESA payment profile is not available for this building. Ask management to update payment routing."
+          });
+        }
+
         if (!mpesaConfig.enabled) {
           return res.status(503).json({
-            error: "M-PESA STK is disabled. Set MPESA_STK_ENABLED=true to activate."
+            error: "M-PESA STK is disabled for this building payment profile."
           });
         }
 
         if (!mpesaConfig.isConfigured) {
           return res.status(503).json({
-            error: "M-PESA STK is not fully configured.",
+            error: "M-PESA STK is not fully configured for this building payment profile.",
             missing: mpesaConfig.missing
           });
         }
@@ -10926,9 +11142,14 @@ async function bootstrap() {
         const initiatedAt = new Date().toISOString();
         const billingMonth = parsed.billingMonth ?? effectiveBill.billingMonth;
         const utilityRef = utilityType === "water" ? "WATER" : "POWER";
-        const houseRef =
-          session.houseNumber.replace(/[^A-Za-z0-9]/g, "").slice(0, 7) || "HOUSE";
-        const accountReference = `${utilityRef}${houseRef}`.slice(0, 12);
+        const baseAccountReference = buildRentAccountReference({
+          houseNumber: session.houseNumber,
+          assignment: buildingPaymentProfile.assignment,
+          profile: buildingPaymentProfile.publicProfile
+        });
+        const accountReference = buildingPaymentProfile.assignment.accountReference
+          ? baseAccountReference
+          : `${utilityRef}${baseAccountReference}`.slice(0, 12);
         const building = await store.getBuilding(session.buildingId);
         const buildingLabel =
           building?.name?.trim() || session.buildingId?.trim() || "Utility";
@@ -10959,7 +11180,11 @@ async function bootstrap() {
           phoneNumber: normalizeKenyaPhone(paymentPhone),
           amountKsh,
           billingMonth,
-          initiatedAt
+          initiatedAt,
+          paymentProfileId: buildingPaymentProfile.publicProfile.id,
+          paymentProfileName: buildingPaymentProfile.publicProfile.name,
+          paymentAccountReference: accountReference,
+          paymentShortCode: buildingPaymentProfile.publicProfile.shortCode
         });
 
         return res.status(202).json({
@@ -10977,7 +11202,14 @@ async function bootstrap() {
             billingMonth,
             amountKsh,
             targetBalanceKsh: Math.round(targetBill.balanceKsh),
-            phoneMask: maskPhone(normalizeKenyaPhone(paymentPhone))
+            phoneMask: maskPhone(normalizeKenyaPhone(paymentPhone)),
+            paymentProfile: {
+              id: buildingPaymentProfile.publicProfile.id,
+              name: buildingPaymentProfile.publicProfile.name,
+              shortCode: buildingPaymentProfile.publicProfile.shortCode,
+              partyB: buildingPaymentProfile.publicProfile.partyB,
+              accountReference
+            }
           }
         });
       } catch (error) {
@@ -11038,10 +11270,20 @@ async function bootstrap() {
           });
         }
 
-        const mpesaConfig = getMpesaConfig("/api/payments/mpesa/rent-callback");
+        const paymentProfile = paymentProfileService.resolveProfile(
+          pending.paymentProfileId,
+          "/api/payments/mpesa/rent-callback"
+        );
+        const mpesaConfig = paymentProfile.config;
+        if (!paymentProfile.publicProfile || !mpesaConfig) {
+          return res.status(503).json({
+            error: "M-PESA payment profile is not available for this request."
+          });
+        }
+
         if (!mpesaConfig.enabled || !mpesaConfig.isConfigured) {
           return res.status(503).json({
-            error: "M-PESA STK is not configured.",
+            error: "M-PESA STK is not configured for this payment profile.",
             missing: mpesaConfig.missing
           });
         }
@@ -11323,6 +11565,9 @@ async function bootstrap() {
         billingMonth,
         tenantUserId,
         tenantName,
+        paymentProfileId: pendingRentFromInit?.paymentProfileId,
+        paymentProfileName: pendingRentFromInit?.paymentProfileName,
+        paymentAccountReference: pendingRentFromInit?.paymentAccountReference,
         rawPayload: req.body
       });
 
@@ -12144,6 +12389,10 @@ async function bootstrap() {
         }
       }
 
+      const buildingPaymentProfile = paymentProfileService.resolveForBuilding(
+        buildingId,
+        "/api/payments/mpesa/rent-callback"
+      );
       const outcome = rentLedgerService.recordPayment({
         buildingId,
         houseNumber,
@@ -12153,7 +12402,10 @@ async function bootstrap() {
         phoneNumber: parsed.phoneNumber,
         billingMonth: parsed.billingMonth,
         paidAt: parsed.paidAt,
-        source: "manual"
+        source: "manual",
+        paymentProfileId: buildingPaymentProfile.publicProfile?.id,
+        paymentProfileName: buildingPaymentProfile.publicProfile?.name,
+        paymentAccountReference: buildingPaymentProfile.assignment.accountReference
       });
 
       const providerLabel =

@@ -18,6 +18,9 @@ interface RecordRentPaymentInput {
   billingMonth?: string;
   tenantUserId?: string;
   tenantName?: string;
+  paymentProfileId?: string;
+  paymentProfileName?: string;
+  paymentAccountReference?: string;
   source?: RentPaymentSource;
 }
 
@@ -35,6 +38,9 @@ export interface RentPaymentEvent {
   providerReference: string;
   amountKsh: number;
   phoneNumber?: string;
+  paymentProfileId?: string;
+  paymentProfileName?: string;
+  paymentAccountReference?: string;
   paidAt: string;
   createdAt: string;
   source?: RentPaymentSource;
@@ -708,6 +714,9 @@ export class RentLedgerService {
       billingMonth: input.billingMonth,
       tenantUserId: input.tenantUserId,
       tenantName: input.tenantName,
+      paymentProfileId: input.paymentProfileId,
+      paymentProfileName: input.paymentProfileName,
+      paymentAccountReference: input.paymentAccountReference,
       source: "mpesa"
     });
   }
@@ -742,6 +751,9 @@ export class RentLedgerService {
       providerReference: normalizedReference,
       amountKsh: Math.round(input.amountKsh),
       phoneNumber: input.phoneNumber,
+      paymentProfileId: input.paymentProfileId,
+      paymentProfileName: input.paymentProfileName,
+      paymentAccountReference: input.paymentAccountReference,
       paidAt,
       createdAt: nowIso(),
       source: input.source

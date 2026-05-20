@@ -32,6 +32,7 @@ esac
 docker compose --env-file "$env_file" -f "$app_root/docker-compose.vps2.yml" up -d --build
 
 if [ "$run_seed" = "true" ]; then
+  docker compose --env-file "$env_file" -f "$app_root/docker-compose.vps2.yml" run --rm landlord_housing_api npm run prisma:deploy
   docker compose --env-file "$env_file" -f "$app_root/docker-compose.vps2.yml" run --rm landlord_housing_api npm run prisma:seed
 fi
 

@@ -234,6 +234,36 @@
         <section
           class="panel wide-panel landlord-view hidden"
           data-landlord-view-panel="tenants"
+          id="overview-payment-routing-section"
+        >
+          <div class="panel-head">
+            <div>
+              <h2>Building Payment Routing</h2>
+              <p id="payment-profiles-summary" class="status-text"></p>
+            </div>
+            <button id="refresh-payment-profiles" type="button">Refresh</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>M-PESA Profile</th>
+                  <th>Shortcode</th>
+                  <th>Party B</th>
+                  <th>Account Ref</th>
+                  <th>Updated</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="payment-profiles-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
           id="overview-payment-access-section"
         >
           <div class="panel-head">

@@ -64,7 +64,8 @@ deploy/vps2/check-env.sh
 deploy/vps2/deploy.sh
 ```
 
-Apply the seed once after the first successful migration:
+Apply the seed once after the first deploy. The helper runs Prisma migrations
+before the seed so the database tables exist:
 
 ```bash
 deploy/vps2/deploy.sh --seed
@@ -165,11 +166,23 @@ Before enabling live M-PESA:
 ESTATEDESK_MPESA_STK_ENABLED=false
 ESTATEDESK_MPESA_ENVIRONMENT=sandbox
 ESTATEDESK_MPESA_CALLBACK_URL=https://<customer-domain>/api/payments/mpesa/rent-callback
+ESTATEDESK_MPESA_PAYMENT_PROFILES_JSON=[]
 ```
 
 Switch `ESTATEDESK_MPESA_STK_ENABLED=true` only after sandbox STK and callback
 verification pass. Use customer-specific callback tokens and M-PESA credentials;
 do not reuse CAPTYN Housing production payment secrets.
+
+For building-level payment routing, keep the default `ESTATEDESK_MPESA_*`
+credentials as the fallback account and add extra building-selectable profiles
+with `ESTATEDESK_MPESA_PAYMENT_PROFILES_JSON`. Example shape:
+
+```bash
+ESTATEDESK_MPESA_PAYMENT_PROFILES_JSON=[{"id":"building-a","name":"Building A Rent Account","shortCode":"123456","partyB":"123456","consumerKey":"<safaricom-consumer-key>","consumerSecret":"<safaricom-consumer-secret>","passkey":"<safaricom-passkey>","accountReferencePrefix":"BLDGA"}]
+```
+
+The manager UI shows profile names, shortcodes, and assignment status. It does
+not expose consumer secrets or passkeys.
 
 ## Smoke Test
 

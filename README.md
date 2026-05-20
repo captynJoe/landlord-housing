@@ -92,6 +92,7 @@ and `deploy/vps2/deploy.sh` helpers validate env files before running compose.
 - `MPESA_CONSUMER_KEY` + `MPESA_CONSUMER_SECRET`: Safaricom app credentials
 - `MPESA_BUSINESS_SHORT_CODE` + `MPESA_PASSKEY`: STK business credentials
 - `MPESA_CALLBACK_URL` (optional): callback URL override for rent STK webhook
+- `MPESA_PAYMENT_PROFILES_JSON`: optional JSON array of building-selectable M-PESA profiles for direct building-level settlement routing
 - `BASE_URL`: used to derive callback URL when `MPESA_CALLBACK_URL` is not set
 - `UPLOADS_DIR`: persistent local media directory, defaults to `uploads`
 - `USER_SESSION_COOKIE_NAME` + `ADMIN_SESSION_COOKIE_NAME`: app-specific cookie names
@@ -119,6 +120,13 @@ Owner/staff auth flow:
 2. Server sets secure `landlord_housing_user_session` cookie by default.
 3. Access protected `/landlord`.
 4. Owner/staff accounts can manage all buildings in this dedicated app.
+
+Building-level payment routing:
+
+- Define extra M-PESA profiles in `MPESA_PAYMENT_PROFILES_JSON` on the backend.
+- Assign each building to a profile from the manager workspace.
+- Resident rent and utility STK prompts use the building's assigned profile.
+- If a building has no assignment, it uses the default `MPESA_*` profile.
 
 ## Implemented endpoints
 

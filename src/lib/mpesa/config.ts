@@ -40,21 +40,24 @@ function resolveTransactionType(rawType: string | undefined): string {
   return "CustomerPayBillOnline";
 }
 
-export function getMpesaConfig(defaultCallbackPath: string): MpesaConfig {
-  const enabled = toBool(process.env.MPESA_STK_ENABLED);
+export function getMpesaConfig(
+  defaultCallbackPath: string,
+  env: NodeJS.ProcessEnv = process.env
+): MpesaConfig {
+  const enabled = toBool(env.MPESA_STK_ENABLED);
   const environment =
-    process.env.MPESA_ENVIRONMENT?.toLowerCase() === "production"
+    env.MPESA_ENVIRONMENT?.toLowerCase() === "production"
       ? "production"
       : "sandbox";
 
   const baseUrl =
-    process.env.MPESA_BASE_URL?.trim() ||
+    env.MPESA_BASE_URL?.trim() ||
     (environment === "production"
       ? "https://api.safaricom.co.ke"
       : "https://sandbox.safaricom.co.ke");
 
-  const baseCallbackUrl = process.env.MPESA_CALLBACK_URL?.trim() || "";
-  const appBaseUrl = process.env.BASE_URL?.trim() || "";
+  const baseCallbackUrl = env.MPESA_CALLBACK_URL?.trim() || "";
+  const appBaseUrl = env.BASE_URL?.trim() || "";
   const callbackUrl =
     baseCallbackUrl ||
     (appBaseUrl
@@ -64,32 +67,32 @@ export function getMpesaConfig(defaultCallbackPath: string): MpesaConfig {
       : "");
 
   const shortCode =
-    process.env.MPESA_BUSINESS_SHORT_CODE?.trim() ||
-    process.env.MPESA_BUSINESS_SHORTCODE?.trim() ||
-    process.env.MPESA_SHORT_CODE?.trim() ||
-    process.env.MPESA_SHORTCODE?.trim() ||
+    env.MPESA_BUSINESS_SHORT_CODE?.trim() ||
+    env.MPESA_BUSINESS_SHORTCODE?.trim() ||
+    env.MPESA_SHORT_CODE?.trim() ||
+    env.MPESA_SHORTCODE?.trim() ||
     "";
   const partyB =
-    process.env.MPESA_PARTY_B?.trim() ||
-    process.env.MPESA_PARTYB?.trim() ||
-    process.env.MPESA_STORE_NUMBER?.trim() ||
+    env.MPESA_PARTY_B?.trim() ||
+    env.MPESA_PARTYB?.trim() ||
+    env.MPESA_STORE_NUMBER?.trim() ||
     shortCode;
 
   const config: MpesaConfig = {
     enabled,
     environment,
     baseUrl: stripTrailingSlash(baseUrl),
-    consumerKey: process.env.MPESA_CONSUMER_KEY?.trim() || "",
-    consumerSecret: process.env.MPESA_CONSUMER_SECRET?.trim() || "",
+    consumerKey: env.MPESA_CONSUMER_KEY?.trim() || "",
+    consumerSecret: env.MPESA_CONSUMER_SECRET?.trim() || "",
     shortCode,
     partyB,
     passkey:
-      process.env.MPESA_PASSKEY?.trim() ||
-      process.env.MPESA_STK_PASSKEY?.trim() ||
+      env.MPESA_PASSKEY?.trim() ||
+      env.MPESA_STK_PASSKEY?.trim() ||
       "",
     callbackUrl,
     transactionType: resolveTransactionType(
-      process.env.MPESA_STK_TRANSACTION_TYPE || process.env.MPESA_TRANSACTION_TYPE
+      env.MPESA_STK_TRANSACTION_TYPE || env.MPESA_TRANSACTION_TYPE
     ),
     missing: [],
     isConfigured: false

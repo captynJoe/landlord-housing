@@ -728,6 +728,12 @@ export const landlordPaymentAccessUpdateSchema = z
     }
   );
 
+export const landlordPaymentProfileUpdateSchema = z.object({
+  profileId: z.string().trim().min(1).max(80).default("default"),
+  accountReference: z.string().trim().max(40).optional(),
+  note: z.string().trim().max(280).optional()
+});
+
 export const landlordBuildingConfigurationUpdateSchema = z
   .object({
     rentEnabled: z.boolean().optional(),
@@ -940,6 +946,9 @@ export const rentMpesaCallbackSchema = z.object({
   billingMonth: billingMonthSchema.optional(),
   tenantUserId: z.string().trim().max(120).optional(),
   tenantName: z.string().trim().max(160).optional(),
+  paymentProfileId: z.string().trim().max(80).optional(),
+  paymentProfileName: z.string().trim().max(160).optional(),
+  paymentAccountReference: z.string().trim().max(40).optional(),
   paidAt: z.string().datetime().optional(),
   rawPayload: z.unknown().optional()
 });
@@ -1111,6 +1120,9 @@ export type TenantAgreementUpsertInput = z.infer<typeof tenantAgreementUpsertSch
 export type LandlordDecisionInput = z.infer<typeof landlordDecisionSchema>;
 export type LandlordPaymentAccessUpdateInput = z.infer<
   typeof landlordPaymentAccessUpdateSchema
+>;
+export type LandlordPaymentProfileUpdateInput = z.infer<
+  typeof landlordPaymentProfileUpdateSchema
 >;
 export type LandlordBuildingConfigurationUpdateInput = z.infer<
   typeof landlordBuildingConfigurationUpdateSchema

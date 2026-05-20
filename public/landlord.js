@@ -173,6 +173,9 @@ const rentPaymentHelpEl = document.getElementById("rent-payment-help");
 const rentPaymentDetailsEl = document.getElementById("rent-payment-details");
 const paymentAccessBodyEl = document.getElementById("payment-access-body");
 const refreshPaymentAccessBtnEl = document.getElementById("refresh-payment-access");
+const paymentProfilesBodyEl = document.getElementById("payment-profiles-body");
+const paymentProfilesSummaryEl = document.getElementById("payment-profiles-summary");
+const refreshPaymentProfilesBtnEl = document.getElementById("refresh-payment-profiles");
 const wifiPackageBuildingSelectEl = document.getElementById("wifi-package-building-select");
 const wifiPackageListEl = document.getElementById("wifi-package-list");
 const refreshWifiPackagesBtnEl = document.getElementById("refresh-wifi-packages");
@@ -359,6 +362,9 @@ const state = {
   selectedRentPaymentBuildingId: "",
   paymentAccess: [],
   paymentAccessByBuildingId: new Map(),
+  paymentProfiles: [],
+  buildingPaymentProfiles: [],
+  buildingPaymentProfileByBuildingId: new Map(),
   wifiPackages: [],
   wifiPackagesUnavailableReason: "",
   selectedWifiPackageBuildingId: "",
@@ -562,6 +568,18 @@ function setPaymentAccess(rows) {
   state.paymentAccess = Array.isArray(rows) ? rows : [];
   state.paymentAccessByBuildingId = new Map(
     state.paymentAccess
+      .map((item) => [normalizeLookupBuildingId(item.buildingId), item])
+      .filter(([key]) => Boolean(key))
+  );
+}
+
+function setPaymentProfiles(payload) {
+  const profiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
+  const assignments = Array.isArray(payload?.assignments) ? payload.assignments : [];
+  state.paymentProfiles = profiles;
+  state.buildingPaymentProfiles = assignments;
+  state.buildingPaymentProfileByBuildingId = new Map(
+    assignments
       .map((item) => [normalizeLookupBuildingId(item.buildingId), item])
       .filter(([key]) => Boolean(key))
   );
@@ -7787,6 +7805,74 @@ function renderPaymentAccess(rows) {
   });
 }
 
+function renderPaymentProfiles() {
+  if (!(paymentProfilesBodyEl instanceof HTMLElement)) {
+    return;
+  }
+
+  paymentProfilesBodyEl.replaceChildren();
+
+  const profiles = Array.isArray(state.paymentProfiles) ? state.paymentProfiles : [];
+  const assignments = Array.isArray(state.buildingPaymentProfiles)
+    ? state.buildingPaymentProfiles
+    : [];
+  const canEdit = !isCaretakerRole();
+
+  if (paymentProfilesSummaryEl instanceof HTMLElement) {
+    const configuredCount = profiles.filter((profile) => profile.isConfigured).length;
+    paymentProfilesSummaryEl.textContent = `${profiles.length} payment profile${
+      profiles.length === 1 ? "" : "s"
+    } available. ${configuredCount} configured for STK.`;
+  }
+
+  if (assignments.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML =
+      '<td colspan="7">No buildings available for payment routing settings.</td>';
+    paymentProfilesBodyEl.append(row);
+    return;
+  }
+
+  const profileOptions = profiles
+    .map((profile) => {
+      const status = profile.isConfigured ? "ready" : "not configured";
+      return `<option value="${escapeHtml(profile.id)}">${escapeHtml(
+        `${profile.name} (${status})`
+      )}</option>`;
+    })
+    .join("");
+
+  assignments.forEach((item) => {
+    const row = document.createElement("tr");
+    const safeBuildingName = getBuildingDisplayNameById(
+      item.buildingId,
+      item.buildingName ?? "Building"
+    );
+    const selectedProfileId = String(item.effectiveProfileId || item.profileId || "default");
+    const profile = item.profile;
+    const accountReference = String(item.accountReference || "");
+    row.innerHTML = `
+      <td><strong>${escapeHtml(safeBuildingName)}</strong></td>
+      <td>
+        <select data-setting="paymentProfileId" ${canEdit ? "" : "disabled"}>
+          ${profileOptions}
+        </select>
+      </td>
+      <td>${profile ? escapeHtml(profile.shortCode || "-") : "<span class=\"danger-text\">Missing</span>"}</td>
+      <td>${profile ? escapeHtml(profile.partyB || "-") : "-"}</td>
+      <td><input data-setting="paymentAccountReference" type="text" maxlength="40" value="${escapeHtml(accountReference)}" placeholder="Optional account" ${canEdit ? "" : "disabled"} /></td>
+      <td>${formatDateTime(item.updatedAt)}${item.updatedByRole ? `<br /><small>${escapeHtml(item.updatedByRole)}</small>` : ""}</td>
+      <td><button type="button" data-action="save-payment-profile" data-building-id="${escapeHtml(item.buildingId)}" ${canEdit ? "" : "disabled"}>Save</button></td>
+    `;
+
+    const select = row.querySelector('select[data-setting="paymentProfileId"]');
+    if (select instanceof HTMLSelectElement) {
+      select.value = selectedProfileId;
+    }
+    paymentProfilesBodyEl.append(row);
+  });
+}
+
 function isWifiEnabledForBuilding(building) {
   return (
     Boolean(building?.wifiEnabled) &&
@@ -8515,6 +8601,12 @@ async function loadPaymentAccess() {
   syncRentPaymentBuildingOptions();
 }
 
+async function loadPaymentProfiles() {
+  const payload = await requestJson("/api/landlord/payment-profiles");
+  setPaymentProfiles(payload.data ?? {});
+  renderPaymentProfiles();
+}
+
 async function loadLandlordWifiPackages() {
   const buildingId =
     String(
@@ -8798,6 +8890,10 @@ function applyLandlordStartupData(startup) {
   const selection = startup?.selection ?? {};
   setBuildings(startup?.buildings ?? []);
   setPaymentAccess(startup?.paymentAccess ?? []);
+  setPaymentProfiles({
+    profiles: startup?.paymentProfiles ?? [],
+    assignments: startup?.buildingPaymentProfiles ?? []
+  });
   const deepLinkBuildingId = getRoomsDeepLinkBuildingId();
   const hasDeepLinkBuilding = state.buildings.some(
     (item) => item.id === deepLinkBuildingId
@@ -8879,6 +8975,7 @@ function applyLandlordStartupData(startup) {
   renderRegistryBuildingOptions();
   renderResidentsBuildingOptions();
   renderPaymentAccess(state.paymentAccess);
+  renderPaymentProfiles();
   renderApplications(state.applications);
   updateApplicationsIndicator();
   renderRentStatus(state.rentStatus);
@@ -8920,6 +9017,7 @@ async function loadDataLegacy() {
       loadApplications(),
       loadRentStatus(),
       loadPaymentAccess(),
+      loadPaymentProfiles(),
       loadLandlordWifiPackages(),
       loadOwnerStaff(),
       loadCaretakerAccessRequests(),
@@ -9502,6 +9600,114 @@ paymentAccessBodyEl.addEventListener("click", (event) => {
       await loadPaymentAccess();
     } catch (error) {
       handleLandlordError(error, "Failed to update payment access.");
+    } finally {
+      target.disabled = false;
+    }
+  })();
+});
+
+paymentProfilesBodyEl?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot change payment routing.");
+    return;
+  }
+
+  if (target.dataset.action !== "save-payment-profile") {
+    return;
+  }
+
+  const buildingId = target.dataset.buildingId;
+  if (!buildingId) {
+    return;
+  }
+
+  const row = target.closest("tr");
+  if (!row) {
+    return;
+  }
+
+  const profileSelect = row.querySelector('select[data-setting="paymentProfileId"]');
+  const accountInput = row.querySelector('input[data-setting="paymentAccountReference"]');
+  if (
+    !(profileSelect instanceof HTMLSelectElement) ||
+    !(accountInput instanceof HTMLInputElement)
+  ) {
+    return;
+  }
+
+  const profileId = String(profileSelect.value || "default").trim();
+  const accountReference = String(accountInput.value || "").trim() || undefined;
+  const profile = state.paymentProfiles.find((item) => item.id === profileId);
+  const assignment = state.buildingPaymentProfileByBuildingId.get(
+    normalizeLookupBuildingId(buildingId)
+  );
+  const buildingLabel = assignment?.buildingName || getBuildingDisplayNameById(buildingId);
+
+  if (!profile) {
+    showError("Selected payment profile was not found. Refresh and retry.");
+    return;
+  }
+
+  if (!profile.isConfigured) {
+    const missing = Array.isArray(profile.missing) ? profile.missing.join(", ") : "secrets";
+    const confirmation = window.confirm(
+      `${profile.name} is not fully configured (${missing}). Save this routing anyway? Residents will not be able to initialize STK until backend env is updated.`
+    );
+    if (!confirmation) {
+      return;
+    }
+  }
+
+  const confirmation = window.confirm(
+    [
+      `Route rent STK payments for ${buildingLabel} through ${profile.name}?`,
+      "",
+      `Shortcode: ${profile.shortCode || "-"}`,
+      `Party B: ${profile.partyB || "-"}`,
+      `Account reference: ${accountReference || profile.accountReferencePrefix || "room number"}`
+    ].join("\n")
+  );
+  if (!confirmation) {
+    return;
+  }
+
+  const noteRaw = window.prompt(
+    "Optional note for this routing change. Leave blank to skip."
+  );
+  const note =
+    noteRaw == null || String(noteRaw).trim().length === 0
+      ? undefined
+      : String(noteRaw).trim();
+
+  target.disabled = true;
+  clearError();
+
+  void (async () => {
+    try {
+      await requestJson(
+        `/api/landlord/payment-profiles/${encodeURIComponent(buildingId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            profileId,
+            accountReference,
+            note
+          })
+        }
+      );
+
+      setStatus(`Payment routing updated for ${buildingLabel}.`);
+      await loadPaymentProfiles();
+    } catch (error) {
+      handleLandlordError(error, "Failed to update payment routing.");
     } finally {
       target.disabled = false;
     }
@@ -11388,6 +11594,12 @@ refreshResidentsBtnEl?.addEventListener("click", () => {
 refreshPaymentAccessBtnEl.addEventListener("click", () => {
   void loadPaymentAccess().catch((error) => {
     handleLandlordError(error, "Unable to refresh payment access settings.");
+  });
+});
+
+refreshPaymentProfilesBtnEl?.addEventListener("click", () => {
+  void loadPaymentProfiles().catch((error) => {
+    handleLandlordError(error, "Unable to refresh payment routing settings.");
   });
 });
 

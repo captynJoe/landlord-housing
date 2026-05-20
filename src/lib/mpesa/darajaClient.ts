@@ -33,7 +33,7 @@ const DARAJA_HTTP_TIMEOUT_MS = Number.parseInt(
   10
 );
 
-let cachedAccessToken: { token: string; expiresAtMs: number } | null = null;
+const cachedAccessTokens = new Map<string, { token: string; expiresAtMs: number }>();
 
 async function parseJsonSafely<T>(response: Response): Promise<T | null> {
   const raw = await response.text();
@@ -79,7 +79,9 @@ export class DarajaClient {
   constructor(private readonly config: MpesaConfig) {}
 
   private async getAccessToken(): Promise<string> {
+    const cacheKey = `${this.config.baseUrl}:${this.config.consumerKey}`;
     const now = Date.now();
+    const cachedAccessToken = cachedAccessTokens.get(cacheKey);
     if (cachedAccessToken && now < cachedAccessToken.expiresAtMs) {
       return cachedAccessToken.token;
     }
@@ -127,10 +129,10 @@ export class DarajaClient {
       Number.parseInt(String(payload.expires_in || 3600), 10) || 3600
     );
 
-    cachedAccessToken = {
+    cachedAccessTokens.set(cacheKey, {
       token: payload.access_token,
       expiresAtMs: Date.now() + Math.max(60, expiresInSeconds - 60) * 1000
-    };
+    });
 
     return payload.access_token;
   }
