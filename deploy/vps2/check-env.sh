@@ -67,6 +67,15 @@ if [ -n "$callback_url" ] && [ "$callback_url" != "$base_url/api/payments/mpesa/
   echo "Warning: ESTATEDESK_MPESA_CALLBACK_URL does not match BASE_URL rent callback path." >&2
 fi
 
+bind_ip="$(read_env_value ESTATEDESK_PRIVATE_BIND_IP)"
+if [ -n "$bind_ip" ] && [ "$bind_ip" != "0.0.0.0" ] && command -v ip >/dev/null 2>&1; then
+  if ! ip -o addr show | awk '{ print $4 }' | cut -d/ -f1 | grep -qx "$bind_ip"; then
+    echo "ESTATEDESK_PRIVATE_BIND_IP is not assigned to this VPS: $bind_ip" >&2
+    echo "Use this VPS private/VPN IP from: ip -brief addr" >&2
+    failed=1
+  fi
+fi
+
 if [ "$failed" -ne 0 ]; then
   exit 1
 fi
