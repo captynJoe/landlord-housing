@@ -1087,7 +1087,8 @@ button,
   .rent-keyvals,
   .utility-bill-meta,
   .payments-grid,
-  .payment-summary-grid {
+  .payment-summary-grid,
+  .payment-instructions-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1177,6 +1178,58 @@ button,
 
 .payment-summary-note {
   margin: -2px 0 0;
+}
+
+.payment-instructions-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid rgba(16, 28, 40, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.payment-instructions-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.payment-instructions-head h3 {
+  margin: 4px 0 0;
+  color: var(--ink-950);
+}
+
+.payment-instructions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.payment-instructions-grid div {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 28, 40, 0.08);
+  background: #f8fbf9;
+}
+
+.payment-instructions-grid dt {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+}
+
+.payment-instructions-grid dd {
+  margin: 6px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-950);
+  overflow-wrap: anywhere;
 }
 
 .payments-grid {

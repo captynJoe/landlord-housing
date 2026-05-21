@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260517h" />
+    <link rel="stylesheet" href="/landlord.css?v=20260521a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
@@ -257,6 +257,36 @@
                 </tr>
               </thead>
               <tbody id="payment-profiles-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="tenants"
+          id="overview-payment-instructions-section"
+        >
+          <div class="panel-head">
+            <div>
+              <h2>Building Payment Instructions</h2>
+              <p id="payment-instructions-summary" class="status-text"></p>
+            </div>
+            <button id="refresh-payment-instructions" type="button">Refresh</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>Method</th>
+                  <th>M-PESA</th>
+                  <th>Bank</th>
+                  <th>Other</th>
+                  <th>Updated</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="payment-instructions-body"></tbody>
             </table>
           </div>
         </section>
@@ -1606,6 +1636,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260517h"></script>
+    <script type="module" src="/landlord.js?v=20260521a"></script>
   </body>
 </html>

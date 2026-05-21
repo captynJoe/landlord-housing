@@ -176,6 +176,11 @@ const refreshPaymentAccessBtnEl = document.getElementById("refresh-payment-acces
 const paymentProfilesBodyEl = document.getElementById("payment-profiles-body");
 const paymentProfilesSummaryEl = document.getElementById("payment-profiles-summary");
 const refreshPaymentProfilesBtnEl = document.getElementById("refresh-payment-profiles");
+const paymentInstructionsBodyEl = document.getElementById("payment-instructions-body");
+const paymentInstructionsSummaryEl = document.getElementById("payment-instructions-summary");
+const refreshPaymentInstructionsBtnEl = document.getElementById(
+  "refresh-payment-instructions"
+);
 const wifiPackageBuildingSelectEl = document.getElementById("wifi-package-building-select");
 const wifiPackageListEl = document.getElementById("wifi-package-list");
 const refreshWifiPackagesBtnEl = document.getElementById("refresh-wifi-packages");
@@ -365,6 +370,8 @@ const state = {
   paymentProfiles: [],
   buildingPaymentProfiles: [],
   buildingPaymentProfileByBuildingId: new Map(),
+  buildingPaymentInstructions: [],
+  buildingPaymentInstructionByBuildingId: new Map(),
   wifiPackages: [],
   wifiPackagesUnavailableReason: "",
   selectedWifiPackageBuildingId: "",
@@ -580,6 +587,16 @@ function setPaymentProfiles(payload) {
   state.buildingPaymentProfiles = assignments;
   state.buildingPaymentProfileByBuildingId = new Map(
     assignments
+      .map((item) => [normalizeLookupBuildingId(item.buildingId), item])
+      .filter(([key]) => Boolean(key))
+  );
+}
+
+function setPaymentInstructions(rows) {
+  const instructions = Array.isArray(rows) ? rows : [];
+  state.buildingPaymentInstructions = instructions;
+  state.buildingPaymentInstructionByBuildingId = new Map(
+    instructions
       .map((item) => [normalizeLookupBuildingId(item.buildingId), item])
       .filter(([key]) => Boolean(key))
   );
@@ -7873,6 +7890,127 @@ function renderPaymentProfiles() {
   });
 }
 
+function renderPaymentInstructions() {
+  if (!(paymentInstructionsBodyEl instanceof HTMLElement)) {
+    return;
+  }
+
+  paymentInstructionsBodyEl.replaceChildren();
+
+  const rows = Array.isArray(state.buildingPaymentInstructions)
+    ? state.buildingPaymentInstructions
+    : [];
+  const canEdit = !isCaretakerRole();
+
+  if (paymentInstructionsSummaryEl instanceof HTMLElement) {
+    const configuredCount = rows.filter((item) => {
+      const method = String(item.primaryMethod || "mpesa");
+      const effective = item.effective || {};
+      if (method === "mpesa") {
+        return Boolean(effective.mpesaBusinessNumber || item.mpesaBusinessNumber);
+      }
+      if (method === "bank") {
+        return Boolean(effective.bankAccountNumber || item.bankAccountNumber);
+      }
+      if (method === "cash") {
+        return Boolean(effective.cashLocation || item.cashLocation);
+      }
+      return Boolean(effective.instructions || item.instructions);
+    }).length;
+    paymentInstructionsSummaryEl.textContent = `${configuredCount} of ${
+      rows.length
+    } building${rows.length === 1 ? "" : "s"} have visible payment details.`;
+  }
+
+  if (rows.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML =
+      '<td colspan="7">No buildings available for payment instructions.</td>';
+    paymentInstructionsBodyEl.append(row);
+    return;
+  }
+
+  rows.forEach((item) => {
+    const row = document.createElement("tr");
+    const effective = item.effective || {};
+    const safeBuildingName = getBuildingDisplayNameById(
+      item.buildingId,
+      item.buildingName ?? "Building"
+    );
+    row.innerHTML = `
+      <td><strong>${escapeHtml(safeBuildingName)}</strong></td>
+      <td>
+        <select data-setting="primaryMethod" ${canEdit ? "" : "disabled"}>
+          <option value="mpesa">M-PESA</option>
+          <option value="bank">Bank</option>
+          <option value="cash">Cash</option>
+          <option value="manual">Manual</option>
+        </select>
+      </td>
+      <td>
+        <div class="payment-instruction-fields">
+          <input data-setting="mpesaBusinessNumber" type="text" maxlength="40" value="${escapeHtml(
+            item.mpesaBusinessNumber || ""
+          )}" placeholder="${escapeHtml(
+            effective.mpesaBusinessNumber || "Paybill or Till"
+          )}" ${canEdit ? "" : "disabled"} />
+          <input data-setting="mpesaAccountReference" type="text" maxlength="80" value="${escapeHtml(
+            item.mpesaAccountReference || ""
+          )}" placeholder="${escapeHtml(
+            effective.mpesaAccountReference || "Account reference"
+          )}" ${canEdit ? "" : "disabled"} />
+          <input data-setting="mpesaAccountName" type="text" maxlength="120" value="${escapeHtml(
+            item.mpesaAccountName || ""
+          )}" placeholder="${escapeHtml(
+            effective.mpesaAccountName || "Account name"
+          )}" ${canEdit ? "" : "disabled"} />
+        </div>
+      </td>
+      <td>
+        <div class="payment-instruction-fields">
+          <input data-setting="bankName" type="text" maxlength="120" value="${escapeHtml(
+            item.bankName || ""
+          )}" placeholder="Bank name" ${canEdit ? "" : "disabled"} />
+          <input data-setting="bankAccountName" type="text" maxlength="120" value="${escapeHtml(
+            item.bankAccountName || ""
+          )}" placeholder="Account name" ${canEdit ? "" : "disabled"} />
+          <input data-setting="bankAccountNumber" type="text" maxlength="80" value="${escapeHtml(
+            item.bankAccountNumber || ""
+          )}" placeholder="Account number" ${canEdit ? "" : "disabled"} />
+          <input data-setting="bankBranch" type="text" maxlength="120" value="${escapeHtml(
+            item.bankBranch || ""
+          )}" placeholder="Branch" ${canEdit ? "" : "disabled"} />
+          <input data-setting="bankSwiftCode" type="text" maxlength="40" value="${escapeHtml(
+            item.bankSwiftCode || ""
+          )}" placeholder="SWIFT or bank code" ${canEdit ? "" : "disabled"} />
+        </div>
+      </td>
+      <td>
+        <div class="payment-instruction-fields">
+          <input data-setting="cashLocation" type="text" maxlength="160" value="${escapeHtml(
+            item.cashLocation || ""
+          )}" placeholder="Office or contact" ${canEdit ? "" : "disabled"} />
+          <textarea data-setting="instructions" maxlength="800" placeholder="Resident payment notes" ${canEdit ? "" : "disabled"}>${escapeHtml(
+            item.instructions || ""
+          )}</textarea>
+          <textarea data-setting="proofInstructions" maxlength="800" placeholder="Receipt or proof notes" ${canEdit ? "" : "disabled"}>${escapeHtml(
+            item.proofInstructions || ""
+          )}</textarea>
+        </div>
+      </td>
+      <td>${formatDateTime(item.updatedAt)}${item.updatedByRole ? `<br /><small>${escapeHtml(item.updatedByRole)}</small>` : ""}</td>
+      <td><button type="button" data-action="save-payment-instructions" data-building-id="${escapeHtml(item.buildingId)}" ${canEdit ? "" : "disabled"}>Save</button></td>
+    `;
+
+    const methodSelect = row.querySelector('select[data-setting="primaryMethod"]');
+    if (methodSelect instanceof HTMLSelectElement) {
+      methodSelect.value = String(item.primaryMethod || "mpesa");
+    }
+
+    paymentInstructionsBodyEl.append(row);
+  });
+}
+
 function isWifiEnabledForBuilding(building) {
   return (
     Boolean(building?.wifiEnabled) &&
@@ -8607,6 +8745,12 @@ async function loadPaymentProfiles() {
   renderPaymentProfiles();
 }
 
+async function loadPaymentInstructions() {
+  const payload = await requestJson("/api/landlord/payment-instructions");
+  setPaymentInstructions(payload.data ?? []);
+  renderPaymentInstructions();
+}
+
 async function loadLandlordWifiPackages() {
   const buildingId =
     String(
@@ -8894,6 +9038,7 @@ function applyLandlordStartupData(startup) {
     profiles: startup?.paymentProfiles ?? [],
     assignments: startup?.buildingPaymentProfiles ?? []
   });
+  setPaymentInstructions(startup?.buildingPaymentInstructions ?? []);
   const deepLinkBuildingId = getRoomsDeepLinkBuildingId();
   const hasDeepLinkBuilding = state.buildings.some(
     (item) => item.id === deepLinkBuildingId
@@ -8976,6 +9121,7 @@ function applyLandlordStartupData(startup) {
   renderResidentsBuildingOptions();
   renderPaymentAccess(state.paymentAccess);
   renderPaymentProfiles();
+  renderPaymentInstructions();
   renderApplications(state.applications);
   updateApplicationsIndicator();
   renderRentStatus(state.rentStatus);
@@ -9018,6 +9164,7 @@ async function loadDataLegacy() {
       loadRentStatus(),
       loadPaymentAccess(),
       loadPaymentProfiles(),
+      loadPaymentInstructions(),
       loadLandlordWifiPackages(),
       loadOwnerStaff(),
       loadCaretakerAccessRequests(),
@@ -9708,6 +9855,101 @@ paymentProfilesBodyEl?.addEventListener("click", (event) => {
       await loadPaymentProfiles();
     } catch (error) {
       handleLandlordError(error, "Failed to update payment routing.");
+    } finally {
+      target.disabled = false;
+    }
+  })();
+});
+
+paymentInstructionsBodyEl?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot change payment instructions.");
+    return;
+  }
+
+  if (target.dataset.action !== "save-payment-instructions") {
+    return;
+  }
+
+  const buildingId = target.dataset.buildingId;
+  if (!buildingId) {
+    return;
+  }
+
+  const row = target.closest("tr");
+  if (!row) {
+    return;
+  }
+
+  const valueFor = (setting) => {
+    const field = row.querySelector(`[data-setting="${setting}"]`);
+    if (
+      field instanceof HTMLInputElement ||
+      field instanceof HTMLTextAreaElement ||
+      field instanceof HTMLSelectElement
+    ) {
+      const normalized = String(field.value || "").trim();
+      return normalized || undefined;
+    }
+    return undefined;
+  };
+
+  const primaryMethod = valueFor("primaryMethod") || "mpesa";
+  const current = state.buildingPaymentInstructionByBuildingId.get(
+    normalizeLookupBuildingId(buildingId)
+  );
+  const buildingLabel = current?.buildingName || getBuildingDisplayNameById(buildingId);
+
+  const confirmation = window.confirm(
+    [
+      `Update payment instructions for ${buildingLabel}?`,
+      "",
+      `Primary method: ${primaryMethod.toUpperCase()}`,
+      "Residents in this building will see these details in their payment workspace."
+    ].join("\n")
+  );
+  if (!confirmation) {
+    return;
+  }
+
+  target.disabled = true;
+  clearError();
+
+  void (async () => {
+    try {
+      await requestJson(
+        `/api/landlord/payment-instructions/${encodeURIComponent(buildingId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            primaryMethod,
+            mpesaBusinessNumber: valueFor("mpesaBusinessNumber"),
+            mpesaAccountReference: valueFor("mpesaAccountReference"),
+            mpesaAccountName: valueFor("mpesaAccountName"),
+            bankName: valueFor("bankName"),
+            bankAccountName: valueFor("bankAccountName"),
+            bankAccountNumber: valueFor("bankAccountNumber"),
+            bankBranch: valueFor("bankBranch"),
+            bankSwiftCode: valueFor("bankSwiftCode"),
+            cashLocation: valueFor("cashLocation"),
+            instructions: valueFor("instructions"),
+            proofInstructions: valueFor("proofInstructions")
+          })
+        }
+      );
+
+      setStatus(`Payment instructions updated for ${buildingLabel}.`);
+      await loadPaymentInstructions();
+    } catch (error) {
+      handleLandlordError(error, "Failed to update payment instructions.");
     } finally {
       target.disabled = false;
     }
@@ -11600,6 +11842,12 @@ refreshPaymentAccessBtnEl.addEventListener("click", () => {
 refreshPaymentProfilesBtnEl?.addEventListener("click", () => {
   void loadPaymentProfiles().catch((error) => {
     handleLandlordError(error, "Unable to refresh payment routing settings.");
+  });
+});
+
+refreshPaymentInstructionsBtnEl?.addEventListener("click", () => {
+  void loadPaymentInstructions().catch((error) => {
+    handleLandlordError(error, "Unable to refresh payment instructions.");
   });
 });
 

@@ -1066,8 +1066,26 @@ button.resident-overview-card.is-active {
   order: 70;
 }
 
+#overview-payment-instructions-section {
+  order: 68;
+}
+
+#overview-payment-routing-section {
+  order: 69;
+}
+
 #overview-wifi-packages-section {
   order: 80;
+}
+
+.payment-instruction-fields {
+  display: grid;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.payment-instruction-fields textarea {
+  min-height: 58px;
 }
 
 .landlord-drawer-backdrop {

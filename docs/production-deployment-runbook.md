@@ -184,6 +184,11 @@ ESTATEDESK_MPESA_PAYMENT_PROFILES_JSON=[{"id":"building-a","name":"Building A Re
 The manager UI shows profile names, shortcodes, and assignment status. It does
 not expose consumer secrets or passkeys.
 
+Use **Building Payment Instructions** in the manager workspace for resident-facing
+payment details such as Paybill, account reference, bank account, cash location,
+and proof-of-payment notes. These instructions are stored as app state and are
+safe to show to residents; keep Daraja API secrets in VPS2 environment values.
+
 ## Smoke Test
 
 After deployment:
@@ -195,6 +200,7 @@ After deployment:
 - owner approval,
 - resident phone login,
 - resident dashboard only shows the assigned room,
+- resident payment workspace shows the assigned building payment instructions,
 - image upload writes under the `landlord_housing_uploads` volume,
 - M-PESA callback token rejects bad requests.
 

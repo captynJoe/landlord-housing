@@ -734,6 +734,22 @@ export const landlordPaymentProfileUpdateSchema = z.object({
   note: z.string().trim().max(280).optional()
 });
 
+export const landlordPaymentInstructionsUpdateSchema = z.object({
+  primaryMethod: z.enum(["mpesa", "bank", "cash", "manual"]).default("mpesa"),
+  mpesaBusinessNumber: z.string().trim().max(40).optional(),
+  mpesaAccountReference: z.string().trim().max(80).optional(),
+  mpesaAccountName: z.string().trim().max(120).optional(),
+  bankName: z.string().trim().max(120).optional(),
+  bankAccountName: z.string().trim().max(120).optional(),
+  bankAccountNumber: z.string().trim().max(80).optional(),
+  bankBranch: z.string().trim().max(120).optional(),
+  bankSwiftCode: z.string().trim().max(40).optional(),
+  cashLocation: z.string().trim().max(160).optional(),
+  instructions: z.string().trim().max(800).optional(),
+  proofInstructions: z.string().trim().max(800).optional(),
+  note: z.string().trim().max(280).optional()
+});
+
 export const landlordBuildingConfigurationUpdateSchema = z
   .object({
     rentEnabled: z.boolean().optional(),
@@ -1123,6 +1139,9 @@ export type LandlordPaymentAccessUpdateInput = z.infer<
 >;
 export type LandlordPaymentProfileUpdateInput = z.infer<
   typeof landlordPaymentProfileUpdateSchema
+>;
+export type LandlordPaymentInstructionsUpdateInput = z.infer<
+  typeof landlordPaymentInstructionsUpdateSchema
 >;
 export type LandlordBuildingConfigurationUpdateInput = z.infer<
   typeof landlordBuildingConfigurationUpdateSchema

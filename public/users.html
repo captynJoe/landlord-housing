@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="EstateDesk Resident" />
     <link rel="icon" href="/icons/housing-app.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/users.css?v=20260509a" />
+    <link rel="stylesheet" href="/users.css?v=20260521a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body class="app-loading">
@@ -472,6 +472,17 @@
                   pay separately.
                 </p>
               </section>
+              <section id="payment-instructions-card" class="payment-instructions-card">
+                <div class="payment-instructions-head">
+                  <div>
+                    <p class="subheading">Where to pay</p>
+                    <h3 id="payment-instructions-title">Payment instructions</h3>
+                  </div>
+                  <span id="payment-instructions-method" class="item-chip">-</span>
+                </div>
+                <dl id="payment-instructions-list" class="payment-instructions-grid"></dl>
+                <p id="payment-instructions-note" class="item-details"></p>
+              </section>
               <div class="payments-grid">
                 <div class="payments-column">
                   <section class="payment-cluster">
@@ -835,6 +846,6 @@
       </article>
     </section>
 
-    <script type="module" src="/users.js?v=20260519a"></script>
+    <script type="module" src="/users.js?v=20260521a"></script>
   </body>
 </html>

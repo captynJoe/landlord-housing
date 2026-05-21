@@ -106,6 +106,11 @@ const paymentsRentOutstandingEl = document.getElementById("payments-rent-outstan
 const paymentsUtilityOutstandingEl = document.getElementById("payments-utility-outstanding");
 const paymentsMonthPaidEl = document.getElementById("payments-month-paid");
 const paymentShortcutButtons = [...document.querySelectorAll("[data-payment-shortcut]")];
+const paymentInstructionsCardEl = document.getElementById("payment-instructions-card");
+const paymentInstructionsTitleEl = document.getElementById("payment-instructions-title");
+const paymentInstructionsMethodEl = document.getElementById("payment-instructions-method");
+const paymentInstructionsListEl = document.getElementById("payment-instructions-list");
+const paymentInstructionsNoteEl = document.getElementById("payment-instructions-note");
 const utilityBillsSummaryEl = document.getElementById("utility-bills-summary");
 const utilityBillsListEl = document.getElementById("utility-bills-list");
 const rentPaymentClusterEl = document.querySelector(".payment-cluster-rent");
@@ -206,6 +211,7 @@ const state = {
   rentPayments: [],
   utilityPayments: [],
   paymentAccess: { ...DEFAULT_PAYMENT_ACCESS },
+  paymentInstructions: null,
   residentToken: INITIAL_RESIDENT_STORAGE.token,
   rememberResidentDevice:
     INITIAL_RESIDENT_STORAGE.token !== ""
@@ -305,6 +311,11 @@ const REQUIRED_DOM_BINDINGS = Object.freeze([
   ["payments-rent-outstanding", paymentsRentOutstandingEl],
   ["payments-utility-outstanding", paymentsUtilityOutstandingEl],
   ["payments-month-paid", paymentsMonthPaidEl],
+  ["payment-instructions-card", paymentInstructionsCardEl],
+  ["payment-instructions-title", paymentInstructionsTitleEl],
+  ["payment-instructions-method", paymentInstructionsMethodEl],
+  ["payment-instructions-list", paymentInstructionsListEl],
+  ["payment-instructions-note", paymentInstructionsNoteEl],
   ["utility-bills-summary", utilityBillsSummaryEl],
   ["utility-bills-list", utilityBillsListEl],
   ["rent-payment-section", rentPaymentSectionEl],
@@ -1303,6 +1314,115 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function appendPaymentInstructionDetail(label, value) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized || !(paymentInstructionsListEl instanceof HTMLElement)) {
+    return false;
+  }
+
+  const item = document.createElement("div");
+  const term = document.createElement("dt");
+  const description = document.createElement("dd");
+  term.textContent = label;
+  description.textContent = normalized;
+  item.append(term, description);
+  paymentInstructionsListEl.append(item);
+  return true;
+}
+
+function renderPaymentInstructions() {
+  if (
+    !(paymentInstructionsCardEl instanceof HTMLElement) ||
+    !(paymentInstructionsListEl instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  const instructions = state.paymentInstructions;
+  paymentInstructionsListEl.replaceChildren();
+
+  if (!instructions) {
+    paymentInstructionsTitleEl.textContent = "Payment instructions";
+    paymentInstructionsMethodEl.textContent = "-";
+    paymentInstructionsNoteEl.textContent =
+      "Payment instructions will appear after your building details load.";
+    return;
+  }
+
+  const method = String(instructions.primaryMethod || "mpesa");
+  const effective = instructions.effective || {};
+  paymentInstructionsTitleEl.textContent = instructions.buildingName
+    ? `${instructions.buildingName} payment details`
+    : "Payment instructions";
+  paymentInstructionsMethodEl.textContent = instructions.methodLabel || method.toUpperCase();
+
+  let hasDetail = false;
+  if (method === "bank") {
+    hasDetail =
+      appendPaymentInstructionDetail("Bank", effective.bankName || instructions.bankName) ||
+      hasDetail;
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "Account Name",
+        effective.bankAccountName || instructions.bankAccountName
+      ) || hasDetail;
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "Account Number",
+        effective.bankAccountNumber || instructions.bankAccountNumber
+      ) || hasDetail;
+    hasDetail =
+      appendPaymentInstructionDetail("Branch", effective.bankBranch || instructions.bankBranch) ||
+      hasDetail;
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "SWIFT",
+        effective.bankSwiftCode || instructions.bankSwiftCode
+      ) || hasDetail;
+  } else if (method === "cash") {
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "Cash Point",
+        effective.cashLocation || instructions.cashLocation
+      ) || hasDetail;
+  } else if (method === "manual") {
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "Manual Payment",
+        effective.instructions || instructions.instructions
+      ) || hasDetail;
+  } else {
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "M-PESA Number",
+        effective.mpesaBusinessNumber || instructions.mpesaBusinessNumber
+      ) || hasDetail;
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "Account Reference",
+        effective.mpesaAccountReference || instructions.mpesaAccountReference
+      ) || hasDetail;
+    hasDetail =
+      appendPaymentInstructionDetail(
+        "Account Name",
+        effective.mpesaAccountName || instructions.mpesaAccountName
+      ) || hasDetail;
+  }
+
+  const notes = [
+    method !== "manual" ? effective.instructions || instructions.instructions : "",
+    effective.proofInstructions || instructions.proofInstructions
+  ].filter(Boolean);
+  paymentInstructionsNoteEl.textContent = notes.join(" ");
+
+  if (!hasDetail) {
+    appendPaymentInstructionDetail(
+      "Status",
+      "Payment details are not set yet. Contact management before sending rent."
+    );
+  }
 }
 
 function getPublicBuildingLabel(building, fallback = "Assigned building") {
@@ -3477,6 +3597,7 @@ function showSignedOutState() {
   state.rentDue = null;
   state.rentPayments = [];
   state.utilityPayments = [];
+  state.paymentInstructions = null;
   state.rentPaymentBaseline = null;
   state.rentSelectedBillingMonth = null;
   state.utilityPaymentBaseline = null;
@@ -3490,6 +3611,7 @@ function showSignedOutState() {
     electricity: null
   };
   state.paymentAccess = { ...DEFAULT_PAYMENT_ACCESS };
+  renderPaymentInstructions();
   renderUtilityBills([], [], undefined, []);
   renderUtilityPayments([]);
   renderOverviewSession();
@@ -3590,10 +3712,12 @@ async function loadTenantData() {
 
     state.reports = data.reports ?? [];
     state.notifications = data.notifications ?? [];
+    state.paymentInstructions = data.paymentInstructions ?? null;
     state.rentDue = data.rentDue ?? null;
 
     renderReports(state.reports);
     renderNotifications(state.notifications);
+    renderPaymentInstructions();
     await refreshRentDueCard(messages.rentDue);
     state.rentPayments = data.rentPayments ?? [];
     renderRentPayments(state.rentPayments, messages.rentPayments);

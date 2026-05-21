@@ -128,6 +128,13 @@ Building-level payment routing:
 - Resident rent and utility STK prompts use the building's assigned profile.
 - If a building has no assignment, it uses the default `MPESA_*` profile.
 
+Building payment instructions:
+
+- Configure resident-facing payment instructions per building from the manager workspace.
+- Supported display methods are M-PESA, bank transfer, cash, and manual payment.
+- These instructions are separate from M-PESA API secrets, so landlords can safely publish Paybill, account, bank, and proof-of-payment details without exposing Daraja credentials.
+- Resident payment workspaces show the selected building's instructions even when residents pay outside the portal.
+
 ## Implemented endpoints
 
 Public + shared:

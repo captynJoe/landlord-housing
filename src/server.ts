@@ -69,6 +69,11 @@ import {
   type PaymentProfilePersistedState
 } from "./services/paymentProfileService.js";
 import {
+  PaymentInstructionService,
+  type BuildingPaymentInstructionsRecord,
+  type PaymentInstructionsPersistedState
+} from "./services/paymentInstructionService.js";
+import {
   NotificationDeliveryService,
   SmsNotificationService
 } from "./services/notifications/index.js";
@@ -131,6 +136,7 @@ import {
   landlordBuildingConfigurationUpdateSchema,
   landlordPaymentAccessUpdateSchema,
   landlordPaymentProfileUpdateSchema,
+  landlordPaymentInstructionsUpdateSchema,
   landlordExpenditureCreateSchema,
   landlordUtilityBulkSubmissionAuditCreateSchema,
   landlordUtilityBulkSubmissionAuditFinalizeSchema,
@@ -280,6 +286,7 @@ const USER_SUPPORT_STATE_KEY = "user_support_v1";
 const WIFI_ACCESS_STATE_KEY = "wifi_access_v1";
 const PAYMENT_ACCESS_STATE_KEY = "payment_access_v1";
 const PAYMENT_PROFILE_STATE_KEY = "payment_profiles_v1";
+const PAYMENT_INSTRUCTIONS_STATE_KEY = "payment_instructions_v1";
 const CARETAKER_ACCESS_STATE_KEY = "caretaker_access_v1";
 const BUILDING_EXPENDITURE_STATE_KEY = "building_expenditure_v1";
 const RUNTIME_QUEUES_STATE_KEY = "runtime_queues_v1";
@@ -2415,6 +2422,7 @@ async function bootstrap() {
 
     paymentAccessService.removeBuilding(normalizedBuildingId);
     paymentProfileService.removeBuilding(normalizedBuildingId);
+    paymentInstructionService.removeBuilding(normalizedBuildingId);
 
     if (runtimeQueuesChanged) {
       syncCombinedUtilityChargeDefaultsToService();
@@ -2736,6 +2744,94 @@ async function bootstrap() {
   const utilityBillingService = new UtilityBillingService();
   const paymentAccessService = new PaymentAccessService();
   const paymentProfileService = new PaymentProfileService();
+  const paymentInstructionService = new PaymentInstructionService();
+  const publicPaymentInstructionValue = (value: string | undefined) => {
+    const normalized = String(value ?? "").trim();
+    const lower = normalized.toLowerCase();
+    if (
+      !normalized ||
+      lower.includes("your_") ||
+      lower.includes("replace_me") ||
+      lower.includes("changeme") ||
+      lower.includes("change-me") ||
+      normalized.includes("<") ||
+      normalized.includes(">")
+    ) {
+      return "";
+    }
+
+    return normalized;
+  };
+  const buildBuildingPaymentInstructionPayload = (input: {
+    buildingId: string;
+    buildingName?: string;
+    houseNumber?: string;
+  }) => {
+    const record = paymentInstructionService.getForBuilding(input.buildingId);
+    const buildingPaymentProfile = paymentProfileService.resolveForBuilding(
+      input.buildingId,
+      "/api/payments/mpesa/rent-callback"
+    );
+    const profile = buildingPaymentProfile.publicProfile;
+    const profileForAccountReference = profile
+      ? {
+          ...profile,
+          accountReferencePrefix:
+            publicPaymentInstructionValue(profile.accountReferencePrefix) || undefined
+        }
+      : profile;
+    const fallbackAccountReference = input.houseNumber
+      ? buildRentAccountReference({
+          houseNumber: input.houseNumber,
+          assignment: buildingPaymentProfile.assignment,
+          profile: profileForAccountReference
+        })
+      : publicPaymentInstructionValue(profile?.accountReferencePrefix) ||
+        "Resident house number";
+    const mpesaBusinessNumber =
+      record.mpesaBusinessNumber ||
+      publicPaymentInstructionValue(profile?.partyB) ||
+      publicPaymentInstructionValue(profile?.shortCode);
+    const mpesaAccountReference =
+      record.mpesaAccountReference || fallbackAccountReference;
+    const methodLabels: Record<
+      BuildingPaymentInstructionsRecord["primaryMethod"],
+      string
+    > = {
+      mpesa: "M-PESA",
+      bank: "Bank transfer",
+      cash: "Cash",
+      manual: "Manual"
+    };
+
+    return {
+      ...record,
+      buildingName: input.buildingName ?? input.buildingId,
+      methodLabel: methodLabels[record.primaryMethod],
+      effective: {
+        mpesaBusinessNumber,
+        mpesaAccountReference,
+        mpesaAccountName: record.mpesaAccountName || profile?.name || "",
+        bankName: record.bankName || "",
+        bankAccountName: record.bankAccountName || "",
+        bankAccountNumber: record.bankAccountNumber || "",
+        bankBranch: record.bankBranch || "",
+        bankSwiftCode: record.bankSwiftCode || "",
+        cashLocation: record.cashLocation || "",
+        instructions: record.instructions || "",
+        proofInstructions: record.proofInstructions || ""
+      },
+      paymentProfile: profile
+        ? {
+            id: profile.id,
+            name: profile.name,
+            shortCode: profile.shortCode,
+            partyB: profile.partyB,
+            isConfigured: profile.isConfigured
+          }
+        : null
+    };
+  };
   const residentNotificationPreferenceService =
     new ResidentNotificationPreferenceService();
   const appStateService = repositoryContext.prisma
@@ -3373,6 +3469,7 @@ async function bootstrap() {
         wifiState,
         paymentAccessState,
         paymentProfileState,
+        paymentInstructionsState,
         caretakerAccessState,
         buildingExpenditureState,
         runtimeQueuesState,
@@ -3391,6 +3488,9 @@ async function bootstrap() {
         ),
         loadAppStateJsonSafely<PaymentProfilePersistedState>(
           PAYMENT_PROFILE_STATE_KEY
+        ),
+        loadAppStateJsonSafely<PaymentInstructionsPersistedState>(
+          PAYMENT_INSTRUCTIONS_STATE_KEY
         ),
         loadAppStateJsonSafely<CaretakerAccessPersistedState>(
           CARETAKER_ACCESS_STATE_KEY
@@ -3414,6 +3514,7 @@ async function bootstrap() {
       wifiService.importState(wifiState);
       paymentAccessService.importState(paymentAccessState);
       paymentProfileService.importState(paymentProfileState);
+      paymentInstructionService.importState(paymentInstructionsState);
       pushNotificationService.importState(pushSubscriptionState);
       residentNotificationPreferenceService.importState(
         residentNotificationPreferenceState
@@ -3575,6 +3676,9 @@ async function bootstrap() {
       paymentProfileService.setStateChangeHandler((state) =>
         queuePersist(PAYMENT_PROFILE_STATE_KEY, state)
       );
+      paymentInstructionService.setStateChangeHandler((state) =>
+        queuePersist(PAYMENT_INSTRUCTIONS_STATE_KEY, state)
+      );
       pushNotificationService.setStateChangeHandler((state) =>
         queuePersist(PUSH_SUBSCRIPTIONS_STATE_KEY, state)
       );
@@ -3621,6 +3725,10 @@ async function bootstrap() {
       void queuePersist(
         PAYMENT_PROFILE_STATE_KEY,
         paymentProfileService.exportState()
+      );
+      void queuePersist(
+        PAYMENT_INSTRUCTIONS_STATE_KEY,
+        paymentInstructionService.exportState()
       );
       void queuePersist(
         PUSH_SUBSCRIPTIONS_STATE_KEY,
@@ -5421,6 +5529,12 @@ async function bootstrap() {
           buildings.find((building) => building.id === item.buildingId)?.name ??
           item.buildingId
       }));
+    const buildingPaymentInstructions = buildings.map((building) =>
+      buildBuildingPaymentInstructionPayload({
+        buildingId: building.id,
+        buildingName: building.name
+      })
+    );
     const paymentAccessByBuildingId = new Map(
       paymentAccess.map((item) => [item.buildingId, item])
     );
@@ -5584,6 +5698,7 @@ async function bootstrap() {
       paymentAccess,
       paymentProfiles,
       buildingPaymentProfiles,
+      buildingPaymentInstructions,
       wifiPackages,
       wifiPackagesUnavailableReason,
       ownerStaff,
@@ -8469,6 +8584,41 @@ async function bootstrap() {
     }
   });
 
+  app.get("/api/landlord/payment-instructions", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      const queryBuildingId =
+        typeof req.query.buildingId === "string" ? req.query.buildingId.trim() : "";
+      const requestedBuildingId = queryBuildingId || undefined;
+
+      let visibleBuildings = await listVisibleBuildingsForLandlordContext(context);
+
+      if (requestedBuildingId) {
+        visibleBuildings = visibleBuildings.filter(
+          (item) => item.id === requestedBuildingId
+        );
+      }
+
+      const data = visibleBuildings.map((building) =>
+        buildBuildingPaymentInstructionPayload({
+          buildingId: building.id,
+          buildingName: building.name
+        })
+      );
+
+      return res.json({
+        data,
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   app.get(
     "/api/landlord/buildings/:buildingId/configuration",
     async (req, res, next) => {
@@ -9349,6 +9499,72 @@ async function bootstrap() {
     }
   );
 
+  app.patch(
+    "/api/landlord/payment-instructions/:buildingId",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "Caretaker accounts cannot change payment instructions."
+          });
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(
+          context,
+          building.id
+        );
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const parsed = landlordPaymentInstructionsUpdateSchema.parse(req.body ?? {});
+        paymentInstructionService.updateForBuilding(
+          building.id,
+          {
+            primaryMethod: parsed.primaryMethod,
+            mpesaBusinessNumber: parsed.mpesaBusinessNumber,
+            mpesaAccountReference: parsed.mpesaAccountReference,
+            mpesaAccountName: parsed.mpesaAccountName,
+            bankName: parsed.bankName,
+            bankAccountName: parsed.bankAccountName,
+            bankAccountNumber: parsed.bankAccountNumber,
+            bankBranch: parsed.bankBranch,
+            bankSwiftCode: parsed.bankSwiftCode,
+            cashLocation: parsed.cashLocation,
+            instructions: parsed.instructions,
+            proofInstructions: parsed.proofInstructions,
+            note: parsed.note
+          },
+          {
+            role: context.role,
+            userId: context.userId
+          }
+        );
+
+        return res.json({
+          data: buildBuildingPaymentInstructionPayload({
+            buildingId: building.id,
+            buildingName: building.name
+          }),
+          role: context.role
+        });
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
   app.get("/api/buildings/:buildingId", async (req, res, next) => {
     try {
       const userSession = await resolveOptionalUserSession(req);
@@ -10211,6 +10427,12 @@ async function bootstrap() {
         session.houseNumber
       );
       const basePaymentAccess = paymentAccessService.getForBuilding(session.buildingId);
+      const sessionBuilding = await store.getBuilding(session.buildingId);
+      const paymentInstructions = buildBuildingPaymentInstructionPayload({
+        buildingId: session.buildingId,
+        buildingName: sessionBuilding?.name,
+        houseNumber: session.houseNumber
+      });
       const paymentAccess = billingVisible
         ? {
             ...basePaymentAccess,
@@ -10325,6 +10547,7 @@ async function bootstrap() {
           paymentAccess,
           reports,
           notifications,
+          paymentInstructions,
           rentDue,
           rentPayments,
           utilityBills,
