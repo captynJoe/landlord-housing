@@ -5475,11 +5475,12 @@ async function bootstrap() {
     const roomBuildingId = buildings[0]?.id ?? "";
 
     const applicationsPromise =
-      context.role === "caretaker"
+      context.role === "caretaker" || !context.userSession
         ? Promise.resolve([])
         : (async () => {
-            if (!context.userSession) {
-              throw new Error("Landlord authentication required");
+            const session = context.userSession;
+            if (!session) {
+              return [];
             }
             if (!userAccountService) {
               throw new Error(
@@ -5487,7 +5488,7 @@ async function bootstrap() {
               );
             }
             return userAccountService.listLandlordApplications(
-              context.userSession,
+              session,
               applicationStatus
             );
           })();
@@ -9694,7 +9695,7 @@ async function bootstrap() {
 
       const session = context.userSession;
       if (!session) {
-        return res.status(401).json({ error: "Landlord authentication required" });
+        return res.json({ data: [], role: context.role });
       }
 
       if (!userAccountService) {
@@ -9729,7 +9730,10 @@ async function bootstrap() {
 
       const session = context.userSession;
       if (!session) {
-        return res.status(401).json({ error: "Landlord authentication required" });
+        return res.status(403).json({
+          error:
+            "Tenant application review requires a database-backed owner/staff account."
+        });
       }
 
       if (!userAccountService) {
@@ -14457,11 +14461,11 @@ async function bootstrap() {
     try {
       const userSession = await resolveOptionalUserSession(req);
       const legacyAdminSession = adminAuthService.getSession(readAdminSessionToken(req));
-      const hasLegacyAdmin = legacyAdminSession
-        ? adminAuthService.hasRole(legacyAdminSession, "admin")
+      const hasLegacyBuildingManager = legacyAdminSession
+        ? adminAuthService.hasRole(legacyAdminSession, "landlord")
         : false;
 
-      if (!userSession && !hasLegacyAdmin) {
+      if (!userSession && !hasLegacyBuildingManager) {
         return res.status(401).json({ error: "Authorization required" });
       }
 
@@ -14612,14 +14616,14 @@ async function bootstrap() {
 
   app.post("/api/landlord/buildings/:buildingId/houses", async (req, res, next) => {
     try {
-      const session = await getUserSession(req, res, "landlord");
-      if (!session) {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
         return;
       }
 
-      if (!userAccountService) {
-        return res.status(503).json({
-          error: "User account service unavailable. Database connection is required."
+      if (context.role === "caretaker") {
+        return res.status(403).json({
+          error: "House manager accounts cannot add rooms."
         });
       }
 
@@ -14628,7 +14632,7 @@ async function bootstrap() {
         return res.status(400).json({ error: "Building id is required." });
       }
 
-      const hasAccess = await userAccountService.canAccessBuilding(session, buildingId);
+      const hasAccess = await canManageBuildingFromLandlordContext(context, buildingId);
       if (!hasAccess) {
         return res.status(403).json({ error: "Building access denied" });
       }
@@ -14644,7 +14648,8 @@ async function bootstrap() {
           building: updated.building,
           addedHouseNumbers: updated.addedHouseNumbers,
           addedCount: updated.addedHouseNumbers.length
-        }
+        },
+        role: context.role
       });
     } catch (error) {
       return next(error);
@@ -14657,14 +14662,14 @@ async function bootstrap() {
     next: NextFunction
   ) => {
     try {
-      const session = await getUserSession(req, res, "landlord");
-      if (!session) {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
         return;
       }
 
-      if (!userAccountService) {
-        return res.status(503).json({
-          error: "User account service unavailable. Database connection is required."
+      if (context.role === "caretaker") {
+        return res.status(403).json({
+          error: "House manager accounts cannot remove rooms."
         });
       }
 
@@ -14676,7 +14681,7 @@ async function bootstrap() {
           .json({ error: "Building id and house number are required." });
       }
 
-      const hasAccess = await userAccountService.canAccessBuilding(session, buildingId);
+      const hasAccess = await canManageBuildingFromLandlordContext(context, buildingId);
       if (!hasAccess) {
         return res.status(403).json({ error: "Building access denied" });
       }
@@ -14706,7 +14711,7 @@ async function bootstrap() {
         houseNumber,
         action: "room.removed",
         summary: `Room ${houseNumber} removed from ${updated.building.name}.`,
-        actor: actorFromUserSession(session),
+        actor: actorFromLandlordContext(context),
         metadata: {
           removedHouseNumber: updated.removedHouseNumber
         }
@@ -14716,7 +14721,8 @@ async function bootstrap() {
         data: {
           building: updated.building,
           removedHouseNumber: updated.removedHouseNumber
-        }
+        },
+        role: context.role
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes("tenancy")) {
@@ -14876,9 +14882,17 @@ async function bootstrap() {
     "/api/landlord/buildings/:buildingId/users/:userId/move-out-settlement",
     async (req, res, next) => {
       try {
-        const session = await getUserSession(req, res, "landlord");
-        if (!session) {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
           return;
+        }
+
+        const session = context.userSession;
+        if (!session) {
+          return res.status(403).json({
+            error:
+              "Move-out settlement requires a database-backed owner/staff account."
+          });
         }
 
         if (!userAccountService || !repositoryContext.prisma) {
@@ -14893,7 +14907,7 @@ async function bootstrap() {
           return res.status(400).json({ error: "Building id and user id are required." });
         }
 
-        const hasAccess = await userAccountService.canAccessBuilding(session, buildingId);
+        const hasAccess = await canManageBuildingFromLandlordContext(context, buildingId);
         if (!hasAccess) {
           return res.status(403).json({ error: "Building access denied" });
         }
@@ -14919,9 +14933,16 @@ async function bootstrap() {
     next: NextFunction
   ) => {
     try {
-      const session = await getUserSession(req, res, "landlord");
-      if (!session) {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
         return;
+      }
+
+      const session = context.userSession;
+      if (!session) {
+        return res.status(403).json({
+          error: "Clearing a resident requires a database-backed owner/staff account."
+        });
       }
 
       if (!userAccountService) {

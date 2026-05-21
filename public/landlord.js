@@ -5086,7 +5086,7 @@ function isMissingRouteError(error) {
 
 async function ensureSession() {
   try {
-    const payload = await requestJson("/api/auth/session", { cache: "no-store" });
+    const payload = await requestJson("/api/auth/landlord/session", { cache: "no-store" });
     const role = payload.data?.role ?? "tenant";
     if (
       role !== "landlord" &&

@@ -183,24 +183,16 @@ async function handleSignedInRole(role, identity = {}) {
 
 async function checkSession() {
   try {
-    const payload = await requestJson("/api/auth/session", { cache: "no-store" });
+    const payload = await requestJson("/api/auth/landlord/session", { cache: "no-store" });
     const role = payload.data?.role;
     return handleSignedInRole(role, payload.data ?? {});
-  } catch (_userSessionError) {
+  } catch (_landlordSessionError) {
     try {
-      const adminPayload = await requestJson("/api/auth/admin/session", {
-        cache: "no-store"
-      });
-      const adminRole = adminPayload.data?.role;
-      if (adminRole) {
-        setStatus(
-          `Signed in as ${adminRole}. Redirecting...`
-        );
-        window.location.href = "/landlord";
-        return true;
-      }
-    } catch (_adminSessionError) {
-      // no active admin session
+      const payload = await requestJson("/api/auth/session", { cache: "no-store" });
+      const role = payload.data?.role;
+      return handleSignedInRole(role, payload.data ?? {});
+    } catch (_userSessionError) {
+      // no active manager/user session
     }
     return false;
   }
