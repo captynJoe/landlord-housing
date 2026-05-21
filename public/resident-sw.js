@@ -1,10 +1,10 @@
-const CACHE_NAME = "estatedesk-resident-v20260519a";
+const CACHE_NAME = "jk-flats-resident-v20260521b";
 const RESIDENT_SHELL_URL = "/resident";
 const APP_ASSETS = [
   RESIDENT_SHELL_URL,
   "/users.css?v=20260509a",
   "/dedicated-theme.css?v=20260519a",
-  "/users.js?v=20260519a",
+  "/users.js?v=20260521b",
   "/password-visibility.js",
   "/manifest.webmanifest",
   "/icons/housing-app.svg",
@@ -118,12 +118,12 @@ self.addEventListener("push", (event) => {
     };
   }
 
-  const title = data.title || "EstateDesk Resident";
+  const title = data.title || "JK Flats Resident";
   const options = {
     body: data.body || "New resident update available.",
     icon: "/icons/housing-app.svg",
     badge: "/icons/housing-badge.svg",
-    tag: data.tag || "estatedesk-resident",
+    tag: data.tag || "jk-flats-resident",
     data: {
       url: data.url || "/resident"
     }

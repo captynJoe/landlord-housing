@@ -2,7 +2,7 @@ import {
   applyDocumentBranding,
   getLandlordPortalTitle,
   getLandlordShellBrand
-} from "./portal-branding.js";
+} from "./portal-branding.js?v=20260521b";
 import { notifyError, notifyStatus } from "./notifications.js";
 
 const roomAccountTagEl = document.getElementById("room-account-tag");

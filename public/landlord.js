@@ -10,7 +10,7 @@ import {
   applyDocumentBranding,
   getLandlordPortalTitle,
   getLandlordShellBrand
-} from "./portal-branding.js";
+} from "./portal-branding.js?v=20260521b";
 
 const authStatusEl = document.getElementById("auth-status");
 const landlordRoleEl = document.getElementById("landlord-role");
@@ -4553,7 +4553,7 @@ function downloadUtilityBulkAuditCsv(record) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = [
-    "estatedesk",
+    "jk-flats",
     String(record.buildingId || "").trim().toLowerCase(),
     String(record.billingMonth || "").trim(),
     "bulk-utility-audit.csv"

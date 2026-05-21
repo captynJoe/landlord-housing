@@ -2,10 +2,10 @@ import {
   applyDocumentBranding,
   getResidentProfileTitle,
   getResidentShellBrand
-} from "./portal-branding.js";
+} from "./portal-branding.js?v=20260521b";
 import { notifyError, notifyStatus } from "./notifications.js";
 
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260325b";
+const RESIDENT_SW_URL = "/resident-sw.js?v=20260521b";
 
 const apiStatusEl = document.getElementById("api-status");
 const authStateEl = document.getElementById("auth-state");

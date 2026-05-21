@@ -4,7 +4,7 @@ Last updated: 2026-05-19
 
 ## Target Shape
 
-Deploy EstateDesk as its own service, database, uploads volume, and public domain.
+Deploy JK Flats as its own service, database, uploads volume, and public domain.
 CAPTYN Housing remains separate and keeps its current deployment.
 
 Recommended production topology:
@@ -92,7 +92,7 @@ Expected shape:
 
 Run these on the frontend VPS that already hosts the public Nginx entrypoint.
 The frontend VPS needs this repo present so it can mount `public/` and the
-EstateDesk Nginx templates.
+JK Flats Nginx templates.
 
 ```bash
 cd /home/captyn/landlord-housing

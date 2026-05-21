@@ -1,7 +1,7 @@
 {
   "id": "/resident",
-  "name": "EstateDesk Resident",
-  "short_name": "EstateDesk",
+  "name": "JK Flats Resident",
+  "short_name": "JK Flats",
   "description": "Resident workspace for rent, utility, support, and building updates.",
   "start_url": "/resident",
   "scope": "/",

@@ -9,12 +9,12 @@ import {
   applyDocumentBranding,
   getResidentPortalTitle,
   getResidentShellBrand
-} from "./portal-branding.js";
+} from "./portal-branding.js?v=20260521b";
 
 const RESIDENT_TOKEN_KEY = "estatedesk_resident_session_token";
 const RESIDENT_SESSION_TOKEN_KEY = "estatedesk_resident_session_token_session";
 const RESIDENT_REMEMBER_DEVICE_KEY = "estatedesk_resident_remember_device";
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260519a";
+const RESIDENT_SW_URL = "/resident-sw.js?v=20260521b";
 
 let deferredInstallPrompt = null;
 let residentSwRegistrationPromise = null;
@@ -1792,7 +1792,7 @@ function downloadActiveReceipt() {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `estatedesk-${state.activeReceipt.kind}-receipt-${fileSafeReference || "payment"}.html`;
+  anchor.download = `jk-flats-${state.activeReceipt.kind}-receipt-${fileSafeReference || "payment"}.html`;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();

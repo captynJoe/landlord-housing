@@ -1,8 +1,8 @@
-const DEFAULT_RESIDENT_BRAND = "EstateDesk Resident";
-const DEFAULT_RESIDENT_PROFILE = "EstateDesk Profile";
-const DEFAULT_LANDLORD_BRAND = "EstateDesk Manager";
-const DEFAULT_PUBLIC_HOME = "EstateDesk Resident";
-const DEFAULT_PORTFOLIO_BRAND = "EstateDesk";
+const DEFAULT_RESIDENT_BRAND = "JK Flats Resident";
+const DEFAULT_RESIDENT_PROFILE = "JK Flats Profile";
+const DEFAULT_LANDLORD_BRAND = "JK Flats Manager";
+const DEFAULT_PUBLIC_HOME = "JK Flats Resident";
+const DEFAULT_PORTFOLIO_BRAND = "JK Flats";
 
 export function normalizeBuildingBrand(value) {
   const normalized = String(value ?? "").trim();

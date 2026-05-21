@@ -68,7 +68,7 @@ npm run db:logs
 
 ## Split VPS Docker deploy
 
-EstateDesk can deploy like CAPTYN Housing without sharing its runtime:
+JK Flats can deploy like CAPTYN Housing without sharing its runtime:
 
 - VPS2 runs `landlord_housing_api` and `landlord_housing_db` from `docker-compose.vps2.yml`.
 - VPS2 binds the API privately on `<vps2-private-ip>:4110`, leaving CAPTYN Housing's `4100` path alone.
