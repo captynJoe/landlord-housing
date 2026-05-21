@@ -51,6 +51,7 @@ ESTATEDESK_CORS_ORIGIN=https://<customer-domain>
 LANDLORD_HOUSING_DB_PASSWORD=<strong-database-password>
 ESTATEDESK_WIFI_PAYMENT_CALLBACK_TOKEN=<strong-unique-token>
 ESTATEDESK_MPESA_RENT_CALLBACK_TOKEN=<strong-unique-token>
+ESTATEDESK_RECOVERY_LANDLORD_USERNAME=mashbuildings
 ESTATEDESK_RECOVERY_LANDLORD_PASSWORD=<strong-owner-recovery-password>
 ESTATEDESK_RECOVERY_ADMIN_PASSWORD=<strong-admin-recovery-password>
 ESTATEDESK_RECOVERY_ROOT_PASSWORD=<strong-root-recovery-password>

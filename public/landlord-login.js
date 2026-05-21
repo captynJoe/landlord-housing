@@ -107,6 +107,10 @@ function identifierLoginPayload(identifier, password) {
     : { email: normalized, password };
 }
 
+function looksLikeEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? "").trim());
+}
+
 function looksLikeKenyaPhone(value) {
   return /^(\+254|254|0)\d{9}$/.test(String(value ?? "").trim().replace(/[\s-]/g, ""));
 }
@@ -322,13 +326,21 @@ async function signIn(event) {
       return;
     }
 
-    const payload = await requestJson("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify(identifierLoginPayload(identifier, password))
-    });
+    const managerUsernameLogin = !looksLikeKenyaPhone(identifier) && !looksLikeEmail(identifier);
+    const payload = await requestJson(
+      managerUsernameLogin ? "/api/auth/landlord/login" : "/api/auth/login",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(
+          managerUsernameLogin
+            ? { username: identifier, password }
+            : identifierLoginPayload(identifier, password)
+        )
+      }
+    );
 
     const role = payload.data?.role;
     const handled = await handleSignedInRole(role, payload.data ?? {});

@@ -21,7 +21,7 @@
           <p class="tag">EstateDesk Operations</p>
           <h1>Manager Sign-In</h1>
           <p class="subtitle">
-            Sign in with your property account (email or phone + password)
+            Sign in with your property account (email, phone, or username + password)
             to manage buildings, approve tenant applications, and publish utility bills.
           </p>
         </div>
@@ -31,17 +31,17 @@
       <section class="panel auth-panel" style="grid-template-columns: 1fr; max-width: 700px;">
         <form id="landlord-login-form" class="package-card">
           <p class="status-text">
-            Manager login: use email/phone + password.
+            Manager login: use email, phone, or recovery username + password.
             House manager login: enable house manager mode and use phone + house number.
             First-time house managers leave password empty, set a new password once, then future sign-ins use that password.
           </p>
           <label>
-            Email or Phone
+            Email, Phone, or Username
             <input
               id="landlord-email"
               type="text"
               autocomplete="username"
-              placeholder="manager@example.com or 07XXXXXXXX"
+              placeholder="manager@example.com, 07XXXXXXXX, or username"
               required
             />
           </label>
@@ -121,6 +121,6 @@
       </section>
     </main>
 
-    <script type="module" src="/landlord-login.js?v=20260323b"></script>
+    <script type="module" src="/landlord-login.js?v=20260521a"></script>
   </body>
 </html>
