@@ -5475,18 +5475,18 @@ async function bootstrap() {
     const roomBuildingId = buildings[0]?.id ?? "";
 
     const applicationsPromise =
-      context.role === "caretaker" || !context.userSession
+      context.role === "caretaker"
         ? Promise.resolve([])
         : (async () => {
-            const session = context.userSession;
-            if (!session) {
-              return [];
-            }
             if (!userAccountService) {
               throw new Error(
                 "User account service unavailable. Database connection is required."
               );
             }
+            const session = context.userSession ?? {
+              role: context.role as UserRole,
+              userId: context.userId ?? null
+            };
             return userAccountService.listLandlordApplications(
               session,
               applicationStatus
@@ -9694,10 +9694,6 @@ async function bootstrap() {
       }
 
       const session = context.userSession;
-      if (!session) {
-        return res.json({ data: [], role: context.role });
-      }
-
       if (!userAccountService) {
         return res.status(503).json({
           error: "User account service unavailable. Database connection is required."
@@ -9705,8 +9701,12 @@ async function bootstrap() {
       }
 
       const status = parseTenantApplicationStatus(req.query.status);
+      const actor = session ?? {
+        role: context.role as UserRole,
+        userId: context.userId ?? null
+      };
       const data = await userAccountService.listLandlordApplications(
-        session,
+        actor,
         status
       );
       return res.json({ data, role: context.role });
@@ -9729,13 +9729,6 @@ async function bootstrap() {
       }
 
       const session = context.userSession;
-      if (!session) {
-        return res.status(403).json({
-          error:
-            "Tenant application review requires a database-backed owner/staff account."
-        });
-      }
-
       if (!userAccountService) {
         return res.status(503).json({
           error: "User account service unavailable. Database connection is required."
@@ -9743,9 +9736,13 @@ async function bootstrap() {
       }
 
       const parsed = landlordDecisionSchema.parse(req.body);
+      const actor = session ?? {
+        role: context.role as UserRole,
+        userId: context.userId ?? null
+      };
       try {
         const data = await userAccountService.reviewTenantApplication(
-          session,
+          actor,
           req.params.applicationId,
           parsed
         );

@@ -42,6 +42,10 @@ export interface AuthenticatedUserSession {
   residentTenancyId?: string;
 }
 
+type LandlordApplicationActor = Pick<AuthenticatedUserSession, "role"> & {
+  userId?: string | null;
+};
+
 export interface ResidentPhoneSessionResult {
   session: AuthenticatedUserSession;
   tenancyId: string;
@@ -1664,7 +1668,7 @@ export class UserAccountService {
   }
 
   async listLandlordApplications(
-    session: AuthenticatedUserSession,
+    session: LandlordApplicationActor,
     status?: TenantApplicationStatus
   ) {
     if (session.role !== "landlord" && session.role !== "admin" && session.role !== "root_admin") {
@@ -1704,7 +1708,7 @@ export class UserAccountService {
   }
 
   async reviewTenantApplication(
-    session: AuthenticatedUserSession,
+    session: LandlordApplicationActor,
     applicationId: string,
     input: LandlordDecisionInput
   ) {
@@ -1756,7 +1760,7 @@ export class UserAccountService {
           data: {
             status: "rejected",
             reviewedAt: rejectedAt,
-            reviewedByUserId: session.userId,
+            reviewedByUserId: session.userId ?? null,
             note: input.note ?? application.note
           }
         });
@@ -1847,7 +1851,7 @@ export class UserAccountService {
         data: {
           status: "approved",
           reviewedAt: new Date(),
-          reviewedByUserId: session.userId,
+          reviewedByUserId: session.userId ?? null,
           note: input.note ?? application.note
         }
       });
