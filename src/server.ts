@@ -5462,12 +5462,36 @@ async function bootstrap() {
     return [...collectionRowsByKey.values()].slice(0, limit);
   };
 
+  const STARTUP_RECURRING_UTILITY_BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
+  let startupRecurringUtilityBackfillPromise: Promise<unknown> | null = null;
+  let startupRecurringUtilityBackfillLastStartedAt = 0;
+
+  function scheduleStartupRecurringUtilityBackfill(reason: string) {
+    const now = Date.now();
+    if (
+      startupRecurringUtilityBackfillPromise ||
+      now - startupRecurringUtilityBackfillLastStartedAt <
+        STARTUP_RECURRING_UTILITY_BACKFILL_INTERVAL_MS
+    ) {
+      return;
+    }
+
+    startupRecurringUtilityBackfillLastStartedAt = now;
+    startupRecurringUtilityBackfillPromise = ensureRecurringUtilityBillsCurrent(reason)
+      .catch((error) => {
+        console.error("Startup recurring utility backfill failed.", error);
+      })
+      .finally(() => {
+        startupRecurringUtilityBackfillPromise = null;
+      });
+  }
+
   const buildLandlordStartupPayload = async (context: {
     role: string;
     userId?: string;
     userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
   }) => {
-    await ensureRecurringUtilityBillsCurrent("landlord.startup");
+    scheduleStartupRecurringUtilityBackfill("landlord.startup");
     const buildings = await listLandlordBuildingSummaries(context);
     const visibleBuildingIds = new Set(buildings.map((item) => item.id));
     const applicationStatus: TenantApplicationStatus = "pending";
@@ -5549,9 +5573,15 @@ async function bootstrap() {
       : rentEnabledBuildings[0]?.id ?? "";
     const wifiPackageBuildingId = buildings.find((building) => building.wifiEnabled)?.id ?? "";
 
-    let wifiPackages: unknown[] = [];
-    let wifiPackagesUnavailableReason = "";
-    if (wifiPackageBuildingId) {
+    const wifiPackagesPromise = (async () => {
+      if (!wifiPackageBuildingId) {
+        return {
+          wifiPackages: [] as unknown[],
+          wifiPackagesUnavailableReason:
+            "Wi-Fi is hidden because no building has it enabled."
+        };
+      }
+
       if (!buildingWifiPackageService) {
         throw new Error("Wi-Fi package management requires database connection.");
       }
@@ -5559,21 +5589,102 @@ async function bootstrap() {
       await buildingWifiPackageService.ensureDefaultsForBuildings([
         { id: wifiPackageBuildingId }
       ]);
-      wifiPackages = await buildingWifiPackageService.listForBuilding(wifiPackageBuildingId);
-    } else {
-      wifiPackagesUnavailableReason =
-        "Wi-Fi is hidden because no building has it enabled.";
-    }
+      return {
+        wifiPackages:
+          await buildingWifiPackageService.listForBuilding(wifiPackageBuildingId),
+        wifiPackagesUnavailableReason: ""
+      };
+    })();
+    const utilityBuildingConfigurationPromise =
+      registryBuildingId && buildingConfigurationService
+        ? buildingConfigurationService.getForBuilding(registryBuildingId)
+        : Promise.resolve(null);
+    const moveOutSettlementsPromise = registryBuildingId
+      ? listLandlordMoveOutSettlements({
+          context,
+          buildingId: registryBuildingId,
+          limit: 500
+        })
+      : Promise.resolve([]);
+    const caretakerAccessPromise = (async () => {
+      if (!registryBuildingId) {
+        return {
+          caretakerRequests: [] as Array<
+            ReturnType<typeof mapCaretakerAccessRequestWithUser>
+          >,
+          caretakers: [] as Array<
+            CaretakerAccessRecord & {
+              user: {
+                id: string;
+                fullName: string;
+                email: string | null;
+                phone: string;
+                role: string;
+                status: string;
+              } | null;
+            }
+          >
+        };
+      }
+
+      if (!repositoryContext.prisma) {
+        throw new Error("Caretaker access management requires database connection.");
+      }
+
+      const pendingRequests = listCaretakerAccessRequests({
+        buildingId: registryBuildingId,
+        status: "pending"
+      });
+      const caretakerRecords = listCaretakerRecordsForBuilding(registryBuildingId);
+      const userIds = [
+        ...new Set([
+          ...pendingRequests.map((item) => item.userId),
+          ...caretakerRecords.map((item) => item.userId)
+        ])
+      ];
+
+      const users =
+        userIds.length > 0
+          ? await repositoryContext.prisma.housingUser.findMany({
+              where: {
+                id: { in: userIds }
+              },
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                phone: true,
+                role: true,
+                status: true
+              }
+            })
+          : [];
+      const userById = new Map(users.map((item) => [item.id, item]));
+
+      return {
+        caretakerRequests: pendingRequests.map((item) =>
+          mapCaretakerAccessRequestWithUser(item, userById.get(item.userId) ?? null)
+        ),
+        caretakers: caretakerRecords.map((item) => ({
+          ...item,
+          user: userById.get(item.userId) ?? null
+        }))
+      };
+    })();
+    const ownerStaffPromise =
+      context.role === "caretaker" || !userAccountService
+        ? Promise.resolve({
+            users: [],
+            limit: OWNER_STAFF_LIMIT,
+            remaining: 0
+          })
+        : userAccountService.listOwnerStaffUsers();
 
     const registryRows = registryBuildingId
       ? residentDirectory
           .filter((item) => item.buildingId === registryBuildingId)
           .map(({ buildingId: _buildingId, buildingName: _buildingName, ...row }) => row)
       : [];
-    const utilityBuildingConfiguration =
-      registryBuildingId && buildingConfigurationService
-        ? await buildingConfigurationService.getForBuilding(registryBuildingId)
-        : null;
     const utilityRateDefaults = registryBuildingId
       ? getUtilityRateDefaultsForBuilding(registryBuildingId) ?? { buildingId: registryBuildingId }
       : null;
@@ -5608,78 +5719,19 @@ async function bootstrap() {
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
           .slice(0, 500)
       : [];
-    const moveOutSettlements = registryBuildingId
-      ? await listLandlordMoveOutSettlements({
-          context,
-          buildingId: registryBuildingId,
-          limit: 500
-        })
-      : [];
-
-    let caretakerRequests: Array<ReturnType<typeof mapCaretakerAccessRequestWithUser>> = [];
-    let caretakers: Array<
-      CaretakerAccessRecord & {
-        user: {
-          id: string;
-          fullName: string;
-          email: string | null;
-          phone: string;
-          role: string;
-          status: string;
-        } | null;
-      }
-    > = [];
-
-    if (registryBuildingId) {
-      if (!repositoryContext.prisma) {
-        throw new Error("Caretaker access management requires database connection.");
-      }
-
-      const pendingRequests = listCaretakerAccessRequests({
-        buildingId: registryBuildingId,
-        status: "pending"
-      });
-      const caretakerRecords = listCaretakerRecordsForBuilding(registryBuildingId);
-      const userIds = [...new Set([
-        ...pendingRequests.map((item) => item.userId),
-        ...caretakerRecords.map((item) => item.userId)
-      ])];
-
-      const users =
-        userIds.length > 0
-          ? await repositoryContext.prisma.housingUser.findMany({
-              where: {
-                id: { in: userIds }
-              },
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-                phone: true,
-                role: true,
-                status: true
-              }
-            })
-          : [];
-      const userById = new Map(users.map((item) => [item.id, item]));
-
-      caretakerRequests = pendingRequests.map((item) =>
-        mapCaretakerAccessRequestWithUser(item, userById.get(item.userId) ?? null)
-      );
-      caretakers = caretakerRecords.map((item) => ({
-        ...item,
-        user: userById.get(item.userId) ?? null
-      }));
-    }
-
-    const ownerStaff =
-      context.role === "caretaker" || !userAccountService
-        ? {
-            users: [],
-            limit: OWNER_STAFF_LIMIT,
-            remaining: 0
-          }
-        : await userAccountService.listOwnerStaffUsers();
+    const [
+      { wifiPackages, wifiPackagesUnavailableReason },
+      utilityBuildingConfiguration,
+      moveOutSettlements,
+      { caretakerRequests, caretakers },
+      ownerStaff
+    ] = await Promise.all([
+      wifiPackagesPromise,
+      utilityBuildingConfigurationPromise,
+      moveOutSettlementsPromise,
+      caretakerAccessPromise,
+      ownerStaffPromise
+    ]);
 
     return {
       selection: {
