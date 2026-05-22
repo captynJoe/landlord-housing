@@ -56,9 +56,13 @@ ESTATEDESK_RECOVERY_LANDLORD_PASSWORD=<strong-owner-recovery-password>
 ESTATEDESK_RECOVERY_ADMIN_PASSWORD=<strong-admin-recovery-password>
 ESTATEDESK_RECOVERY_ROOT_PASSWORD=<strong-root-recovery-password>
 ESTATEDESK_SEED_OWNER_PASSWORD=<temporary-owner-password>
+ESTATEDESK_MIGRATION_TIMEOUT_SECONDS=180
 ```
 
-Start the service:
+Start the service. The helper builds the API image, starts PostgreSQL, waits for
+the database health check, runs Prisma migrations as a one-off task with a
+timeout, and only then recreates the API container. If migrations fail or time
+out, the existing API container is left in place.
 
 ```bash
 deploy/vps2/check-env.sh
@@ -72,9 +76,15 @@ before the seed so the database tables exist:
 deploy/vps2/deploy.sh --seed
 ```
 
-Keep `ESTATEDESK_RUN_SEED_ON_START=false` for normal operation. Set it to
-`true` only for a deliberate first-launch seed, because the seed carries owner
-account defaults that should not be rewritten on every restart.
+For an emergency restart when a deploy contains no Prisma changes and migration
+checks are blocked, skip migrations explicitly:
+
+```bash
+deploy/vps2/deploy.sh --skip-migrations
+```
+
+Use `--skip-migrations` only as an operational escape hatch. Normal deploys
+should run migrations before the API is recreated.
 
 Backend health check:
 

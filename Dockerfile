@@ -20,12 +20,10 @@ ENV NODE_ENV=production
 ENV PORT=4100
 ENV UPLOADS_DIR=/var/lib/landlord-housing/uploads
 ENV ALLOW_MEMORY_FALLBACK_ON_DB_ERROR=false
-ENV RUN_SEED_ON_START=false
 
 EXPOSE 4100
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
   CMD wget -q -T 3 --spider http://localhost:${PORT}/health || exit 1
 
-CMD ["sh", "-lc", "npm run prisma:deploy && if [ \"${RUN_SEED_ON_START:-false}\" = \"true\" ]; then npm run prisma:seed; fi && npm run start"]
-
+CMD ["npm", "run", "start"]

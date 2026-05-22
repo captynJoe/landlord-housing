@@ -39,7 +39,7 @@ Do not deploy a branch unless these pass:
 - `npm run typecheck`
 - `npm test`
 - `npm run build`
-- `npm run prisma:deploy`
+- `npm run prisma:deploy` or the VPS2 deploy helper's migration step
 - `npm run prisma:seed` only for first setup or intentional seed refresh
 - `curl -fsS http://localhost:4100/health`
 
@@ -54,4 +54,3 @@ Never commit:
 - database dumps.
 
 Keep production secrets in the process manager, deployment secret store, or a server-local `.env` outside git backups.
-

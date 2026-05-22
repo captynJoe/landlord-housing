@@ -93,7 +93,6 @@ services:
       SEED_BUILDING_NAME: ${ESTATEDESK_SEED_BUILDING_NAME:-Main Building}
       SEED_BUILDING_ADDRESS: ${ESTATEDESK_SEED_BUILDING_ADDRESS:-Set building address}
       SEED_BUILDING_COUNTY: ${ESTATEDESK_SEED_BUILDING_COUNTY:-Nairobi}
-      RUN_SEED_ON_START: ${ESTATEDESK_RUN_SEED_ON_START:-false}
     volumes:
       - landlord_housing_uploads:/var/lib/landlord-housing/uploads
     depends_on:

@@ -62,9 +62,20 @@ done
 
 base_url="$(read_env_value ESTATEDESK_BASE_URL)"
 callback_url="$(read_env_value ESTATEDESK_MPESA_CALLBACK_URL)"
+timeout_seconds="$(read_env_value ESTATEDESK_MIGRATION_TIMEOUT_SECONDS)"
 
 if [ -n "$callback_url" ] && [ "$callback_url" != "$base_url/api/payments/mpesa/rent-callback" ]; then
   echo "Warning: ESTATEDESK_MPESA_CALLBACK_URL does not match BASE_URL rent callback path." >&2
+fi
+
+if [ -n "$timeout_seconds" ]; then
+  if ! printf '%s' "$timeout_seconds" | grep -Eq '^[0-9]+$'; then
+    echo "ESTATEDESK_MIGRATION_TIMEOUT_SECONDS must be a whole number of seconds." >&2
+    failed=1
+  elif [ "$timeout_seconds" -lt 1 ]; then
+    echo "ESTATEDESK_MIGRATION_TIMEOUT_SECONDS must be greater than 0." >&2
+    failed=1
+  fi
 fi
 
 bind_ip="$(read_env_value ESTATEDESK_PRIVATE_BIND_IP)"
