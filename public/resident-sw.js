@@ -1,10 +1,14 @@
-const CACHE_NAME = "jk-flats-resident-v20260521b";
+const CACHE_NAME = "jk-flats-resident-v20260523a";
 const RESIDENT_SHELL_URL = "/resident";
+const LANDLORD_SHELL_URL = "/landlord";
 const APP_ASSETS = [
   RESIDENT_SHELL_URL,
+  LANDLORD_SHELL_URL,
   "/users.css?v=20260509a",
+  "/landlord.css?v=20260523a",
   "/dedicated-theme.css?v=20260519a",
-  "/users.js?v=20260521b",
+  "/users.js?v=20260523a",
+  "/landlord.js?v=20260523a",
   "/password-visibility.js",
   "/manifest.webmanifest",
   "/icons/housing-app.svg",
@@ -12,6 +16,10 @@ const APP_ASSETS = [
 ];
 
 function getShellCacheKey(pathname) {
+  if (pathname === "/landlord" || pathname.startsWith("/landlord/")) {
+    return LANDLORD_SHELL_URL;
+  }
+
   if (
     pathname === "/user" ||
     pathname === "/user/" ||
@@ -139,11 +147,15 @@ self.addEventListener("notificationclick", (event) => {
     event.notification.data?.url || "/resident",
     self.location.origin
   ).href;
+  const targetPath = new URL(targetUrl).pathname;
+  const targetShellPrefix = targetPath.startsWith("/landlord")
+    ? "/landlord"
+    : "/resident";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if (client.url.startsWith(`${self.location.origin}/resident`)) {
+        if (client.url.startsWith(`${self.location.origin}${targetShellPrefix}`)) {
           return client.focus();
         }
       }

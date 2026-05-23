@@ -423,6 +423,91 @@
   background: rgba(255, 255, 255, 0.16);
 }
 
+.landlord-alert-btn {
+  gap: 6px;
+}
+
+.landlord-alert-btn.has-alert {
+  border-color: rgba(243, 197, 91, 0.62);
+  background: rgba(243, 197, 91, 0.16);
+  color: #fff;
+}
+
+.landlord-notification-panel {
+  padding: 16px;
+}
+
+.landlord-notification-list {
+  display: grid;
+  gap: 8px;
+}
+
+.landlord-notification-item {
+  display: grid;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 1px solid rgba(15, 62, 87, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: inherit;
+  text-decoration: none;
+}
+
+.landlord-notification-item.is-unread {
+  border-color: rgba(184, 121, 47, 0.34);
+  background: rgba(255, 250, 239, 0.96);
+}
+
+.landlord-notification-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.landlord-notification-item strong {
+  font-size: 0.94rem;
+}
+
+.landlord-notification-item p,
+.landlord-notification-item small {
+  margin: 0;
+}
+
+.landlord-notification-item p {
+  color: rgba(16, 35, 49, 0.76);
+  font-size: 0.88rem;
+}
+
+.landlord-notification-item small {
+  color: rgba(16, 35, 49, 0.58);
+  font-size: 0.75rem;
+}
+
+.landlord-notification-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(15, 62, 87, 0.1);
+  color: #102331;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.landlord-notification-chip.chip-warning {
+  background: rgba(184, 121, 47, 0.16);
+  color: #7a4b14;
+}
+
+.landlord-notification-chip.chip-success {
+  background: rgba(24, 110, 110, 0.14);
+  color: #174f4b;
+}
+
 .metric-card-btn {
   appearance: none;
   border: 1px solid rgba(15, 62, 87, 0.14);

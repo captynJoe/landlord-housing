@@ -1821,6 +1821,7 @@ export class UserAccountService {
           id: application.building.id,
           name: application.building.name
         },
+        tenant: application.user,
         houseNumber: rejected.houseNumber,
         reviewedAt: rejected.reviewedAt?.toISOString()
       };

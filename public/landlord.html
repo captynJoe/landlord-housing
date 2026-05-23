@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260521a" />
+    <link rel="stylesheet" href="/landlord.css?v=20260523a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
@@ -30,6 +30,27 @@
           <div class="landlord-navbar-actions">
             <a href="/resident" class="home-link">Resident Desk</a>
             <span id="landlord-role" class="status-text">role: -</span>
+            <button
+              id="landlord-notifications-btn"
+              type="button"
+              class="landlord-alert-btn hidden"
+              aria-expanded="false"
+              aria-controls="landlord-notifications-panel"
+            >
+              Alerts
+              <span
+                id="landlord-notifications-badge"
+                class="landlord-nav-badge hidden"
+                aria-live="polite"
+              ></span>
+            </button>
+            <button
+              id="landlord-push-alerts-btn"
+              type="button"
+              class="landlord-push-alerts-btn hidden"
+            >
+              Enable Alerts
+            </button>
             <button id="refresh-all-btn" type="button">Refresh All</button>
             <button id="landlord-logout-btn" type="button">Sign Out</button>
             <button
@@ -104,6 +125,24 @@
             Expenses
           </button>
         </nav>
+      </section>
+
+      <section
+        id="landlord-notifications-panel"
+        class="panel landlord-notification-panel hidden"
+        aria-live="polite"
+      >
+        <div class="panel-head">
+          <div>
+            <h2>Owner Alerts</h2>
+            <p id="landlord-notifications-summary" class="status-text"></p>
+          </div>
+          <div class="action-row">
+            <button id="landlord-notifications-read-btn" type="button">Mark Read</button>
+            <button id="landlord-notifications-refresh-btn" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="landlord-notifications-list" class="landlord-notification-list"></div>
       </section>
 
       <section class="panel metrics-panel">
@@ -1636,6 +1675,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260521c"></script>
+    <script type="module" src="/landlord.js?v=20260523a"></script>
   </body>
 </html>

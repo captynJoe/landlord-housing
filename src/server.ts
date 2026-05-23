@@ -46,6 +46,10 @@ import {
   type UserSupportPersistedState
 } from "./services/userSupportService.js";
 import {
+  OwnerNotificationService,
+  type OwnerNotificationPersistedState
+} from "./services/ownerNotificationService.js";
+import {
   WifiAccessService,
   type WifiAccessPersistedState,
   type WifiPackage
@@ -120,6 +124,7 @@ import {
   recordUtilityPaymentSchema,
   mediaUploadSignatureRequestSchema,
   residentPushSubscriptionSchema,
+  ownerNotificationReadSchema,
   updateResidentNotificationPreferencesSchema,
   upsertUtilityMeterSchema,
   utilityTypeSchema,
@@ -293,6 +298,7 @@ const RUNTIME_QUEUES_STATE_KEY = "runtime_queues_v1";
 const PUSH_SUBSCRIPTIONS_STATE_KEY = "push_subscriptions_v1";
 const RESIDENT_NOTIFICATION_PREFERENCES_STATE_KEY =
   "resident_notification_preferences_v1";
+const OWNER_NOTIFICATIONS_STATE_KEY = "owner_notifications_v1";
 const DEFAULT_ALLOWED_CORS_ORIGINS: string[] = [];
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const COOKIE_PROTECTED_PATH_PREFIXES = ["/api/auth/", "/api/user/", "/api/landlord/", "/api/admin/"];
@@ -2740,6 +2746,7 @@ async function bootstrap() {
     ? new BuildingWifiPackageService(repositoryContext.prisma)
     : null;
   const userSupportService = new UserSupportService();
+  const ownerNotificationService = new OwnerNotificationService();
   const rentLedgerService = new RentLedgerService();
   const utilityBillingService = new UtilityBillingService();
   const paymentAccessService = new PaymentAccessService();
@@ -3474,7 +3481,8 @@ async function bootstrap() {
         buildingExpenditureState,
         runtimeQueuesState,
         pushSubscriptionState,
-        residentNotificationPreferenceState
+        residentNotificationPreferenceState,
+        ownerNotificationState
       ] = await Promise.all([
         loadAppStateJsonSafely<AdminAuthPersistedState>(ADMIN_AUTH_STATE_KEY),
         loadAppStateJsonSafely<RentLedgerPersistedState>(RENT_LEDGER_STATE_KEY),
@@ -3504,6 +3512,9 @@ async function bootstrap() {
         ),
         loadAppStateJsonSafely<ResidentNotificationPreferencePersistedState>(
           RESIDENT_NOTIFICATION_PREFERENCES_STATE_KEY
+        ),
+        loadAppStateJsonSafely<OwnerNotificationPersistedState>(
+          OWNER_NOTIFICATIONS_STATE_KEY
         )
       ]);
 
@@ -3519,6 +3530,7 @@ async function bootstrap() {
       residentNotificationPreferenceService.importState(
         residentNotificationPreferenceState
       );
+      ownerNotificationService.importState(ownerNotificationState);
       importCaretakerAccessState(caretakerAccessState);
       importBuildingExpenditureState(buildingExpenditureState);
       await syncDerivedBuildingConfigurationState();
@@ -3685,6 +3697,9 @@ async function bootstrap() {
       residentNotificationPreferenceService.setStateChangeHandler((state) =>
         queuePersist(RESIDENT_NOTIFICATION_PREFERENCES_STATE_KEY, state)
       );
+      ownerNotificationService.setStateChangeHandler((state) =>
+        queuePersist(OWNER_NOTIFICATIONS_STATE_KEY, state)
+      );
 
       if (utilityStateNormalized) {
         await appStateService.queueSetJson(
@@ -3737,6 +3752,10 @@ async function bootstrap() {
       void queuePersist(
         RESIDENT_NOTIFICATION_PREFERENCES_STATE_KEY,
         residentNotificationPreferenceService.exportState()
+      );
+      void queuePersist(
+        OWNER_NOTIFICATIONS_STATE_KEY,
+        ownerNotificationService.exportState()
       );
       persistCaretakerAccessState();
       persistBuildingExpenditureState();
@@ -4975,6 +4994,74 @@ async function bootstrap() {
     name: String(context.userSession?.fullName ?? "").trim() || undefined
   });
 
+  const buildLandlordRoomUrl = (buildingId?: string, houseNumber?: string) => {
+    const normalizedBuildingId = String(buildingId ?? "").trim();
+    const normalizedHouseNumber = String(houseNumber ?? "").trim();
+    if (!normalizedBuildingId) {
+      return "/landlord";
+    }
+    if (!normalizedHouseNumber) {
+      return `/landlord/rooms/${encodeURIComponent(normalizedBuildingId)}`;
+    }
+    return `/landlord/rooms/${encodeURIComponent(normalizedBuildingId)}/${encodeURIComponent(
+      normalizedHouseNumber
+    )}`;
+  };
+
+  const enqueueOwnerNotificationForManagerAction = async (
+    context: {
+      role: string;
+      userId?: string;
+      userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
+    },
+    input: {
+      title: string;
+      message: string;
+      level?: "info" | "warning" | "success";
+      action: string;
+      buildingId?: string;
+      buildingName?: string;
+      houseNumber?: string;
+      url?: string;
+      dedupeKey?: string;
+      metadata?: Record<string, unknown>;
+    }
+  ) => {
+    if (context.role !== "caretaker" || !userAccountService) {
+      return null;
+    }
+
+    const ownerStaff = await userAccountService.listOwnerStaffUsers();
+    const recipientUserIds = ownerStaff.users
+      .map((item) => item.id)
+      .filter((id) => id !== context.userSession?.userId);
+    if (recipientUserIds.length === 0) {
+      return null;
+    }
+
+    const actor = actorFromLandlordContext(context);
+    const notification = ownerNotificationService.enqueue({
+      ...input,
+      actorUserId: actor.userId,
+      actorName: actor.name,
+      actorRole: actor.role,
+      recipientUserIds,
+      url: input.url ?? buildLandlordRoomUrl(input.buildingId, input.houseNumber)
+    });
+
+    if (notification) {
+      void pushNotificationService.notifyUserIds(recipientUserIds, {
+        title: notification.title,
+        body: notification.message,
+        level: notification.level,
+        tag: notification.dedupeKey ?? `owner-alert-${notification.id}`,
+        url: notification.url ?? "/landlord"
+      });
+    }
+
+    return notification;
+  };
+
   const findActiveTenancyIdForRoomAudit = async (
     buildingId: string,
     houseNumber: string
@@ -5733,6 +5820,18 @@ async function bootstrap() {
       caretakerAccessPromise,
       ownerStaffPromise
     ]);
+    const ownerNotifications =
+      context.role !== "caretaker" && context.userId
+        ? {
+            notifications: ownerNotificationService.listForUser(context.userId, {
+              limit: 30
+            }),
+            unreadCount: ownerNotificationService.countUnreadForUser(context.userId)
+          }
+        : {
+            notifications: [],
+            unreadCount: 0
+          };
 
     return {
       selection: {
@@ -5756,6 +5855,7 @@ async function bootstrap() {
       wifiPackages,
       wifiPackagesUnavailableReason,
       ownerStaff,
+      ownerNotifications,
       caretakerRequests,
       caretakers,
       tickets,
@@ -8360,6 +8460,171 @@ async function bootstrap() {
     }
   });
 
+  app.get("/api/landlord/notifications", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (context.role === "caretaker") {
+        return res.status(403).json({
+          error: "House manager accounts do not receive owner alerts."
+        });
+      }
+      if (!context.userId) {
+        return res.status(403).json({
+          error: "Owner alerts require an owner/staff user session."
+        });
+      }
+
+      const limitRaw = Number(req.query.limit ?? 50);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(Math.trunc(limitRaw), 1), 200)
+        : 50;
+      const notifications = ownerNotificationService.listForUser(context.userId, {
+        limit
+      });
+
+      return res.json({
+        data: {
+          notifications,
+          unreadCount: ownerNotificationService.countUnreadForUser(context.userId)
+        },
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.post("/api/landlord/notifications/read", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (context.role === "caretaker") {
+        return res.status(403).json({
+          error: "House manager accounts do not receive owner alerts."
+        });
+      }
+      if (!context.userId) {
+        return res.status(403).json({
+          error: "Owner alerts require an owner/staff user session."
+        });
+      }
+
+      const parsed = ownerNotificationReadSchema.parse(req.body ?? {});
+      const readCount = ownerNotificationService.markRead(
+        context.userId,
+        parsed.notificationIds
+      );
+
+      return res.json({
+        data: {
+          readCount,
+          notifications: ownerNotificationService.listForUser(context.userId, {
+            limit: 50
+          }),
+          unreadCount: ownerNotificationService.countUnreadForUser(context.userId)
+        },
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.get("/api/landlord/push/config", async (req, res) => {
+    const context = await resolveLandlordAccessContext(req, res);
+    if (!context) {
+      return;
+    }
+
+    if (context.role === "caretaker" || !context.userId) {
+      return res.json({
+        data: {
+          enabled: false,
+          publicKey: null,
+          scope: "/",
+          startUrl: "/landlord"
+        },
+        role: context.role
+      });
+    }
+
+    return res.json({
+      data: {
+        enabled: pushNotificationService.isEnabled(),
+        publicKey: pushNotificationService.getPublicKey(),
+        scope: "/",
+        startUrl: "/landlord"
+      },
+      role: context.role
+    });
+  });
+
+  app.post("/api/landlord/push-subscriptions", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (context.role === "caretaker" || !context.userId) {
+        return res.status(403).json({
+          error: "Owner browser alerts require an owner/staff user session."
+        });
+      }
+      if (!pushNotificationService.isEnabled()) {
+        return res.status(503).json({
+          error: "Browser push notifications are not configured on this server."
+        });
+      }
+
+      const parsed = residentPushSubscriptionSchema.parse(req.body);
+      const record = pushNotificationService.upsertLandlordSubscription(
+        { userId: context.userId },
+        parsed,
+        req.get("user-agent")
+      );
+
+      return res.status(201).json({
+        data: {
+          endpoint: record.endpoint,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt
+        },
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.delete("/api/landlord/push-subscriptions", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (context.role === "caretaker" || !context.userId) {
+        return res.status(403).json({
+          error: "Owner browser alerts require an owner/staff user session."
+        });
+      }
+
+      const parsed = deleteResidentPushSubscriptionSchema.parse(req.body);
+      const removed = pushNotificationService.removeSubscription(parsed.endpoint);
+      return res.json({ data: { removed }, role: context.role });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   app.get("/api/landlord/staff", async (req, res, next) => {
     try {
       const context = await resolveLandlordAccessContext(req, res);
@@ -9799,6 +10064,27 @@ async function bootstrap() {
           req.params.applicationId,
           parsed
         );
+        await enqueueOwnerNotificationForManagerAction(context, {
+          title:
+            data.status === "approved"
+              ? "Resident Request Approved"
+              : "Resident Request Rejected",
+          message: `${actorFromLandlordContext(context).name || "House manager"} ${data.status === "approved" ? "approved" : "rejected"} ${data.tenant?.fullName ?? "a resident"} for ${data.building.name} house ${data.houseNumber}.`,
+          level: data.status === "approved" ? "success" : "warning",
+          action:
+            data.status === "approved"
+              ? "tenant_application.approved"
+              : "tenant_application.rejected",
+          buildingId: data.building.id,
+          buildingName: data.building.name,
+          houseNumber: data.houseNumber,
+          dedupeKey: `manager-tenant-application-${data.id}-${data.status}-${data.reviewedAt ?? Date.now()}`,
+          metadata: {
+            applicationId: data.id,
+            tenantUserId: data.tenant?.id,
+            reviewedAt: data.reviewedAt
+          }
+        });
         return res.json({ data });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to review application";
@@ -12715,6 +13001,27 @@ async function bootstrap() {
           applied: outcome.applied
         }
       });
+      const notificationBuilding =
+        context.role === "caretaker" ? await store.getBuilding(buildingId) : null;
+      await enqueueOwnerNotificationForManagerAction(context, {
+        title: "Rent Payment Recorded",
+        message: `${actorFromLandlordContext(context).name || "House manager"} recorded ${providerLabel} rent of KSh ${outcome.event.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber}.`,
+        level: "success",
+        action: "rent.payment.recorded",
+        buildingId,
+        buildingName: notificationBuilding?.name,
+        houseNumber,
+        dedupeKey: `manager-rent-payment-${outcome.event.id}`,
+        metadata: {
+          paymentId: outcome.event.id,
+          provider: outcome.event.provider,
+          providerReference: outcome.event.providerReference,
+          amountKsh: outcome.event.amountKsh,
+          billingMonth: outcome.event.billingMonth,
+          paidAt: outcome.event.paidAt,
+          applied: outcome.applied
+        }
+      });
       return res.status(outcome.applied ? 201 : 202).json({
         data: {
           buildingId: outcome.event.buildingId,
@@ -13851,6 +14158,26 @@ async function bootstrap() {
           parsed
         );
         await persistUtilityBillingStateNow();
+        const utilityLabel = utilityType === "water" ? "Water" : "Electricity";
+        const notificationBuilding =
+          context.role === "caretaker" ? await store.getBuilding(buildingId) : null;
+        await enqueueOwnerNotificationForManagerAction(context, {
+          title: `${utilityLabel} Bill Posted`,
+          message: `${actorFromLandlordContext(context).name || "House manager"} posted ${utilityLabel.toLowerCase()} bill of KSh ${data.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber} (${data.billingMonth}).`,
+          level: "info",
+          action: "utility.bill.posted",
+          buildingId,
+          buildingName: notificationBuilding?.name,
+          houseNumber,
+          dedupeKey: `manager-utility-bill-${data.id}`,
+          metadata: {
+            utilityType,
+            billId: data.id,
+            amountKsh: data.amountKsh,
+            billingMonth: data.billingMonth,
+            dueDate: data.dueDate
+          }
+        });
         return res.status(201).json({ data, role: context.role });
       } catch (error) {
         const mapped = mapUtilityDomainError(error);
@@ -14030,6 +14357,28 @@ async function bootstrap() {
               amountKsh: item.appliedAmountKsh,
               balanceKsh: item.bill.balanceKsh
             }))
+          }
+        });
+        const utilityLabel = utilityType === "water" ? "Water" : "Electricity";
+        const notificationBuilding =
+          context.role === "caretaker" ? await store.getBuilding(buildingId) : null;
+        await enqueueOwnerNotificationForManagerAction(context, {
+          title: `${utilityLabel} Payment Recorded`,
+          message: `${actorFromLandlordContext(context).name || "House manager"} recorded ${utilityLabel.toLowerCase()} payment of KSh ${data.event.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber}.`,
+          level: "success",
+          action: "utility.payment.recorded",
+          buildingId,
+          buildingName: notificationBuilding?.name,
+          houseNumber,
+          dedupeKey: `manager-utility-payment-${data.event.id}`,
+          metadata: {
+            utilityType,
+            paymentId: data.event.id,
+            provider: data.event.provider,
+            providerReference: data.event.providerReference,
+            amountKsh: data.event.amountKsh,
+            billingMonth: data.event.billingMonth,
+            paidAt: data.event.paidAt
           }
         });
         return res.status(201).json({ data, role: context.role });
@@ -14461,6 +14810,24 @@ async function bootstrap() {
         return res.status(404).json({ error: "Ticket not found" });
       }
 
+      const notificationBuilding =
+        context.role === "caretaker" ? await store.getBuilding(current.buildingId) : null;
+      await enqueueOwnerNotificationForManagerAction(context, {
+        title: "Support Ticket Updated",
+        message: `${actorFromLandlordContext(context).name || "House manager"} moved ticket ${current.id.slice(0, 8)} for ${notificationBuilding?.name ?? current.buildingId} house ${current.houseNumber} to ${updated.report.status.replace(/_/g, " ")}.`,
+        level: updated.report.status === "resolved" ? "success" : "info",
+        action: "support_ticket.status_updated",
+        buildingId: current.buildingId,
+        buildingName: notificationBuilding?.name,
+        houseNumber: current.houseNumber,
+        dedupeKey: `manager-ticket-${current.id}-${updated.report.status}-${updated.report.statusUpdatedAt}`,
+        metadata: {
+          ticketId: current.id,
+          status: updated.report.status,
+          queue: updated.report.queue,
+          statusUpdatedAt: updated.report.statusUpdatedAt
+        }
+      });
       return res.json({ data: updated, role: context.role });
     } catch (error) {
       return next(error);
@@ -15125,6 +15492,28 @@ async function bootstrap() {
             settlementReason: parsed.settlementReason,
             removedAt: data.removedAt,
             billingSettlement
+          }
+        });
+        await enqueueOwnerNotificationForManagerAction(context, {
+          title: "Resident Cleared",
+          message: `${actor.name || "House manager"} cleared ${data.user.fullName} from ${data.building.name} house ${data.houseNumber}. Settlement: ${parsed.settlementAction.replace(/_/g, " ")}.`,
+          level:
+            billingSettlement.totalSettledKsh > 0 || parsed.settlementAction === "collect_before_move_out"
+              ? "warning"
+              : "info",
+          action: "resident.removed",
+          buildingId,
+          buildingName: data.building.name,
+          houseNumber: data.houseNumber,
+          dedupeKey: `manager-resident-removed-${data.tenancyId}-${data.removedAt}`,
+          metadata: {
+            removedUserId: data.user.id,
+            residentPhone: data.user.phone,
+            settlementAction: parsed.settlementAction,
+            settlementReason: parsed.settlementReason,
+            settlementRecordId: settlementRecord?.id,
+            totalSettledKsh: billingSettlement.totalSettledKsh,
+            removedAt: data.removedAt
           }
         });
         return res.json({

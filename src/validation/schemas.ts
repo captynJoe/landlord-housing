@@ -255,6 +255,10 @@ export const deleteResidentPushSubscriptionSchema = z.object({
   endpoint: z.string().trim().url().max(2_048)
 });
 
+export const ownerNotificationReadSchema = z.object({
+  notificationIds: z.array(nonEmptyString.max(120)).max(100).optional()
+});
+
 export const updateResidentNotificationPreferencesSchema = z
   .object({
     smsEnabled: z.boolean().optional(),

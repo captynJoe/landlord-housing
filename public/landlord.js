@@ -12,10 +12,31 @@ import {
   getLandlordShellBrand
 } from "./portal-branding.js?v=20260521b";
 
+const LANDLORD_SW_URL = "/resident-sw.js?v=20260523a";
 const authStatusEl = document.getElementById("auth-status");
 const landlordRoleEl = document.getElementById("landlord-role");
 const landlordBrandTagEl = document.getElementById("landlord-brand-tag");
 const landlordBrandTitleEl = document.getElementById("landlord-brand-title");
+const landlordNotificationsBtnEl = document.getElementById("landlord-notifications-btn");
+const landlordNotificationsBadgeEl = document.getElementById(
+  "landlord-notifications-badge"
+);
+const landlordPushAlertsBtnEl = document.getElementById("landlord-push-alerts-btn");
+const landlordNotificationsPanelEl = document.getElementById(
+  "landlord-notifications-panel"
+);
+const landlordNotificationsSummaryEl = document.getElementById(
+  "landlord-notifications-summary"
+);
+const landlordNotificationsListEl = document.getElementById(
+  "landlord-notifications-list"
+);
+const landlordNotificationsReadBtnEl = document.getElementById(
+  "landlord-notifications-read-btn"
+);
+const landlordNotificationsRefreshBtnEl = document.getElementById(
+  "landlord-notifications-refresh-btn"
+);
 const refreshAllBtnEl = document.getElementById("refresh-all-btn");
 const landlordLogoutBtnEl = document.getElementById("landlord-logout-btn");
 const landlordGlobalSearchFormEl = document.getElementById("landlord-global-search-form");
@@ -388,6 +409,11 @@ const state = {
   ownerStaff: [],
   ownerStaffLimit: 3,
   ownerStaffRemaining: 0,
+  ownerNotifications: [],
+  ownerNotificationsUnreadCount: 0,
+  ownerNotificationsOpen: false,
+  landlordPushConfig: null,
+  landlordPushSubscriptionEndpoint: "",
   caretakerRequests: [],
   caretakers: [],
   tickets: [],
@@ -425,6 +451,7 @@ const buildingLabelCollator = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: "base"
 });
+let landlordSwRegistrationPromise = null;
 
 initResponsiveTables();
 
@@ -764,6 +791,110 @@ function updateApplicationsIndicator() {
   }
 }
 
+function isOwnerAlertRole() {
+  return state.role === "landlord" || state.role === "admin" || state.role === "root_admin";
+}
+
+function updateOwnerNotificationControls() {
+  const owner = isOwnerAlertRole();
+  const unreadCount = Number(state.ownerNotificationsUnreadCount ?? 0);
+
+  if (landlordNotificationsBtnEl instanceof HTMLButtonElement) {
+    landlordNotificationsBtnEl.classList.toggle("hidden", !owner);
+    landlordNotificationsBtnEl.setAttribute(
+      "aria-expanded",
+      state.ownerNotificationsOpen ? "true" : "false"
+    );
+    landlordNotificationsBtnEl.classList.toggle("has-alert", owner && unreadCount > 0);
+  }
+
+  if (landlordNotificationsBadgeEl instanceof HTMLElement) {
+    landlordNotificationsBadgeEl.textContent = String(unreadCount);
+    landlordNotificationsBadgeEl.classList.toggle("hidden", !owner || unreadCount <= 0);
+  }
+
+  if (landlordNotificationsPanelEl instanceof HTMLElement) {
+    landlordNotificationsPanelEl.classList.toggle(
+      "hidden",
+      !owner || !state.ownerNotificationsOpen
+    );
+  }
+
+  renderLandlordPushControls();
+}
+
+function renderOwnerNotifications() {
+  updateOwnerNotificationControls();
+
+  if (!(landlordNotificationsListEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const notifications = Array.isArray(state.ownerNotifications)
+    ? state.ownerNotifications
+    : [];
+  const unreadCount = Number(state.ownerNotificationsUnreadCount ?? 0);
+
+  if (landlordNotificationsSummaryEl instanceof HTMLElement) {
+    landlordNotificationsSummaryEl.textContent =
+      notifications.length === 0
+        ? "No owner alerts yet."
+        : `${unreadCount} unread of ${notifications.length} recent alert${
+            notifications.length === 1 ? "" : "s"
+          }.`;
+  }
+
+  if (landlordNotificationsReadBtnEl instanceof HTMLButtonElement) {
+    landlordNotificationsReadBtnEl.disabled = unreadCount <= 0;
+  }
+
+  landlordNotificationsListEl.replaceChildren();
+  if (notifications.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "No manager actions have created owner alerts yet.";
+    landlordNotificationsListEl.append(empty);
+    return;
+  }
+
+  notifications.slice(0, 30).forEach((notification) => {
+    const item = document.createElement(notification.url ? "a" : "article");
+    item.className = `landlord-notification-item ${
+      notification.read ? "is-read" : "is-unread"
+    }`;
+    if (notification.url) {
+      item.href = notification.url;
+    }
+
+    const head = document.createElement("div");
+    head.className = "landlord-notification-item-head";
+
+    const title = document.createElement("strong");
+    title.textContent = notification.title || "Owner Alert";
+
+    const chip = document.createElement("span");
+    chip.className = `landlord-notification-chip chip-${notification.level || "info"}`;
+    chip.textContent = notification.level || "info";
+
+    head.append(title, chip);
+
+    const message = document.createElement("p");
+    message.textContent = notification.message || "";
+
+    const meta = document.createElement("small");
+    const metaParts = [
+      notification.buildingName || notification.buildingId,
+      notification.houseNumber ? `House ${notification.houseNumber}` : "",
+      notification.actorName ? `By ${notification.actorName}` : "",
+      formatDateTime(notification.createdAt)
+    ].filter(Boolean);
+    meta.textContent = metaParts.join(" • ");
+
+    item.append(head, message, meta);
+    landlordNotificationsListEl.append(item);
+  });
+}
+
 function applyRoleCapabilities() {
   const caretaker = isCaretakerRole();
 
@@ -781,6 +912,8 @@ function applyRoleCapabilities() {
     }
     button.classList.toggle("hidden", caretaker);
   });
+
+  updateOwnerNotificationControls();
 }
 
 function redirectToLogin() {
@@ -4904,6 +5037,266 @@ async function requestJson(url, options = {}) {
   }
 
   return payload;
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let index = 0; index < rawData.length; index += 1) {
+    outputArray[index] = rawData.charCodeAt(index);
+  }
+
+  return outputArray;
+}
+
+function supportsLandlordPush() {
+  return (
+    typeof window !== "undefined" &&
+    "Notification" in window &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window
+  );
+}
+
+function renderLandlordPushControls() {
+  if (!(landlordPushAlertsBtnEl instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const owner = isOwnerAlertRole();
+  const config = state.landlordPushConfig;
+  const hasSubscription = Boolean(state.landlordPushSubscriptionEndpoint);
+  const supported = supportsLandlordPush();
+  const serverEnabled = Boolean(config?.enabled && config.publicKey);
+  const permission = supported ? Notification.permission : "denied";
+
+  landlordPushAlertsBtnEl.classList.toggle(
+    "hidden",
+    !owner || !supported || !serverEnabled || hasSubscription
+  );
+  landlordPushAlertsBtnEl.disabled =
+    !owner || !supported || !serverEnabled || permission === "denied";
+  landlordPushAlertsBtnEl.textContent =
+    permission === "denied" ? "Alerts Blocked" : "Enable Alerts";
+}
+
+async function ensureLandlordServiceWorkerRegistration() {
+  if (!supportsLandlordPush()) {
+    return null;
+  }
+
+  if (!landlordSwRegistrationPromise) {
+    landlordSwRegistrationPromise = navigator.serviceWorker
+      .register(LANDLORD_SW_URL, { scope: "/" })
+      .catch((error) => {
+        landlordSwRegistrationPromise = null;
+        console.error("Failed to register JK Flats service worker", error);
+        return null;
+      });
+  }
+
+  return landlordSwRegistrationPromise;
+}
+
+async function getLandlordPushSubscription() {
+  const registration = await ensureLandlordServiceWorkerRegistration();
+  if (!registration || !supportsLandlordPush()) {
+    return null;
+  }
+
+  return registration.pushManager.getSubscription();
+}
+
+async function loadLandlordPushConfig() {
+  if (!isOwnerAlertRole()) {
+    state.landlordPushConfig = null;
+    state.landlordPushSubscriptionEndpoint = "";
+    renderLandlordPushControls();
+    return null;
+  }
+
+  try {
+    const payload = await requestJson("/api/landlord/push/config", {
+      cache: "no-store"
+    });
+    state.landlordPushConfig = payload.data ?? null;
+  } catch (error) {
+    console.error("Failed to load owner alert push config", error);
+    state.landlordPushConfig = { enabled: false, publicKey: null };
+  }
+
+  renderLandlordPushControls();
+  return state.landlordPushConfig;
+}
+
+async function registerLandlordPushSubscription(subscription) {
+  await requestJson("/api/landlord/push-subscriptions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(subscription.toJSON())
+  });
+  state.landlordPushSubscriptionEndpoint = subscription.endpoint;
+  renderLandlordPushControls();
+}
+
+async function syncLandlordPushState({ subscribeIfAllowed = false } = {}) {
+  renderLandlordPushControls();
+
+  if (!isOwnerAlertRole() || !supportsLandlordPush()) {
+    state.landlordPushSubscriptionEndpoint = "";
+    renderLandlordPushControls();
+    return;
+  }
+
+  const config = state.landlordPushConfig ?? (await loadLandlordPushConfig());
+  if (!config?.enabled || !config.publicKey) {
+    renderLandlordPushControls();
+    return;
+  }
+
+  const subscription = await getLandlordPushSubscription();
+  state.landlordPushSubscriptionEndpoint = subscription?.endpoint ?? "";
+
+  if (!subscription && subscribeIfAllowed && Notification.permission === "granted") {
+    const registration = await ensureLandlordServiceWorkerRegistration();
+    if (!registration) {
+      return;
+    }
+    try {
+      const created = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.publicKey)
+      });
+      await registerLandlordPushSubscription(created);
+      state.landlordPushSubscriptionEndpoint = created.endpoint;
+    } catch (error) {
+      console.error("Failed to create owner alert push subscription", error);
+    }
+    renderLandlordPushControls();
+    return;
+  }
+
+  if (subscription && Notification.permission === "granted") {
+    try {
+      await registerLandlordPushSubscription(subscription);
+    } catch (error) {
+      console.error("Failed to sync owner alert push subscription", error);
+    }
+  }
+
+  renderLandlordPushControls();
+}
+
+async function enableLandlordPushAlerts() {
+  clearError();
+
+  if (!isOwnerAlertRole()) {
+    showError("Owner alerts are only available for owner/staff accounts.");
+    return;
+  }
+  if (!supportsLandlordPush()) {
+    showError("This browser does not support owner browser alerts.");
+    return;
+  }
+
+  const config = state.landlordPushConfig ?? (await loadLandlordPushConfig());
+  if (!config?.enabled || !config.publicKey) {
+    showError("Browser alerts are not configured on this server yet.");
+    return;
+  }
+
+  let permission = Notification.permission;
+  if (permission !== "granted") {
+    permission = await Notification.requestPermission();
+  }
+  if (permission !== "granted") {
+    renderLandlordPushControls();
+    setStatus("Owner browser alerts were not enabled.");
+    return;
+  }
+
+  const registration = await ensureLandlordServiceWorkerRegistration();
+  if (!registration) {
+    showError("Unable to prepare this device for owner browser alerts.");
+    return;
+  }
+
+  try {
+    const existing = await registration.pushManager.getSubscription();
+    const subscription =
+      existing ??
+      (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.publicKey)
+      }));
+    await registerLandlordPushSubscription(subscription);
+    setStatus("Owner browser alerts enabled for this device.");
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to enable owner browser alerts.";
+    showError(message);
+  } finally {
+    renderLandlordPushControls();
+  }
+}
+
+async function loadOwnerNotifications() {
+  if (!isOwnerAlertRole()) {
+    state.ownerNotifications = [];
+    state.ownerNotificationsUnreadCount = 0;
+    renderOwnerNotifications();
+    return;
+  }
+
+  const payload = await requestJson("/api/landlord/notifications?limit=50", {
+    cache: "no-store"
+  });
+  state.ownerNotifications = Array.isArray(payload.data?.notifications)
+    ? payload.data.notifications
+    : [];
+  state.ownerNotificationsUnreadCount = Number.isFinite(
+    Number(payload.data?.unreadCount)
+  )
+    ? Number(payload.data.unreadCount)
+    : state.ownerNotifications.filter((item) => !item.read).length;
+  renderOwnerNotifications();
+}
+
+async function markOwnerNotificationsRead() {
+  if (!isOwnerAlertRole()) {
+    return;
+  }
+
+  const unreadIds = state.ownerNotifications
+    .filter((item) => !item.read)
+    .map((item) => item.id)
+    .filter(Boolean);
+  if (unreadIds.length === 0) {
+    renderOwnerNotifications();
+    return;
+  }
+
+  const payload = await requestJson("/api/landlord/notifications/read", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ notificationIds: unreadIds })
+  });
+  state.ownerNotifications = Array.isArray(payload.data?.notifications)
+    ? payload.data.notifications
+    : state.ownerNotifications.map((item) => ({ ...item, read: true }));
+  state.ownerNotificationsUnreadCount = Number.isFinite(
+    Number(payload.data?.unreadCount)
+  )
+    ? Number(payload.data.unreadCount)
+    : 0;
+  renderOwnerNotifications();
 }
 
 function replaceUploadPreview(container, gallery, emptyText) {
@@ -9077,6 +9470,14 @@ function applyLandlordStartupData(startup) {
     : [];
   state.caretakers = Array.isArray(startup?.caretakers) ? startup.caretakers : [];
   setOwnerStaffData(startup?.ownerStaff);
+  state.ownerNotifications = Array.isArray(startup?.ownerNotifications?.notifications)
+    ? startup.ownerNotifications.notifications
+    : [];
+  state.ownerNotificationsUnreadCount = Number.isFinite(
+    Number(startup?.ownerNotifications?.unreadCount)
+  )
+    ? Number(startup.ownerNotifications.unreadCount)
+    : state.ownerNotifications.filter((item) => !item.read).length;
   state.tickets = Array.isArray(startup?.tickets) ? startup.tickets : [];
   setResidentDirectory(
     dedupeResidentDirectoryRows(
@@ -9118,6 +9519,7 @@ function applyLandlordStartupData(startup) {
   renderResidentDirectory(state.residentDirectory);
   renderWifiPackages(state.wifiPackages);
   renderOwnerStaff();
+  renderOwnerNotifications();
   renderCaretakerRequests(state.caretakerRequests);
   renderCaretakers(state.caretakers);
   renderLandlordTickets(state.tickets);
@@ -12009,6 +12411,32 @@ moveOutSettlementFormEl?.addEventListener("submit", (event) => {
   void submitMoveOutSettlement(event);
 });
 
+landlordNotificationsBtnEl?.addEventListener("click", () => {
+  state.ownerNotificationsOpen = !state.ownerNotificationsOpen;
+  renderOwnerNotifications();
+  if (state.ownerNotificationsOpen) {
+    void loadOwnerNotifications().catch((error) => {
+      handleLandlordError(error, "Unable to refresh owner alerts.");
+    });
+  }
+});
+
+landlordNotificationsRefreshBtnEl?.addEventListener("click", () => {
+  void loadOwnerNotifications().catch((error) => {
+    handleLandlordError(error, "Unable to refresh owner alerts.");
+  });
+});
+
+landlordNotificationsReadBtnEl?.addEventListener("click", () => {
+  void markOwnerNotificationsRead().catch((error) => {
+    handleLandlordError(error, "Unable to mark owner alerts as read.");
+  });
+});
+
+landlordPushAlertsBtnEl?.addEventListener("click", () => {
+  void enableLandlordPushAlerts();
+});
+
 refreshAllBtnEl.addEventListener("click", () => {
   void loadData();
 });
@@ -12046,6 +12474,7 @@ void (async () => {
   }
   syncUtilityBillInputMode();
   await loadData();
+  void syncLandlordPushState({ subscribeIfAllowed: true });
   window.setInterval(() => {
     void refreshPendingApplicationsIndicator().catch(() => {
       // Ignore transient polling failures while the landlord keeps working.

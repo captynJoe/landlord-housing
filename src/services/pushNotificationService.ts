@@ -11,6 +11,7 @@ export interface ResidentPushSubscriptionInput {
 
 export interface ResidentPushSubscriptionRecord
   extends ResidentPushSubscriptionInput {
+  scopeType?: "resident" | "landlord";
   userId: string;
   buildingId: string;
   houseNumber: string;
@@ -35,6 +36,10 @@ interface ResidentScope {
   userId: string;
   buildingId: string;
   houseNumber: string;
+}
+
+interface LandlordScope {
+  userId: string;
 }
 
 interface PushServiceConfig {
@@ -87,6 +92,12 @@ function toWebPushSubscription(
   };
 }
 
+function subscriptionScopeType(
+  value: Pick<ResidentPushSubscriptionRecord, "scopeType">
+): "resident" | "landlord" {
+  return value.scopeType === "landlord" ? "landlord" : "resident";
+}
+
 export class PushNotificationService {
   private readonly subscriptionsByEndpoint = new Map<
     string,
@@ -136,6 +147,7 @@ export class PushNotificationService {
       const subscription = normalizeSubscriptionInput(item);
       this.subscriptionsByEndpoint.set(subscription.endpoint, {
         ...subscription,
+        scopeType: item.scopeType === "landlord" ? "landlord" : "resident",
         userId: String(item.userId ?? "").trim(),
         buildingId: normalizeBuildingId(item.buildingId),
         houseNumber: normalizeHouseNumber(item.houseNumber),
@@ -168,9 +180,35 @@ export class PushNotificationService {
 
     const record: ResidentPushSubscriptionRecord = {
       ...subscription,
+      scopeType: "resident",
       userId: String(scope.userId ?? "").trim(),
       buildingId: normalizeBuildingId(scope.buildingId),
       houseNumber: normalizeHouseNumber(scope.houseNumber),
+      userAgent: String(userAgent ?? "").trim() || undefined,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp
+    };
+
+    this.subscriptionsByEndpoint.set(subscription.endpoint, record);
+    this.emitStateChange();
+    return record;
+  }
+
+  upsertLandlordSubscription(
+    scope: LandlordScope,
+    subscriptionInput: ResidentPushSubscriptionInput,
+    userAgent?: string
+  ): ResidentPushSubscriptionRecord {
+    const subscription = normalizeSubscriptionInput(subscriptionInput);
+    const existing = this.subscriptionsByEndpoint.get(subscription.endpoint);
+    const timestamp = nowIso();
+
+    const record: ResidentPushSubscriptionRecord = {
+      ...subscription,
+      scopeType: "landlord",
+      userId: String(scope.userId ?? "").trim(),
+      buildingId: "__landlord__",
+      houseNumber: "__landlord__",
       userAgent: String(userAgent ?? "").trim() || undefined,
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp
@@ -202,10 +240,42 @@ export class PushNotificationService {
     const targetHouseNumber = normalizeHouseNumber(houseNumber);
     const targets = [...this.subscriptionsByEndpoint.values()].filter(
       (item) =>
+        subscriptionScopeType(item) === "resident" &&
         item.buildingId === targetBuildingId &&
         item.houseNumber === targetHouseNumber
     );
 
+    await this.sendToTargets(targets, payload);
+  }
+
+  async notifyUserIds(
+    userIds: string[],
+    payload: PushNotificationPayload
+  ): Promise<void> {
+    if (!this.enabled) {
+      return;
+    }
+
+    const targetUserIds = new Set(
+      userIds.map((item) => String(item ?? "").trim()).filter(Boolean)
+    );
+    if (targetUserIds.size === 0) {
+      return;
+    }
+
+    const targets = [...this.subscriptionsByEndpoint.values()].filter(
+      (item) =>
+        subscriptionScopeType(item) === "landlord" &&
+        targetUserIds.has(item.userId)
+    );
+
+    await this.sendToTargets(targets, payload);
+  }
+
+  private async sendToTargets(
+    targets: ResidentPushSubscriptionRecord[],
+    payload: PushNotificationPayload
+  ): Promise<void> {
     if (targets.length === 0) {
       return;
     }

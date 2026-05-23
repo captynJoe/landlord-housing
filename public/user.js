@@ -5,7 +5,7 @@ import {
 } from "./portal-branding.js?v=20260521b";
 import { notifyError, notifyStatus } from "./notifications.js";
 
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260521b";
+const RESIDENT_SW_URL = "/resident-sw.js?v=20260523a";
 
 const apiStatusEl = document.getElementById("api-status");
 const authStateEl = document.getElementById("auth-state");
