@@ -5052,6 +5052,18 @@ async function bootstrap() {
     )}`;
   };
 
+  const LEGACY_OWNER_ALERT_USER_ID = "legacy-owner-alerts";
+  const ownerAlertUserIdForLandlordContext = (context: {
+    role: string;
+    userId?: string;
+  }) => {
+    if (context.role === "caretaker") {
+      return "";
+    }
+
+    return String(context.userId ?? "").trim() || LEGACY_OWNER_ALERT_USER_ID;
+  };
+
   const enqueueOwnerNotificationForManagerAction = async (
     context: {
       role: string;
@@ -5076,9 +5088,12 @@ async function bootstrap() {
     }
 
     const ownerStaff = await userAccountService.listOwnerStaffUsers();
-    const recipientUserIds = ownerStaff.users
-      .map((item) => item.id)
-      .filter((id) => id !== context.userSession?.userId);
+    const recipientUserIds = [
+      ...ownerStaff.users
+        .map((item) => item.id)
+        .filter((id) => id !== context.userSession?.userId),
+      LEGACY_OWNER_ALERT_USER_ID
+    ];
     if (recipientUserIds.length === 0) {
       return null;
     }
@@ -5864,13 +5879,14 @@ async function bootstrap() {
       caretakerAccessPromise,
       ownerStaffPromise
     ]);
+    const ownerAlertUserId = ownerAlertUserIdForLandlordContext(context);
     const ownerNotifications =
-      context.role !== "caretaker" && context.userId
+      ownerAlertUserId
         ? {
-            notifications: ownerNotificationService.listForUser(context.userId, {
+            notifications: ownerNotificationService.listForUser(ownerAlertUserId, {
               limit: 30
             }),
-            unreadCount: ownerNotificationService.countUnreadForUser(context.userId)
+            unreadCount: ownerNotificationService.countUnreadForUser(ownerAlertUserId)
           }
         : {
             notifications: [],
@@ -8563,24 +8579,20 @@ async function bootstrap() {
           error: "House manager accounts do not receive owner alerts."
         });
       }
-      if (!context.userId) {
-        return res.status(403).json({
-          error: "Owner alerts require an owner/staff user session."
-        });
-      }
+      const ownerAlertUserId = ownerAlertUserIdForLandlordContext(context);
 
       const limitRaw = Number(req.query.limit ?? 50);
       const limit = Number.isFinite(limitRaw)
         ? Math.min(Math.max(Math.trunc(limitRaw), 1), 200)
         : 50;
-      const notifications = ownerNotificationService.listForUser(context.userId, {
+      const notifications = ownerNotificationService.listForUser(ownerAlertUserId, {
         limit
       });
 
       return res.json({
         data: {
           notifications,
-          unreadCount: ownerNotificationService.countUnreadForUser(context.userId)
+          unreadCount: ownerNotificationService.countUnreadForUser(ownerAlertUserId)
         },
         role: context.role
       });
@@ -8601,25 +8613,21 @@ async function bootstrap() {
           error: "House manager accounts do not receive owner alerts."
         });
       }
-      if (!context.userId) {
-        return res.status(403).json({
-          error: "Owner alerts require an owner/staff user session."
-        });
-      }
+      const ownerAlertUserId = ownerAlertUserIdForLandlordContext(context);
 
       const parsed = ownerNotificationReadSchema.parse(req.body ?? {});
       const readCount = ownerNotificationService.markRead(
-        context.userId,
+        ownerAlertUserId,
         parsed.notificationIds
       );
 
       return res.json({
         data: {
           readCount,
-          notifications: ownerNotificationService.listForUser(context.userId, {
+          notifications: ownerNotificationService.listForUser(ownerAlertUserId, {
             limit: 50
           }),
-          unreadCount: ownerNotificationService.countUnreadForUser(context.userId)
+          unreadCount: ownerNotificationService.countUnreadForUser(ownerAlertUserId)
         },
         role: context.role
       });
@@ -8634,7 +8642,8 @@ async function bootstrap() {
       return;
     }
 
-    if (context.role === "caretaker" || !context.userId) {
+    const ownerAlertUserId = ownerAlertUserIdForLandlordContext(context);
+    if (!ownerAlertUserId) {
       return res.json({
         data: {
           enabled: false,
@@ -8664,9 +8673,10 @@ async function bootstrap() {
         return;
       }
 
-      if (context.role === "caretaker" || !context.userId) {
+      const ownerAlertUserId = ownerAlertUserIdForLandlordContext(context);
+      if (!ownerAlertUserId) {
         return res.status(403).json({
-          error: "Owner browser alerts require an owner/staff user session."
+          error: "House manager accounts do not receive owner browser alerts."
         });
       }
       if (!pushNotificationService.isEnabled()) {
@@ -8677,7 +8687,7 @@ async function bootstrap() {
 
       const parsed = residentPushSubscriptionSchema.parse(req.body);
       const record = pushNotificationService.upsertLandlordSubscription(
-        { userId: context.userId },
+        { userId: ownerAlertUserId },
         parsed,
         req.get("user-agent")
       );
@@ -8702,9 +8712,10 @@ async function bootstrap() {
         return;
       }
 
-      if (context.role === "caretaker" || !context.userId) {
+      const ownerAlertUserId = ownerAlertUserIdForLandlordContext(context);
+      if (!ownerAlertUserId) {
         return res.status(403).json({
-          error: "Owner browser alerts require an owner/staff user session."
+          error: "House manager accounts do not receive owner browser alerts."
         });
       }
 
