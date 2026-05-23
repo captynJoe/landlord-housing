@@ -42,8 +42,10 @@ export interface AuthenticatedUserSession {
   residentTenancyId?: string;
 }
 
-type LandlordApplicationActor = Pick<AuthenticatedUserSession, "role"> & {
+type LandlordApplicationActor = {
+  role: UserRole | "caretaker";
   userId?: string | null;
+  visibleBuildingIds?: Set<string> | null;
 };
 
 export interface ResidentPhoneSessionResult {
@@ -1282,9 +1284,21 @@ export class UserAccountService {
 
   async removeResidentFromBuilding(
     session: AuthenticatedUserSession,
-    input: { buildingId: string; userId: string; note?: string }
+    input: {
+      buildingId: string;
+      userId: string;
+      note?: string;
+      actorRole?: UserRole | "caretaker";
+      visibleBuildingIds?: Set<string> | null;
+    }
   ) {
-    if (session.role !== "landlord" && session.role !== "admin" && session.role !== "root_admin") {
+    const actorRole = input.actorRole ?? session.role;
+    if (
+      actorRole !== "landlord" &&
+      actorRole !== "admin" &&
+      actorRole !== "root_admin" &&
+      actorRole !== "caretaker"
+    ) {
       throw new Error("LANDLORD_OR_ADMIN_ROLE_REQUIRED");
     }
 
@@ -1298,6 +1312,15 @@ export class UserAccountService {
     });
     if (!building) {
       throw new Error("BUILDING_NOT_FOUND");
+    }
+    if (
+      input.visibleBuildingIds instanceof Set &&
+      !input.visibleBuildingIds.has(building.id)
+    ) {
+      throw new Error("BUILDING_ACCESS_DENIED");
+    }
+    if (actorRole === "caretaker" && !(input.visibleBuildingIds instanceof Set)) {
+      throw new Error("BUILDING_ACCESS_DENIED");
     }
 
     const tenancy = await this.prisma.tenancy.findFirst({
@@ -1671,11 +1694,22 @@ export class UserAccountService {
     session: LandlordApplicationActor,
     status?: TenantApplicationStatus
   ) {
-    if (session.role !== "landlord" && session.role !== "admin" && session.role !== "root_admin") {
+    if (
+      session.role !== "landlord" &&
+      session.role !== "admin" &&
+      session.role !== "root_admin" &&
+      session.role !== "caretaker"
+    ) {
       throw new Error("LANDLORD_OR_ADMIN_ROLE_REQUIRED");
     }
 
-    const where = { status };
+    const where: Prisma.TenantApplicationWhereInput = {};
+    if (status) {
+      where.status = status;
+    }
+    if (session.visibleBuildingIds instanceof Set) {
+      where.buildingId = { in: [...session.visibleBuildingIds] };
+    }
 
     const rows = await this.prisma.tenantApplication.findMany({
       where,
@@ -1712,7 +1746,12 @@ export class UserAccountService {
     applicationId: string,
     input: LandlordDecisionInput
   ) {
-    if (session.role !== "landlord" && session.role !== "admin" && session.role !== "root_admin") {
+    if (
+      session.role !== "landlord" &&
+      session.role !== "admin" &&
+      session.role !== "root_admin" &&
+      session.role !== "caretaker"
+    ) {
       throw new Error("LANDLORD_OR_ADMIN_ROLE_REQUIRED");
     }
 
@@ -1727,6 +1766,15 @@ export class UserAccountService {
 
     if (!application) {
       throw new Error("APPLICATION_NOT_FOUND");
+    }
+    if (
+      session.visibleBuildingIds instanceof Set &&
+      !session.visibleBuildingIds.has(application.buildingId)
+    ) {
+      throw new Error("BUILDING_ACCESS_DENIED");
+    }
+    if (session.role === "caretaker" && !(session.visibleBuildingIds instanceof Set)) {
+      throw new Error("BUILDING_ACCESS_DENIED");
     }
 
     if (input.action === "reject") {

@@ -226,6 +226,161 @@ test("tenant approval only closes same-building active tenancies", async () => {
   });
 });
 
+test("caretaker tenant approval is limited to assigned buildings", async () => {
+  const application = {
+    id: "application-1",
+    userId: "tenant-1",
+    buildingId: "BLDG-B",
+    unitId: "unit-b-14",
+    houseNumber: "14",
+    note: null,
+    building: {
+      id: "BLDG-B",
+      landlordUserId: "landlord-b",
+      name: "Building B"
+    },
+    user: {
+      id: "tenant-1",
+      fullName: "Tenant One",
+      email: "tenant.one@example.test",
+      phone: "+254700000001"
+    },
+    unit: {
+      id: "unit-b-14",
+      houseNumber: "14"
+    }
+  };
+  const tx = {
+    tenancy: {
+      findFirst: async () => null,
+      updateMany: async () => ({ count: 1 }),
+      create: async () => ({ id: "tenancy-b-14" })
+    },
+    tenantApplication: {
+      update: async () => ({
+        id: application.id,
+        status: "approved",
+        houseNumber: application.houseNumber,
+        reviewedAt: new Date("2026-05-16T00:00:00.000Z")
+      })
+    }
+  };
+  const service = new UserAccountService({
+    tenantApplication: {
+      findUnique: async () => application
+    },
+    $transaction: async (callback: (transaction: typeof tx) => unknown) => callback(tx)
+  } as never);
+
+  await assert.rejects(
+    () =>
+      service.reviewTenantApplication(
+        {
+          userId: "caretaker-1",
+          role: "caretaker",
+          visibleBuildingIds: new Set(["BLDG-A"])
+        },
+        application.id,
+        { action: "approve" }
+      ),
+    /BUILDING_ACCESS_DENIED/
+  );
+
+  const approved = await service.reviewTenantApplication(
+    {
+      userId: "caretaker-1",
+      role: "caretaker",
+      visibleBuildingIds: new Set(["BLDG-B"])
+    },
+    application.id,
+    { action: "approve" }
+  );
+
+  assert.equal(approved.status, "approved");
+  assert.equal(approved.building.id, "BLDG-B");
+});
+
+test("caretaker resident removal is limited to assigned buildings", async () => {
+  const updateManyCalls: any[] = [];
+  const service = new UserAccountService({
+    building: {
+      findUnique: async () => ({
+        id: "BLDG-B",
+        name: "Building B",
+        landlordUserId: "landlord-b"
+      })
+    },
+    tenancy: {
+      findFirst: async () => ({
+        id: "tenancy-b-14",
+        unit: {
+          houseNumber: "14"
+        },
+        user: {
+          id: "tenant-1",
+          fullName: "Tenant One",
+          email: "tenant.one@example.test",
+          phone: "+254700000001",
+          role: "tenant"
+        }
+      })
+    },
+    $transaction: async (callback: (transaction: unknown) => unknown) =>
+      callback({
+        tenancy: {
+          updateMany: async (args: unknown) => {
+            updateManyCalls.push(args);
+            return { count: 1 };
+          }
+        },
+        userSession: {
+          updateMany: async () => ({ count: 1 })
+        },
+        tenantApplication: {
+          updateMany: async () => ({ count: 0 })
+        }
+      })
+  } as never);
+
+  const session = {
+    token: "session-token",
+    userId: "caretaker-1",
+    role: "tenant" as const,
+    fullName: "House Manager",
+    email: "manager@example.test",
+    phone: "+254700000004",
+    expiresAt: "2026-05-16T12:00:00.000Z",
+    mustChangePassword: false
+  };
+
+  await assert.rejects(
+    () =>
+      service.removeResidentFromBuilding(session, {
+        buildingId: "BLDG-B",
+        userId: "tenant-1",
+        actorRole: "caretaker",
+        visibleBuildingIds: new Set(["BLDG-A"])
+      }),
+    /BUILDING_ACCESS_DENIED/
+  );
+
+  const removed = await service.removeResidentFromBuilding(session, {
+    buildingId: "BLDG-B",
+    userId: "tenant-1",
+    actorRole: "caretaker",
+    visibleBuildingIds: new Set(["BLDG-B"]),
+    note: "Moved out"
+  });
+
+  assert.equal(removed.houseNumber, "14");
+  assert.equal(updateManyCalls.length, 1);
+  assert.deepEqual(updateManyCalls[0].where, {
+    buildingId: "BLDG-B",
+    userId: "tenant-1",
+    active: true
+  });
+});
+
 test("dedicated landlord staff can see and manage all buildings", async () => {
   const findUniqueCalls: unknown[] = [];
   const service = new UserAccountService({

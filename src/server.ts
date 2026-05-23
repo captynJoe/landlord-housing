@@ -5498,24 +5498,25 @@ async function bootstrap() {
     const registryBuildingId = buildings[0]?.id ?? "";
     const roomBuildingId = buildings[0]?.id ?? "";
 
-    const applicationsPromise =
-      context.role === "caretaker"
-        ? Promise.resolve([])
-        : (async () => {
-            if (!userAccountService) {
-              throw new Error(
-                "User account service unavailable. Database connection is required."
-              );
-            }
-            const session = context.userSession ?? {
-              role: context.role as UserRole,
-              userId: context.userId ?? null
-            };
-            return userAccountService.listLandlordApplications(
-              session,
-              applicationStatus
-            );
-          })();
+    const applicationsPromise = (async () => {
+      if (!userAccountService) {
+        throw new Error(
+          "User account service unavailable. Database connection is required."
+        );
+      }
+      const session = context.userSession ?? {
+        role: context.role as UserRole,
+        userId: context.userId ?? null
+      };
+      return userAccountService.listLandlordApplications(
+        {
+          ...session,
+          role: context.role as UserRole | "caretaker",
+          visibleBuildingIds
+        },
+        applicationStatus
+      );
+    })();
 
     const residentDirectoryPromise = listLandlordResidentDirectoryRows(buildings);
     const visibleHouseNumbersPromise = listVisibleHouseNumbersForBuildings(buildings);
@@ -9741,10 +9742,6 @@ async function bootstrap() {
         return;
       }
 
-      if (context.role === "caretaker") {
-        return res.json({ data: [], role: context.role });
-      }
-
       const session = context.userSession;
       if (!userAccountService) {
         return res.status(503).json({
@@ -9753,12 +9750,17 @@ async function bootstrap() {
       }
 
       const status = parseTenantApplicationStatus(req.query.status);
+      const visibleBuildingIds = await listVisibleBuildingIdsForLandlordContext(context);
       const actor = session ?? {
         role: context.role as UserRole,
         userId: context.userId ?? null
       };
       const data = await userAccountService.listLandlordApplications(
-        actor,
+        {
+          ...actor,
+          role: context.role as UserRole | "caretaker",
+          visibleBuildingIds
+        },
         status
       );
       return res.json({ data, role: context.role });
@@ -9774,12 +9776,6 @@ async function bootstrap() {
         return;
       }
 
-      if (context.role === "caretaker") {
-        return res.status(403).json({
-          error: "Caretaker access is read-only for tenant applications."
-        });
-      }
-
       const session = context.userSession;
       if (!userAccountService) {
         return res.status(503).json({
@@ -9788,13 +9784,18 @@ async function bootstrap() {
       }
 
       const parsed = landlordDecisionSchema.parse(req.body);
+      const visibleBuildingIds = await listVisibleBuildingIdsForLandlordContext(context);
       const actor = session ?? {
         role: context.role as UserRole,
         userId: context.userId ?? null
       };
       try {
         const data = await userAccountService.reviewTenantApplication(
-          actor,
+          {
+            ...actor,
+            role: context.role as UserRole | "caretaker",
+            visibleBuildingIds
+          },
           req.params.applicationId,
           parsed
         );
@@ -12584,12 +12585,6 @@ async function bootstrap() {
         return;
       }
 
-      if (context.role === "caretaker") {
-        return res.status(403).json({
-          error: "House manager accounts cannot record rent payments."
-        });
-      }
-
       const { houseNumber } = houseNumberQuerySchema.parse({
         houseNumber: req.params.houseNumber
       });
@@ -13983,12 +13978,6 @@ async function bootstrap() {
           return;
         }
 
-        if (context.role === "caretaker") {
-          return res.status(403).json({
-            error: "House manager accounts cannot record utility payments."
-          });
-        }
-
         const utilityType = utilityTypeSchema.parse(req.params.utilityType);
         const { houseNumber } = houseNumberQuerySchema.parse({
           houseNumber: req.params.houseNumber
@@ -15014,6 +15003,17 @@ async function bootstrap() {
       }
 
       try {
+        const visibleBuildingIds = await listVisibleBuildingIdsForLandlordContext(context);
+        if (visibleBuildingIds && !visibleBuildingIds.has(buildingId)) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+        if (context.role === "caretaker" && parsed.settlementAction === "write_off") {
+          return res.status(403).json({
+            error:
+              "House manager accounts cannot write off resident balances. Transfer the balance to resident debt or keep the resident active until paid."
+          });
+        }
+
         const settlementSummary = await buildResidentMoveOutSettlementSummary(
           buildingId,
           userId
@@ -15043,9 +15043,11 @@ async function bootstrap() {
         const data = await userAccountService.removeResidentFromBuilding(session, {
           buildingId,
           userId,
-          note: parsed.note
+          note: parsed.note,
+          actorRole: context.role as UserRole | "caretaker",
+          visibleBuildingIds
         });
-        const actor = actorFromUserSession(session);
+        const actor = actorFromLandlordContext(context);
         const billingSettlement =
           parsed.settlementAction === "write_off" ||
           parsed.settlementAction === "transfer_to_resident_debt"

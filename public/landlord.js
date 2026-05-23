@@ -766,7 +766,6 @@ function updateApplicationsIndicator() {
 
 function applyRoleCapabilities() {
   const caretaker = isCaretakerRole();
-  const rentPaymentDetailsEl = rentPaymentFormEl?.closest("details");
 
   if (ownerStaffManagementPanelEl instanceof HTMLElement) {
     ownerStaffManagementPanelEl.classList.toggle("hidden", caretaker);
@@ -774,16 +773,6 @@ function applyRoleCapabilities() {
 
   if (caretakerManagementPanelEl instanceof HTMLElement) {
     caretakerManagementPanelEl.classList.toggle("hidden", caretaker);
-  }
-
-  if (rentPaymentDetailsEl instanceof HTMLElement) {
-    rentPaymentDetailsEl.classList.toggle("hidden", caretaker);
-  } else if (rentPaymentFormEl instanceof HTMLElement) {
-    rentPaymentFormEl.classList.toggle("hidden", caretaker);
-  }
-
-  if (rentPaymentHelpEl instanceof HTMLElement) {
-    rentPaymentHelpEl.classList.toggle("hidden", caretaker);
   }
 
   openCreateBuildingDrawerButtons.forEach((button) => {
@@ -3074,11 +3063,6 @@ async function saveResidentRentPayment(form) {
   const resident = state.selectedResident;
   if (!resident) {
     showError("Resident details are no longer in view. Reopen the drawer and retry.");
-    return;
-  }
-
-  if (isCaretakerRole()) {
-    showError("House manager accounts cannot record rent payments.");
     return;
   }
 
@@ -6334,6 +6318,7 @@ function setMoveOutSettlementLoading(loading) {
 
     element.disabled =
       loading ||
+      (isCaretakerRole() && element.value === "write_off") ||
       (total <= 0 &&
         (element.value === "write_off" ||
           element.value === "transfer_to_resident_debt"));
@@ -6422,10 +6407,11 @@ function renderMoveOutSettlement(summary, context) {
     collectInput.checked = total <= 0;
   }
   if (writeOffInput instanceof HTMLInputElement) {
-    writeOffInput.checked = total > 0;
-    writeOffInput.disabled = total <= 0;
+    writeOffInput.checked = total > 0 && !isCaretakerRole();
+    writeOffInput.disabled = total <= 0 || isCaretakerRole();
   }
   if (transferInput instanceof HTMLInputElement) {
+    transferInput.checked = total > 0 && isCaretakerRole();
     transferInput.disabled = total <= 0;
   }
 
@@ -6583,7 +6569,7 @@ function renderRegistryRows(rows) {
       <td>
         <div class="resident-row-actions">
           ${
-            item.residentUserId && !isCaretakerRole()
+            item.residentUserId
               ? `<button
                   type="button"
                   class="btn-danger"
@@ -6608,9 +6594,7 @@ function renderRegistryRows(rows) {
                 >
                   Remove Room
                 </button>`
-              : isCaretakerRole()
-                ? "-"
-                : ""
+              : ""
           }
         </div>
       </td>
@@ -6709,7 +6693,7 @@ function renderApplications(rows) {
 
   rows.forEach((item) => {
     const row = document.createElement("tr");
-    const canReview = item.status === "pending" && !isCaretakerRole();
+    const canReview = item.status === "pending";
     const identitySummary = summarizeResidentIdentity(item);
     const occupationSummary = summarizeResidentOccupation(item);
     row.innerHTML = `
@@ -6758,7 +6742,7 @@ function renderRentStatus(rows) {
     const totalOutstandingKsh = Number(item.balanceKsh ?? currentDueKsh ?? 0);
     const quickPaymentAmountKsh = Math.max(0, totalOutstandingKsh || currentDueKsh);
     const billingMonth = monthKeyFromValue(item.dueDate) || currentBillingMonth();
-    const canRecordPayment = !isCaretakerRole() && quickPaymentAmountKsh > 0;
+    const canRecordPayment = quickPaymentAmountKsh > 0;
     row.innerHTML = `
       <td>${escapeHtml(buildingLabel)}</td>
       <td>${item.houseNumber}</td>
@@ -7129,7 +7113,7 @@ function renderResidentDrawer(resident) {
   const rentPaymentsOpenAttr = compactDrawer ? "" : "open";
   const rentProfileOpenAttr = compactDrawer ? "" : "open";
   const agreementOpenAttr = compactDrawer ? "" : "open";
-  const canRecordCashPayment = hasResident && rentEnabled && !isCaretakerRole();
+  const canRecordCashPayment = hasResident && rentEnabled;
   const canEditRentProfile =
     rentEnabled &&
     !isCaretakerRole() &&
@@ -8348,7 +8332,7 @@ function renderUtilityRoomSummaryActions(item, accountBuildingId) {
         Account
       </button>
       ${
-        !isCaretakerRole() && hasResident
+        hasResident
           ? `<button
               type="button"
               class="btn-danger"
@@ -10346,11 +10330,6 @@ function handleRemoveResidentClick(
   houseNumber,
   residentName
 ) {
-  if (isCaretakerRole()) {
-    showError("House manager accounts cannot remove residents.");
-    return;
-  }
-
   if (!userId) {
     showError("Resident details are missing. Refresh and try again.");
     return;
@@ -10618,11 +10597,6 @@ residentDrawerBodyEl?.addEventListener("submit", (event) => {
 applicationsBodyEl.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLButtonElement)) {
-    return;
-  }
-
-  if (isCaretakerRole()) {
-    showError("House manager accounts cannot approve/reject applications.");
     return;
   }
 
@@ -11507,11 +11481,6 @@ rentPaymentFormEl?.addEventListener("submit", (event) => {
         ? "Rent payment requires building, house, amount, and reference."
         : "Rent payment requires building, house, and amount."
     );
-    return;
-  }
-
-  if (isCaretakerRole()) {
-    showError("House manager accounts cannot record rent payments.");
     return;
   }
 
