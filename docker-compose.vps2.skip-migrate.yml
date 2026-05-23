@@ -1,0 +1,3 @@
+services:
+  landlord_housing_api:
+    command: ["sh", "-lc", "npm run start"]
