@@ -161,6 +161,7 @@ import {
   updateWifiPackageSchema,
   ownerStaffCreateSchema,
   ownerStaffDisableSchema,
+  landlordRentBulkSheetSchema,
   upsertRentDueSchema,
   wifiPackageIdSchema,
   landlordDecisionSchema,
@@ -12972,6 +12973,270 @@ async function bootstrap() {
         data,
         role: context.role
       });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.get(
+    "/api/landlord/buildings/:buildingId/rent-bulk-sheet",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const billingMonth =
+          typeof req.query.billingMonth === "string" && req.query.billingMonth.trim()
+            ? billingMonthSchema.parse(req.query.billingMonth)
+            : billingMonthFromDate(new Date());
+        const registryRows = await buildLandlordUtilityRegistryRows(
+          building.id,
+          building.houseNumbers ?? []
+        );
+
+        return res.json({
+          data: {
+            buildingId: building.id,
+            buildingName: building.name,
+            billingMonth,
+            rentEnabled: paymentAccessService.isEnabled(building.id, "rent"),
+            rows: registryRows.map((row) => ({
+              houseNumber: row.houseNumber,
+              residentName: row.residentName,
+              residentPhone: row.residentPhone,
+              residentUserId: row.residentUserId,
+              hasActiveResident: row.hasActiveResident,
+              verificationStatus: row.verificationStatus,
+              monthlyRentKsh: row.monthlyRentKsh,
+              balanceKsh: row.rentBalanceKsh,
+              currentMonthOutstandingKsh: row.currentMonthRentOutstandingKsh,
+              currentMonthPaidKsh: row.currentMonthRentPaidKsh,
+              arrearsKsh: row.rentArrearsKsh,
+              dueDate: row.rentDueDate,
+              paymentStatus: row.rentPaymentStatus
+            }))
+          },
+          role: context.role
+        });
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
+  app.put(
+    "/api/landlord/buildings/:buildingId/rent-bulk-sheet",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "House manager accounts cannot change rent charges."
+          });
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        if (!paymentAccessService.isEnabled(building.id, "rent")) {
+          return res.status(403).json({
+            error: "Rent billing is disabled for this building."
+          });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const parsed = landlordRentBulkSheetSchema.parse(req.body ?? {});
+        const registryRows = await buildLandlordUtilityRegistryRows(
+          building.id,
+          building.houseNumbers ?? []
+        );
+        const roomRowsByHouse = new Map(
+          registryRows.map((row) => [normalizeHouseNumber(row.houseNumber), row])
+        );
+        const updated = [];
+
+        for (const row of parsed.rows) {
+          const houseNumber = normalizeHouseNumber(row.houseNumber);
+          if (!roomRowsByHouse.has(houseNumber)) {
+            return res.status(400).json({
+              error: `House ${houseNumber || row.houseNumber} is not registered in ${building.name}.`
+            });
+          }
+
+          const existing = rentLedgerService.getRentDue(building.id, houseNumber);
+          const balanceKsh =
+            row.balanceKsh == null
+              ? Math.max(
+                  0,
+                  Number(existing?.balanceKsh ?? (row.monthlyRentKsh > 0 ? row.monthlyRentKsh : 0))
+                )
+              : Math.max(0, Math.round(row.balanceKsh));
+          const snapshot = rentLedgerService.upsertRentDue(building.id, houseNumber, {
+            monthlyRentKsh: Math.max(0, Math.round(row.monthlyRentKsh)),
+            balanceKsh,
+            dueDate: parsed.dueDate,
+            note:
+              parsed.note?.trim() ||
+              `Bulk rent sheet for ${building.name} (${parsed.billingMonth}).`
+          });
+
+          updated.push(snapshot);
+
+          await recordRoomAccountAuditEvent({
+            buildingId: building.id,
+            houseNumber,
+            action: "rent.profile.bulk_updated",
+            summary: `Monthly rent set to KSh ${snapshot.monthlyRentKsh.toLocaleString("en-US")} for ${parsed.billingMonth}.`,
+            actor: actorFromLandlordContext(context),
+            metadata: {
+              billingMonth: parsed.billingMonth,
+              dueDate: parsed.dueDate,
+              monthlyRentKsh: snapshot.monthlyRentKsh,
+              balanceKsh: snapshot.balanceKsh,
+              balanceOverridden: row.balanceKsh != null
+            }
+          });
+        }
+
+        await persistRentLedgerStateNow();
+        const refreshedRows = await buildLandlordUtilityRegistryRows(
+          building.id,
+          building.houseNumbers ?? []
+        );
+
+        return res.json({
+          data: {
+            buildingId: building.id,
+            buildingName: building.name,
+            billingMonth: parsed.billingMonth,
+            updatedCount: updated.length,
+            rows: refreshedRows.map((row) => ({
+              houseNumber: row.houseNumber,
+              residentName: row.residentName,
+              residentPhone: row.residentPhone,
+              residentUserId: row.residentUserId,
+              hasActiveResident: row.hasActiveResident,
+              verificationStatus: row.verificationStatus,
+              monthlyRentKsh: row.monthlyRentKsh,
+              balanceKsh: row.rentBalanceKsh,
+              currentMonthOutstandingKsh: row.currentMonthRentOutstandingKsh,
+              currentMonthPaidKsh: row.currentMonthRentPaidKsh,
+              arrearsKsh: row.rentArrearsKsh,
+              dueDate: row.rentDueDate,
+              paymentStatus: row.rentPaymentStatus
+            }))
+          },
+          role: context.role
+        });
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
+  app.put("/api/landlord/rent-due/:houseNumber", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (context.role === "caretaker") {
+        return res.status(403).json({
+          error: "House manager accounts cannot change rent settings."
+        });
+      }
+
+      const { houseNumber } = houseNumberQuerySchema.parse({
+        houseNumber: req.params.houseNumber
+      });
+      const normalizedHouseNumber = normalizeHouseNumber(houseNumber);
+      const parsed = upsertRentDueSchema.parse(req.body);
+      const buildingId =
+        typeof req.body?.buildingId === "string"
+          ? req.body.buildingId
+          : typeof req.query.buildingId === "string"
+            ? req.query.buildingId
+            : "";
+
+      if (!buildingId.trim()) {
+        return res.status(400).json({
+          error: "Building ID is required to update rent settings."
+        });
+      }
+
+      if (!paymentAccessService.isEnabled(buildingId, "rent")) {
+        return res.status(403).json({
+          error: "Rent billing is disabled for this building."
+        });
+      }
+
+      const building = await store.getBuilding(buildingId);
+      if (!building) {
+        return res.status(404).json({ error: "Building not found" });
+      }
+
+      const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Building access denied" });
+      }
+
+      const visibleHouseNumbers = new Set(
+        (building.houseNumbers ?? []).map((item) => normalizeHouseNumber(item))
+      );
+      if (
+        visibleHouseNumbers.size > 0 &&
+        !visibleHouseNumbers.has(normalizedHouseNumber)
+      ) {
+        return res.status(400).json({
+          error: `House ${normalizedHouseNumber} is not registered in ${building.name}.`
+        });
+      }
+
+      const data = rentLedgerService.upsertRentDue(
+        building.id,
+        normalizedHouseNumber,
+        parsed
+      );
+      await persistRentLedgerStateNow();
+      await recordRoomAccountAuditEvent({
+        buildingId: building.id,
+        houseNumber: normalizedHouseNumber,
+        action: "rent.profile.updated",
+        summary: `Rent settings updated. Monthly rent KSh ${data.monthlyRentKsh.toLocaleString("en-US")}.`,
+        actor: actorFromLandlordContext(context),
+        metadata: {
+          monthlyRentKsh: data.monthlyRentKsh,
+          balanceKsh: data.balanceKsh,
+          dueDate: data.dueDate
+        }
+      });
+
+      return res.json({ data, role: context.role });
     } catch (error) {
       return next(error);
     }

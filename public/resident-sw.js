@@ -1,4 +1,4 @@
-const CACHE_NAME = "jk-flats-resident-v20260523c";
+const CACHE_NAME = "jk-flats-resident-v20260523e";
 const RESIDENT_SHELL_URL = "/resident";
 const PROFILE_SHELL_URL = "/user";
 const LANDLORD_SHELL_URL = "/landlord";
@@ -8,11 +8,11 @@ const APP_ASSETS = [
   LANDLORD_SHELL_URL,
   "/users.css?v=20260523b",
   "/user.css?v=20260523b",
-  "/landlord.css?v=20260523a",
-  "/dedicated-theme.css?v=20260523b",
+  "/landlord.css?v=20260523c",
+  "/dedicated-theme.css?v=20260523c",
   "/users.js?v=20260523c",
   "/user.js?v=20260523b",
-  "/landlord.js?v=20260523a",
+  "/landlord.js?v=20260523e",
   "/password-visibility.js",
   "/manifest.webmanifest",
   "/icons/housing-app.svg",

@@ -12,7 +12,7 @@ import {
   getLandlordShellBrand
 } from "./portal-branding.js?v=20260521b";
 
-const LANDLORD_SW_URL = "/resident-sw.js?v=20260523a";
+const LANDLORD_SW_URL = "/resident-sw.js?v=20260523e";
 const authStatusEl = document.getElementById("auth-status");
 const landlordRoleEl = document.getElementById("landlord-role");
 const landlordBrandTagEl = document.getElementById("landlord-brand-tag");
@@ -192,6 +192,18 @@ const rentPaymentPaidAtEl = document.getElementById("rent-payment-paid-at");
 const rentPaymentReferenceEl = document.getElementById("rent-payment-reference");
 const rentPaymentHelpEl = document.getElementById("rent-payment-help");
 const rentPaymentDetailsEl = document.getElementById("rent-payment-details");
+const openRentSheetBtnEl = document.getElementById("open-rent-sheet-btn");
+const rentSheetBackdropEl = document.getElementById("rent-sheet-backdrop");
+const rentSheetModalEl = document.getElementById("rent-sheet-modal");
+const closeRentSheetBtnEl = document.getElementById("close-rent-sheet-btn");
+const rentSheetFormEl = document.getElementById("rent-sheet-form");
+const rentSheetBuildingSelectEl = document.getElementById("rent-sheet-building-select");
+const rentSheetBillingMonthEl = document.getElementById("rent-sheet-billing-month");
+const rentSheetDueDateEl = document.getElementById("rent-sheet-due-date");
+const rentSheetNoteEl = document.getElementById("rent-sheet-note");
+const rentSheetBodyEl = document.getElementById("rent-sheet-body");
+const rentSheetSubmitBtnEl = document.getElementById("rent-sheet-submit-btn");
+const rentSheetReloadBtnEl = document.getElementById("rent-sheet-reload-btn");
 const paymentAccessBodyEl = document.getElementById("payment-access-body");
 const refreshPaymentAccessBtnEl = document.getElementById("refresh-payment-access");
 const paymentProfilesBodyEl = document.getElementById("payment-profiles-body");
@@ -386,6 +398,8 @@ const state = {
   pendingApplicationsCount: 0,
   rentStatus: [],
   selectedRentPaymentBuildingId: "",
+  selectedRentSheetBuildingId: "",
+  rentSheetRows: [],
   paymentAccess: [],
   paymentAccessByBuildingId: new Map(),
   paymentProfiles: [],
@@ -912,6 +926,10 @@ function applyRoleCapabilities() {
     }
     button.classList.toggle("hidden", caretaker);
   });
+
+  if (openRentSheetBtnEl instanceof HTMLButtonElement) {
+    openRentSheetBtnEl.classList.toggle("hidden", caretaker);
+  }
 
   updateOwnerNotificationControls();
 }
@@ -5790,6 +5808,7 @@ function setPreferredBuildingSelection(buildingId, options = {}) {
   state.selectedOverviewRoomBuildingId = normalizedBuildingId;
   state.selectedWifiPackageBuildingId = normalizedBuildingId;
   state.selectedRentPaymentBuildingId = normalizedBuildingId;
+  state.selectedRentSheetBuildingId = normalizedBuildingId;
   if (options.includeResidents !== false) {
     state.selectedResidentsBuildingId = normalizedBuildingId;
   }
@@ -5811,6 +5830,9 @@ function setPreferredBuildingSelection(buildingId, options = {}) {
   }
   if (rentPaymentBuildingSelectEl instanceof HTMLSelectElement) {
     rentPaymentBuildingSelectEl.value = normalizedBuildingId;
+  }
+  if (rentSheetBuildingSelectEl instanceof HTMLSelectElement) {
+    rentSheetBuildingSelectEl.value = normalizedBuildingId;
   }
   if (landlordTicketBuildingSelectEl instanceof HTMLSelectElement) {
     landlordTicketBuildingSelectEl.value = normalizedBuildingId;
@@ -5922,6 +5944,259 @@ function syncRentPaymentBuildingOptions() {
   }
 }
 
+function getRentEnabledBuildings() {
+  return (Array.isArray(state.buildings) ? state.buildings : []).filter(
+    (building) => getPaymentAccessRecord(building.id)?.rentEnabled !== false
+  );
+}
+
+function defaultRentDueDateForBillingMonth(billingMonth) {
+  const raw = String(billingMonth ?? "").trim();
+  const match = raw.match(/^(\d{4})-(\d{2})$/);
+  const due = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, 5, 23, 59, 0, 0)
+    : new Date();
+  if (!match) {
+    due.setDate(due.getDate() + 7);
+    due.setHours(23, 59, 0, 0);
+  }
+  return due;
+}
+
+function syncRentSheetBuildingOptions() {
+  if (!(rentSheetBuildingSelectEl instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  rentSheetBuildingSelectEl.replaceChildren();
+  const rentEnabledBuildings = getRentEnabledBuildings();
+
+  if (rentEnabledBuildings.length === 0) {
+    state.selectedRentSheetBuildingId = "";
+    rentSheetBuildingSelectEl.disabled = true;
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No rent-enabled buildings";
+    rentSheetBuildingSelectEl.append(option);
+    return;
+  }
+
+  const selected =
+    state.selectedRentSheetBuildingId &&
+    rentEnabledBuildings.some((item) => item.id === state.selectedRentSheetBuildingId)
+      ? state.selectedRentSheetBuildingId
+      : state.selectedRentPaymentBuildingId ||
+        state.selectedRegistryBuildingId ||
+        rentEnabledBuildings[0].id;
+
+  state.selectedRentSheetBuildingId = selected;
+  rentSheetBuildingSelectEl.disabled = false;
+
+  rentEnabledBuildings.forEach((building) => {
+    const option = document.createElement("option");
+    option.value = building.id;
+    option.textContent = getBuildingDisplayName(building);
+    if (building.id === selected) {
+      option.selected = true;
+    }
+    rentSheetBuildingSelectEl.append(option);
+  });
+}
+
+function getSelectedRentSheetBuildingId() {
+  return String(
+    rentSheetBuildingSelectEl?.value || state.selectedRentSheetBuildingId || ""
+  ).trim();
+}
+
+function renderRentSheetRows(rows) {
+  if (!(rentSheetBodyEl instanceof HTMLElement)) {
+    return;
+  }
+
+  rentSheetBodyEl.replaceChildren();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = '<td colspan="9">No rooms found for this building.</td>';
+    rentSheetBodyEl.append(row);
+    return;
+  }
+
+  [...rows].sort((a, b) => compareHouseNumber(a.houseNumber, b.houseNumber)).forEach((item) => {
+    const houseNumber = normalizeHouse(item.houseNumber);
+    const monthlyRentKsh = Math.max(0, Math.round(Number(item.monthlyRentKsh ?? 0)));
+    const balanceKsh = Math.max(0, Math.round(Number(item.balanceKsh ?? 0)));
+    const currentMonthPaidKsh = Math.max(
+      0,
+      Math.round(Number(item.currentMonthPaidKsh ?? 0))
+    );
+    const arrearsKsh = Math.max(0, Math.round(Number(item.arrearsKsh ?? 0)));
+    const residentLabel =
+      String(item.residentName ?? "").trim() ||
+      (item.hasActiveResident ? "Resident linked" : "Vacant");
+    const residentPhone = String(item.residentPhone ?? "").trim();
+    const statusLabel =
+      String(item.paymentStatus ?? "").trim() ||
+      String(item.verificationStatus ?? "").trim() ||
+      (item.hasActiveResident ? "No rent profile" : "Vacant");
+
+    const row = document.createElement("tr");
+    row.dataset.houseNumber = houseNumber;
+    row.innerHTML = `
+      <td><strong>${escapeHtml(houseNumber)}</strong></td>
+      <td>
+        ${escapeHtml(residentLabel)}
+        ${residentPhone ? `<br /><small>${escapeHtml(residentPhone)}</small>` : ""}
+      </td>
+      <td>${escapeHtml(statusLabel.replaceAll("_", " ").toUpperCase())}</td>
+      <td>${formatCurrency(monthlyRentKsh)}</td>
+      <td>
+        <input
+          class="registry-table-input utility-sheet-input"
+          data-field="monthlyRentKsh"
+          type="number"
+          min="0"
+          step="1"
+          value="${escapeHtml(String(monthlyRentKsh))}"
+          required
+        />
+      </td>
+      <td>${formatCurrency(balanceKsh)}</td>
+      <td>
+        <input
+          class="registry-table-input utility-sheet-input"
+          data-field="balanceKsh"
+          type="number"
+          min="0"
+          step="1"
+          placeholder="Keep current"
+        />
+      </td>
+      <td>${formatCurrency(currentMonthPaidKsh)}</td>
+      <td>${formatCurrency(arrearsKsh)}</td>
+    `;
+    rentSheetBodyEl.append(row);
+  });
+}
+
+function buildRentSheetPayload() {
+  const billingMonth = toBillingMonth(rentSheetBillingMonthEl?.value);
+  const dueDate = toIsoFromDateTimeLocal(rentSheetDueDateEl?.value);
+  if (!billingMonth || !dueDate) {
+    throw new Error("Rent sheet requires billing month and due date.");
+  }
+
+  const rows = [];
+  const trList = rentSheetBodyEl?.querySelectorAll("tr[data-house-number]") ?? [];
+  trList.forEach((tr) => {
+    const houseNumber = normalizeHouse(tr.dataset.houseNumber);
+    const rentInput = tr.querySelector('input[data-field="monthlyRentKsh"]');
+    const balanceInput = tr.querySelector('input[data-field="balanceKsh"]');
+    if (!(rentInput instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const monthlyRentKsh = toOptionalNumber(rentInput.value);
+    if (monthlyRentKsh == null || monthlyRentKsh < 0) {
+      throw new Error(`Monthly rent is required for ${houseNumber}.`);
+    }
+
+    const balanceKsh =
+      balanceInput instanceof HTMLInputElement
+        ? toOptionalNumber(balanceInput.value)
+        : undefined;
+    if (balanceKsh != null && balanceKsh < 0) {
+      throw new Error(`Balance override for ${houseNumber} cannot be negative.`);
+    }
+
+    rows.push({
+      houseNumber,
+      monthlyRentKsh: Math.round(monthlyRentKsh),
+      ...(balanceKsh == null ? {} : { balanceKsh: Math.round(balanceKsh) })
+    });
+  });
+
+  if (rows.length === 0) {
+    throw new Error("No rooms available in rent sheet.");
+  }
+
+  return {
+    billingMonth,
+    dueDate,
+    note: String(rentSheetNoteEl?.value ?? "").trim() || undefined,
+    rows
+  };
+}
+
+async function loadRentSheetRows() {
+  const buildingId = getSelectedRentSheetBuildingId();
+  if (!buildingId) {
+    state.rentSheetRows = [];
+    renderRentSheetRows(state.rentSheetRows);
+    return null;
+  }
+
+  const billingMonth = toBillingMonth(rentSheetBillingMonthEl?.value) || currentBillingMonth();
+  const payload = await requestJson(
+    `/api/landlord/buildings/${encodeURIComponent(buildingId)}/rent-bulk-sheet?billingMonth=${encodeURIComponent(billingMonth)}`
+  );
+  state.rentSheetRows = Array.isArray(payload?.data?.rows) ? payload.data.rows : [];
+  state.selectedRentSheetBuildingId = buildingId;
+  if (
+    rentSheetBillingMonthEl instanceof HTMLInputElement &&
+    payload?.data?.billingMonth
+  ) {
+    rentSheetBillingMonthEl.value = toMonthInputValue(payload.data.billingMonth);
+  }
+  renderRentSheetRows(state.rentSheetRows);
+  return payload;
+}
+
+function showRentSheetModal() {
+  rentSheetBackdropEl?.classList.remove("hidden");
+  rentSheetModalEl?.classList.remove("hidden");
+}
+
+function closeRentSheetModal() {
+  rentSheetBackdropEl?.classList.add("hidden");
+  rentSheetModalEl?.classList.add("hidden");
+}
+
+async function openRentSheetModal() {
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot change rent charges.");
+    return;
+  }
+
+  clearError();
+  syncRentSheetBuildingOptions();
+  const buildingId = getSelectedRentSheetBuildingId();
+  if (!buildingId) {
+    showError("No rent-enabled building is available.");
+    return;
+  }
+
+  showRentSheetModal();
+  setPreferredBuildingSelection(buildingId, { includeResidents: false });
+  state.selectedRentSheetBuildingId = buildingId;
+  syncRentSheetBuildingOptions();
+
+  if (rentSheetBillingMonthEl instanceof HTMLInputElement && !rentSheetBillingMonthEl.value) {
+    rentSheetBillingMonthEl.value = currentBillingMonth();
+  }
+  if (rentSheetDueDateEl instanceof HTMLInputElement && !rentSheetDueDateEl.value) {
+    rentSheetDueDateEl.value = toDateTimeLocalInputValue(
+      defaultRentDueDateForBillingMonth(rentSheetBillingMonthEl?.value)
+    );
+  }
+
+  try {
+    await loadRentSheetRows();
+  } catch (error) {
+    handleLandlordError(error, "Failed to load bulk rent sheet.");
+  }
+}
+
 function renderRegistryBuildingOptions() {
   registryBuildingSelectEl.replaceChildren();
 
@@ -5938,6 +6213,7 @@ function renderRegistryBuildingOptions() {
     registryBuildingSelectEl.append(option);
     renderRegistryRows([]);
     syncRentPaymentBuildingOptions();
+    syncRentSheetBuildingOptions();
     syncUtilitySheetBuildingOptions();
     syncCaretakerBuildingOptions();
     syncLandlordTicketBuildingOptions();
@@ -5966,6 +6242,7 @@ function renderRegistryBuildingOptions() {
   });
 
   syncRentPaymentBuildingOptions();
+  syncRentSheetBuildingOptions();
   syncUtilitySheetBuildingOptions();
   syncCaretakerBuildingOptions();
   syncLandlordTicketBuildingOptions();
@@ -9114,6 +9391,7 @@ async function loadPaymentAccess() {
   setPaymentAccess(payload.data ?? []);
   renderPaymentAccess(state.paymentAccess);
   syncRentPaymentBuildingOptions();
+  syncRentSheetBuildingOptions();
 }
 
 async function loadPaymentProfiles() {
@@ -9679,16 +9957,34 @@ openUtilitySheetBtnEl?.addEventListener("click", () => {
   void openUtilitySheetModal();
 });
 
+openRentSheetBtnEl?.addEventListener("click", () => {
+  void openRentSheetModal();
+});
+
 closeUtilitySheetBtnEl?.addEventListener("click", () => {
   closeUtilitySheetModal();
+});
+
+closeRentSheetBtnEl?.addEventListener("click", () => {
+  closeRentSheetModal();
 });
 
 utilitySheetBackdropEl?.addEventListener("click", () => {
   closeUtilitySheetModal();
 });
 
+rentSheetBackdropEl?.addEventListener("click", () => {
+  closeRentSheetModal();
+});
+
 utilitySheetReloadBtnEl?.addEventListener("click", () => {
   void openUtilitySheetModal();
+});
+
+rentSheetReloadBtnEl?.addEventListener("click", () => {
+  void loadRentSheetRows().catch((error) => {
+    handleLandlordError(error, "Failed to reload rent sheet.");
+  });
 });
 
 document.addEventListener("keydown", (event) => {
@@ -9697,6 +9993,7 @@ document.addEventListener("keydown", (event) => {
     closeBuildingDrawer();
     closeUtilitySetupModal();
     closeUtilitySheetModal();
+    closeRentSheetModal();
     closeResidentDrawer();
   }
 });
@@ -11125,6 +11422,33 @@ utilitySheetBillingMonthEl?.addEventListener("change", () => {
   });
 });
 
+rentSheetBuildingSelectEl?.addEventListener("change", () => {
+  const buildingId = String(rentSheetBuildingSelectEl.value || "").trim();
+  if (!buildingId) {
+    return;
+  }
+
+  state.selectedRentSheetBuildingId = buildingId;
+  setPreferredBuildingSelection(buildingId, { includeResidents: false });
+  syncRentSheetBuildingOptions();
+
+  void loadRentSheetRows().catch((error) => {
+    handleLandlordError(error, "Failed to load selected building in rent sheet.");
+  });
+});
+
+rentSheetBillingMonthEl?.addEventListener("change", () => {
+  if (rentSheetDueDateEl instanceof HTMLInputElement) {
+    rentSheetDueDateEl.value = toDateTimeLocalInputValue(
+      defaultRentDueDateForBillingMonth(rentSheetBillingMonthEl.value)
+    );
+  }
+
+  void loadRentSheetRows().catch((error) => {
+    handleLandlordError(error, "Failed to load selected rent month.");
+  });
+});
+
 registryReadingMonthEl?.addEventListener("change", () => {
   state.registryReadingMonth = toBillingMonth(registryReadingMonthEl.value);
   void Promise.all([loadRegistryReadingBills(), loadRegistryMonthlyCombinedCharge()])
@@ -11864,6 +12188,64 @@ overviewUtilityPaymentFormEl?.addEventListener("submit", (event) => {
 rentPaymentBuildingSelectEl?.addEventListener("change", () => {
   state.selectedRentPaymentBuildingId = String(rentPaymentBuildingSelectEl.value || "").trim();
   updateLandlordBranding();
+});
+
+rentSheetFormEl?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  clearError();
+
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot change rent charges.");
+    return;
+  }
+
+  const buildingId = getSelectedRentSheetBuildingId();
+  if (!buildingId) {
+    showError("Select a rent-enabled building first.");
+    return;
+  }
+
+  let payload;
+  try {
+    payload = buildRentSheetPayload();
+  } catch (error) {
+    handleLandlordError(error, "Invalid values in rent sheet.");
+    return;
+  }
+
+  if (rentSheetSubmitBtnEl instanceof HTMLButtonElement) {
+    rentSheetSubmitBtnEl.disabled = true;
+  }
+
+  void (async () => {
+    try {
+      const response = await requestJson(
+        `/api/landlord/buildings/${encodeURIComponent(buildingId)}/rent-bulk-sheet`,
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      state.selectedRentSheetBuildingId = buildingId;
+      state.rentSheetRows = Array.isArray(response?.data?.rows) ? response.data.rows : [];
+      renderRentSheetRows(state.rentSheetRows);
+      await Promise.all([loadRentStatus(), loadResidents()]);
+      setStatus(
+        `Saved rent sheet for ${getBuildingDisplayNameById(buildingId, buildingId)} (${payload.billingMonth}).`
+      );
+      closeRentSheetModal();
+    } catch (error) {
+      handleLandlordError(error, "Failed to save rent sheet.");
+    } finally {
+      if (rentSheetSubmitBtnEl instanceof HTMLButtonElement) {
+        rentSheetSubmitBtnEl.disabled = false;
+      }
+    }
+  })();
 });
 
 rentPaymentFormEl?.addEventListener("submit", (event) => {

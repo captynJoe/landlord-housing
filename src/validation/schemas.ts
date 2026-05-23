@@ -280,7 +280,7 @@ export const updateResidentNotificationPreferencesSchema = z
 
 export const upsertRentDueSchema = z.object({
   monthlyRentKsh: z.number().int().min(0).max(500_000),
-  balanceKsh: z.number().int().min(0).max(500_000),
+  balanceKsh: z.number().int().min(0).max(5_000_000),
   dueDate: z.string().datetime(),
   note: z.string().trim().max(280).optional()
 });
@@ -300,6 +300,22 @@ export const billingMonthSchema = z
   .regex(/^\d{4}-(0[1-9]|1[0-2])$/, {
     message: "Use YYYY-MM format for billing month."
   });
+
+export const landlordRentBulkSheetSchema = z.object({
+  billingMonth: billingMonthSchema,
+  dueDate: z.string().datetime(),
+  note: z.string().trim().max(280).optional(),
+  rows: z
+    .array(
+      z.object({
+        houseNumber: nonEmptyString.max(24),
+        monthlyRentKsh: z.number().int().min(0).max(500_000),
+        balanceKsh: z.number().int().min(0).max(5_000_000).optional()
+      })
+    )
+    .min(1)
+    .max(2_000)
+});
 
 const utilityMeterNumberField = z
   .string()
