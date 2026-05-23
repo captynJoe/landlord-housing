@@ -188,6 +188,9 @@ const MPESA_VERIFY_RATE_WINDOW_MS = 60 * 1000;
 const MPESA_VERIFY_RATE_MAX_PER_ID = 80;
 const AUTH_ROUTE_RATE_WINDOW_MS = 10 * 60 * 1000;
 const RECURRING_UTILITY_VISIBILITY_WINDOW_DAYS = 7;
+const RESIDENT_ID_GRACE_PERIOD_HOURS = 48;
+const RESIDENT_ID_GRACE_PERIOD_MS =
+  RESIDENT_ID_GRACE_PERIOD_HOURS * 60 * 60 * 1000;
 const HOUSING_DIAGNOSTIC_LOGS_ENABLED =
   process.env.HOUSING_DIAGNOSTIC_LOGS_ENABLED !== "false";
 const LOCAL_MEDIA_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
@@ -3898,6 +3901,7 @@ async function bootstrap() {
       verificationStatus,
       mustChangePassword: userSession.mustChangePassword,
       residentTenancyId: activeTenancy.id,
+      tenancyCreatedAt: activeTenancy.createdAt.toISOString(),
       createdAt: new Date().toISOString(),
       expiresAt: userSession.expiresAt
     };
@@ -4200,6 +4204,45 @@ async function bootstrap() {
     }
 
     return notifications.filter((item) => !isResidentBillingNotification(item));
+  };
+
+  const hasCompleteResidentIdentity = (agreement: {
+    identityType?: string | null;
+    identityNumber?: string | null;
+    identityDocumentUrls?: unknown;
+  } | null | undefined) =>
+    Boolean(
+      String(agreement?.identityType ?? "").trim() &&
+        String(agreement?.identityNumber ?? "").trim() &&
+        Array.isArray(agreement?.identityDocumentUrls) &&
+        agreement.identityDocumentUrls.some((item) => String(item ?? "").trim())
+    );
+
+  const buildResidentIdentityRequirement = (
+    session: {
+      tenancyCreatedAt?: string;
+      createdAt?: string;
+    },
+    agreement: {
+      identityType?: string | null;
+      identityNumber?: string | null;
+      identityDocumentUrls?: unknown;
+    } | null | undefined
+  ) => {
+    const basis = Date.parse(session.tenancyCreatedAt ?? session.createdAt ?? "");
+    const startedAtMs = Number.isFinite(basis) ? basis : Date.now();
+    const dueAtMs = startedAtMs + RESIDENT_ID_GRACE_PERIOD_MS;
+    const complete = hasCompleteResidentIdentity(agreement);
+    const remainingMs = Math.max(0, dueAtMs - Date.now());
+
+    return {
+      required: true,
+      complete,
+      status: complete ? "complete" : remainingMs > 0 ? "pending" : "overdue",
+      graceHours: RESIDENT_ID_GRACE_PERIOD_HOURS,
+      dueAt: new Date(dueAtMs).toISOString(),
+      hoursRemaining: Math.ceil(remainingMs / (60 * 60 * 1000))
+    };
   };
 
   const requireResidentBillingAccess = (
@@ -6867,13 +6910,28 @@ async function bootstrap() {
     });
   };
 
+  const sendResidentProfileShell = (_req: express.Request, res: express.Response) => {
+    res.sendFile(path.join(publicDir, "user.html"), {
+      headers: {
+        "Cache-Control": "no-store, max-age=0"
+      }
+    });
+  };
+
   const redirectResidentAlias = (_req: express.Request, res: express.Response) => {
     res.redirect(308, "/resident");
   };
 
+  const redirectResidentProfileAlias = (
+    _req: express.Request,
+    res: express.Response
+  ) => {
+    res.redirect(308, "/user");
+  };
+
   app.get("/resident", sendResidentShell);
-  app.get("/user", redirectResidentAlias);
-  app.get("/user/", redirectResidentAlias);
+  app.get("/user", sendResidentProfileShell);
+  app.get("/user/", redirectResidentProfileAlias);
   app.get("/users", redirectResidentAlias);
   app.get("/users/", redirectResidentAlias);
 
@@ -7585,6 +7643,14 @@ async function bootstrap() {
     if (!session) {
       return;
     }
+    const agreementState = await userAccountService?.getActiveTenantAgreement({
+      buildingId: session.buildingId,
+      houseNumber: session.houseNumber
+    });
+    const identityRequirement = buildResidentIdentityRequirement(
+      session,
+      agreementState?.agreement
+    );
 
     return res.json({
       data: {
@@ -7595,6 +7661,8 @@ async function bootstrap() {
         phoneMask: maskPhone(session.phoneNumber),
         verificationStatus: session.verificationStatus,
         mustChangePassword: Boolean(session.mustChangePassword),
+        tenancyCreatedAt: session.tenancyCreatedAt,
+        identityRequirement,
         expiresAt: session.expiresAt
       }
     });
@@ -7641,6 +7709,11 @@ async function bootstrap() {
             phoneMask: maskPhone(session.phoneNumber),
             verificationStatus: session.verificationStatus,
             mustChangePassword: Boolean(session.mustChangePassword),
+            tenancyCreatedAt: session.tenancyCreatedAt,
+            identityRequirement: buildResidentIdentityRequirement(
+              session,
+              data.agreement
+            ),
             expiresAt: session.expiresAt
           },
           building: building
@@ -7657,7 +7730,11 @@ async function bootstrap() {
                 county: ""
               },
           resident: data.resident,
-          agreement: data.agreement
+          agreement: data.agreement,
+          identityRequirement: buildResidentIdentityRequirement(
+            session,
+            data.agreement
+          )
         }
       });
     } catch (error) {
@@ -7703,6 +7780,10 @@ async function bootstrap() {
         payload: {
           identityType: parsed.identityType,
           identityNumber: parsed.identityNumber,
+          identityDocumentUrls:
+            parsed.identityDocumentUrls ??
+            currentAgreement?.identityDocumentUrls ??
+            undefined,
           occupationStatus: parsed.occupationStatus,
           occupationLabel: parsed.occupationLabel,
           organizationName: parsed.organizationName,
@@ -7737,6 +7818,11 @@ async function bootstrap() {
             phoneMask: maskPhone(session.phoneNumber),
             verificationStatus: session.verificationStatus,
             mustChangePassword: Boolean(session.mustChangePassword),
+            tenancyCreatedAt: session.tenancyCreatedAt,
+            identityRequirement: buildResidentIdentityRequirement(
+              session,
+              updated.agreement
+            ),
             expiresAt: session.expiresAt
           },
           building: building
@@ -7753,7 +7839,11 @@ async function bootstrap() {
                 county: ""
               },
           resident: updated.resident,
-          agreement: updated.agreement
+          agreement: updated.agreement,
+          identityRequirement: buildResidentIdentityRequirement(
+            session,
+            updated.agreement
+          )
         }
       });
     } catch (error) {
@@ -10508,23 +10598,37 @@ async function bootstrap() {
 
       let targetDirectorySegments = ["misc"];
 
-      if (parsed.category === "support_evidence") {
+      if (
+        parsed.category === "support_evidence" ||
+        parsed.category === "resident_identity"
+      ) {
         const session = await getResidentSession(req, res);
         if (!session) {
           return;
         }
 
-        if (session.verificationStatus !== "verified") {
+        if (
+          parsed.category === "support_evidence" &&
+          session.verificationStatus !== "verified"
+        ) {
           return res.status(403).json({
             error: "Support requests unlock after landlord verification."
           });
         }
 
-        targetDirectorySegments = [
-          "support",
-          normalizeUploadFolderSegment(session.buildingId, "building"),
-          normalizeUploadFolderSegment(session.houseNumber, "house")
-        ];
+        targetDirectorySegments =
+          parsed.category === "resident_identity"
+            ? [
+                "identity",
+                normalizeUploadFolderSegment(session.buildingId, "building"),
+                normalizeUploadFolderSegment(session.houseNumber, "house"),
+                normalizeUploadFolderSegment(session.userId, "resident")
+              ]
+            : [
+                "support",
+                normalizeUploadFolderSegment(session.buildingId, "building"),
+                normalizeUploadFolderSegment(session.houseNumber, "house")
+              ];
       } else {
         const context = await resolveLandlordAccessContext(req, res);
         if (!context) {
@@ -10753,6 +10857,14 @@ async function bootstrap() {
       if (billingVisible) {
         enqueueResidentBillingNotifications(session.buildingId, session.houseNumber);
       }
+      const profileAgreementState = await userAccountService?.getActiveTenantAgreement({
+        buildingId: session.buildingId,
+        houseNumber: session.houseNumber
+      });
+      const identityRequirement = buildResidentIdentityRequirement(
+        session,
+        profileAgreementState?.agreement
+      );
 
       const notifications = filterResidentNotificationsForSession(
         session,
@@ -10893,7 +11005,8 @@ async function bootstrap() {
           utilityBills,
           utilityMeters,
           utilityLatestReadings,
-          utilityPayments
+          utilityPayments,
+          identityRequirement
         },
         messages: {
           rentDue: rentDueMessage,

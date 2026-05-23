@@ -14,7 +14,7 @@ import {
 const RESIDENT_TOKEN_KEY = "estatedesk_resident_session_token";
 const RESIDENT_SESSION_TOKEN_KEY = "estatedesk_resident_session_token_session";
 const RESIDENT_REMEMBER_DEVICE_KEY = "estatedesk_resident_remember_device";
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260523a";
+const RESIDENT_SW_URL = "/resident-sw.js?v=20260523b";
 
 let deferredInstallPrompt = null;
 let residentSwRegistrationPromise = null;
@@ -22,8 +22,10 @@ let residentSwRegistrationPromise = null;
 const apiStatusEl = document.getElementById("api-status");
 const authStateEl = document.getElementById("auth-state");
 const feedbackBoxEl = document.getElementById("feedback-box");
+const residentIdNoticeEl = document.getElementById("resident-id-notice");
 const userMenuToggleEl = document.getElementById("user-menu-toggle");
 const userMenuPanelEl = document.getElementById("user-menu-panel");
+const residentProfileLinkEl = document.getElementById("resident-profile-link");
 const residentBrandEl = document.getElementById("resident-brand");
 const residentHeroTitleEl = document.getElementById("resident-hero-title");
 
@@ -212,6 +214,7 @@ const state = {
   utilityPayments: [],
   paymentAccess: { ...DEFAULT_PAYMENT_ACCESS },
   paymentInstructions: null,
+  identityRequirement: null,
   residentToken: INITIAL_RESIDENT_STORAGE.token,
   rememberResidentDevice:
     INITIAL_RESIDENT_STORAGE.token !== ""
@@ -249,8 +252,10 @@ const REQUIRED_DOM_BINDINGS = Object.freeze([
   ["api-status", apiStatusEl],
   ["auth-state", authStateEl],
   ["feedback-box", feedbackBoxEl],
+  ["resident-id-notice", residentIdNoticeEl],
   ["user-menu-toggle", userMenuToggleEl],
   ["user-menu-panel", userMenuPanelEl],
+  ["resident-profile-link", residentProfileLinkEl],
   ["resident-auth-panel", residentAuthPanelEl],
   ["resident-session-panel", residentSessionPanelEl],
   ["resident-session-summary", residentSessionSummaryEl],
@@ -405,6 +410,69 @@ function formatDateTime(value) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function getResidentIdentityRequirement() {
+  return state.identityRequirement ?? state.residentSession?.identityRequirement ?? null;
+}
+
+function formatIdentityDeadline(requirement) {
+  if (!requirement?.dueAt) {
+    return "";
+  }
+
+  return `Deadline: ${formatDateTime(requirement.dueAt)}.`;
+}
+
+function renderResidentIdentityNotice() {
+  const requirement = getResidentIdentityRequirement();
+  const needsIdentity =
+    Boolean(state.residentSession) &&
+    !isPasswordChangeRequired() &&
+    Boolean(requirement) &&
+    !requirement.complete;
+
+  if (userMenuToggleEl instanceof HTMLElement) {
+    userMenuToggleEl.classList.toggle("has-alert", needsIdentity);
+  }
+  if (residentProfileLinkEl instanceof HTMLElement) {
+    residentProfileLinkEl.classList.toggle("has-alert", needsIdentity);
+  }
+  if (!(residentIdNoticeEl instanceof HTMLElement)) {
+    return;
+  }
+
+  if (!needsIdentity) {
+    residentIdNoticeEl.replaceChildren();
+    residentIdNoticeEl.className = "feedback hidden";
+    return;
+  }
+
+  const overdue = requirement.status === "overdue";
+  const hoursRemaining = Number(requirement.hoursRemaining ?? 0);
+  const remainingCopy = overdue
+    ? "Your 48-hour grace period has ended."
+    : `${hoursRemaining} hour${hoursRemaining === 1 ? "" : "s"} remaining.`;
+
+  const lead = document.createElement("strong");
+  lead.textContent = overdue ? "ID required now. " : "ID required. ";
+
+  const action = document.createElement("a");
+  action.className = "resident-id-action";
+  action.href = "/user";
+  action.textContent = "Add it in Profile & ID";
+
+  residentIdNoticeEl.replaceChildren(
+    lead,
+    document.createTextNode(
+      `Add your ID type, ID number, and ID photo. ${remainingCopy} ${formatIdentityDeadline(
+        requirement
+      )} `
+    ),
+    action,
+    document.createTextNode(".")
+  );
+  residentIdNoticeEl.className = `feedback ${overdue ? "error" : "info"}`;
 }
 
 function formatCurrency(value) {
@@ -3602,6 +3670,7 @@ function showSignedOutState() {
   state.rentSelectedBillingMonth = null;
   state.utilityPaymentBaseline = null;
   state.activeReceipt = null;
+  state.identityRequirement = null;
   updateResidentNavDots();
   state.utilityBills = [];
   state.utilityMeters = [];
@@ -3621,6 +3690,7 @@ function showSignedOutState() {
   applyPaymentAccessUi();
   renderPwaControls();
   renderSmsControls();
+  renderResidentIdentityNotice();
   syncRememberDeviceToggle();
   updateResidentBranding();
 }
@@ -3632,6 +3702,7 @@ function showSignedInState() {
     return;
   }
 
+  state.identityRequirement = state.identityRequirement ?? session.identityRequirement ?? null;
   const mustChangePassword = isPasswordChangeRequired();
   clearResidentAuthFeedback();
   authStateEl.textContent = mustChangePassword
@@ -3652,6 +3723,7 @@ function showSignedInState() {
     session.verificationStatus
   )} • Expires ${formatDateTime(session.expiresAt)}`;
   renderOverviewSession();
+  renderResidentIdentityNotice();
   if (mustChangePassword) {
     setActiveResidentView("payments");
   } else if (isResidentPendingReview()) {
@@ -3669,6 +3741,7 @@ async function loadResidentSession() {
   try {
     const payload = await requestJson("/api/auth/resident/session", {}, { auth: true });
     state.residentSession = payload.data;
+    state.identityRequirement = payload.data?.identityRequirement ?? null;
     showSignedInState();
     await loadResidentPushConfig();
     await loadResidentSmsConfig();
@@ -3677,6 +3750,7 @@ async function loadResidentSession() {
   } catch (_error) {
     saveResidentToken("");
     state.residentSession = null;
+    state.identityRequirement = null;
     showSignedOutState();
     return false;
   }
@@ -3714,6 +3788,8 @@ async function loadTenantData() {
     state.notifications = data.notifications ?? [];
     state.paymentInstructions = data.paymentInstructions ?? null;
     state.rentDue = data.rentDue ?? null;
+    state.identityRequirement =
+      data.identityRequirement ?? state.residentSession?.identityRequirement ?? null;
 
     renderReports(state.reports);
     renderNotifications(state.notifications);
@@ -3735,10 +3811,12 @@ async function loadTenantData() {
     renderUtilityPayments(state.utilityPayments, messages.utilityPayments);
     syncPaymentMessaging();
     updateResidentNavDots();
+    renderResidentIdentityNotice();
   } catch (error) {
     if (error.status === 401) {
       saveResidentToken("");
       state.residentSession = null;
+      state.identityRequirement = null;
       showSignedOutState();
       showFeedback("Session expired. Sign in again.");
       return;

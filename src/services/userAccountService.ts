@@ -87,6 +87,20 @@ function normalizeOptionalText(value: string | null | undefined): string | undef
   return normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      value
+        .map((item) => String(item ?? "").trim())
+        .filter(Boolean)
+    )
+  ];
+}
+
 function isMissingTenantApplicationIdentityColumnsError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : "";
   const code =
@@ -183,6 +197,7 @@ type TenantAgreementRecord = Prisma.TenantAgreementGetPayload<{
     residentUserId: true;
     identityType: true;
     identityNumber: true;
+    identityDocumentUrls: true;
     occupationStatus: true;
     occupationLabel: true;
     organizationName: true;
@@ -238,6 +253,7 @@ function mapTenantAgreement(record: TenantAgreementRecord) {
     residentUserId: record.residentUserId,
     identityType: record.identityType ?? undefined,
     identityNumber: record.identityNumber ?? undefined,
+    identityDocumentUrls: normalizeStringList(record.identityDocumentUrls),
     occupationStatus: record.occupationStatus ?? undefined,
     occupationLabel: record.occupationLabel ?? undefined,
     organizationName: record.organizationName ?? undefined,
@@ -1968,6 +1984,7 @@ export class UserAccountService {
         residentUserId: true,
         identityType: true,
         identityNumber: true,
+        identityDocumentUrls: true,
         occupationStatus: true,
         occupationLabel: true,
         organizationName: true,
@@ -2030,6 +2047,9 @@ export class UserAccountService {
     const normalizedPayload = {
       identityType: input.payload.identityType ?? null,
       identityNumber: normalizeOptionalText(input.payload.identityNumber) ?? null,
+      identityDocumentUrls: normalizeStringList(
+        input.payload.identityDocumentUrls
+      ),
       occupationStatus: input.payload.occupationStatus ?? null,
       occupationLabel: normalizeOptionalText(input.payload.occupationLabel) ?? null,
       organizationName: normalizeOptionalText(input.payload.organizationName) ?? null,
@@ -2055,7 +2075,9 @@ export class UserAccountService {
       specialTerms: normalizeOptionalText(input.payload.specialTerms) ?? null
     };
 
-    const hasValue = Object.values(normalizedPayload).some((value) => value != null);
+    const hasValue = Object.values(normalizedPayload).some((value) =>
+      Array.isArray(value) ? value.length > 0 : value != null
+    );
     if (!hasValue) {
       await this.prisma.tenantAgreement.deleteMany({
         where: { tenancyId: tenancy.id }
@@ -2092,6 +2114,7 @@ export class UserAccountService {
         residentUserId: true,
         identityType: true,
         identityNumber: true,
+        identityDocumentUrls: true,
         occupationStatus: true,
         occupationLabel: true,
         organizationName: true,

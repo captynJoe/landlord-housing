@@ -15,9 +15,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="JK Flats Profile" />
     <link rel="icon" href="/icons/housing-app.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/users.css?v=20260315g" />
-    <link rel="stylesheet" href="/user.css?v=20260315g" />
-    <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
+    <link rel="stylesheet" href="/users.css?v=20260523b" />
+    <link rel="stylesheet" href="/user.css?v=20260523b" />
+    <link rel="stylesheet" href="/dedicated-theme.css?v=20260523b" />
   </head>
   <body class="app-loading">
     <div class="ambient" aria-hidden="true"></div>
@@ -65,6 +65,7 @@
       </header>
 
       <section id="feedback-box" class="feedback hidden"></section>
+      <section id="profile-id-notice" class="feedback info hidden"></section>
 
       <section id="user-auth-panel" class="panel-card hidden">
         <section class="section-head">
@@ -141,6 +142,21 @@
                   />
                 </label>
               </div>
+
+              <label>
+                Upload ID Photo
+                <input
+                  id="profile-identity-document"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                />
+              </label>
+              <div
+                id="profile-identity-document-preview"
+                class="upload-preview-grid"
+                aria-live="polite"
+              ></div>
 
               <div class="field-grid">
                 <label>
@@ -297,6 +313,6 @@
       </section>
     </main>
 
-    <script type="module" src="/user.js?v=20260523a"></script>
+    <script type="module" src="/user.js?v=20260523b"></script>
   </body>
 </html>

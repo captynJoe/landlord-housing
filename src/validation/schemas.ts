@@ -243,6 +243,7 @@ export const residentPushSubscriptionSchema = z.object({
 
 export const mediaUploadCategorySchema = z.enum([
   "support_evidence",
+  "resident_identity",
   "building_profile"
 ]);
 
@@ -426,6 +427,10 @@ const optionalTenantPhoneSchema = z.preprocess(
   emptyStringToUndefined,
   kenyaPhoneSchema.optional()
 );
+const optionalTenantIdentityDocumentUrlsSchema = z
+  .array(mediaAssetUrlSchema)
+  .max(4)
+  .optional();
 
 export const residentPasswordSetupSchema = z.object({
   buildingId: nonEmptyString,
@@ -621,6 +626,7 @@ export const tenantAgreementUpsertSchema = z
   .object({
     identityType: optionalTenantIdentityTypeSchema,
     identityNumber: optionalTenantTextSchema(80),
+    identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
     occupationStatus: optionalTenantOccupationStatusSchema,
     occupationLabel: optionalTenantTextSchema(120),
     organizationName: optionalTenantTextSchema(160),
@@ -643,6 +649,14 @@ export const tenantAgreementUpsertSchema = z
         code: z.ZodIssueCode.custom,
         path: ["identityType"],
         message: "Select the ID type for the provided ID number."
+      });
+    }
+
+    if (value.identityDocumentUrls?.length && (!value.identityType || !value.identityNumber)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["identityNumber"],
+        message: "Add the ID type and ID number before uploading ID photos."
       });
     }
 
@@ -676,6 +690,7 @@ export const residentTenantProfileUpsertSchema = z
   .object({
     identityType: optionalTenantIdentityTypeSchema,
     identityNumber: optionalTenantTextSchema(80),
+    identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
     occupationStatus: optionalTenantOccupationStatusSchema,
     occupationLabel: optionalTenantTextSchema(120),
     organizationName: optionalTenantTextSchema(160),
@@ -692,6 +707,14 @@ export const residentTenantProfileUpsertSchema = z
         code: z.ZodIssueCode.custom,
         path: ["identityType"],
         message: "Select the ID type for the provided ID number."
+      });
+    }
+
+    if (value.identityDocumentUrls?.length && (!value.identityType || !value.identityNumber)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["identityNumber"],
+        message: "Add the ID type and ID number before uploading ID photos."
       });
     }
 

@@ -15,8 +15,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="JK Flats Resident" />
     <link rel="icon" href="/icons/housing-app.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/users.css?v=20260521a" />
-    <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
+    <link rel="stylesheet" href="/users.css?v=20260523b" />
+    <link rel="stylesheet" href="/dedicated-theme.css?v=20260523b" />
   </head>
   <body class="app-loading">
     <div class="ambient" aria-hidden="true"></div>
@@ -49,6 +49,7 @@
               <p id="resident-session-summary" class="item-details"></p>
             </section>
             <a class="user-panel-link" href="/resident">Open resident workspace</a>
+            <a id="resident-profile-link" class="user-panel-link" href="/user">Profile &amp; ID</a>
           </div>
         </div>
       </header>
@@ -81,6 +82,7 @@
       </header>
 
       <section id="feedback-box" class="feedback hidden"></section>
+      <section id="resident-id-notice" class="feedback info hidden"></section>
 
       <section id="resident-auth-panel" class="panel-card auth-stack">
         <section class="section-head">
@@ -156,7 +158,10 @@
 
           <section class="section-head">
             <h2>Access request details</h2>
-            <p>Optional details. You can add them now or skip them and continue with access request.</p>
+            <p>
+              Add ID details now if ready, or complete Profile &amp; ID within
+              48 hours after signing in.
+            </p>
           </section>
 
           <div class="field-grid">
@@ -205,7 +210,9 @@
             </label>
           </div>
           <p class="item-guidance">
-            These details help management complete your resident profile, but they are not required to sign in or request access.
+            ID type, ID number, and an ID photo are required for the tenant
+            record. If you skip them now, the dashboard will remind you after
+            access is requested.
           </p>
 
           <div class="action-row auth-request-actions">
@@ -846,6 +853,6 @@
       </article>
     </section>
 
-    <script type="module" src="/users.js?v=20260523a"></script>
+    <script type="module" src="/users.js?v=20260523b"></script>
   </body>
 </html>

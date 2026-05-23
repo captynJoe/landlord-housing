@@ -4,8 +4,14 @@ import {
   getResidentShellBrand
 } from "./portal-branding.js?v=20260521b";
 import { notifyError, notifyStatus } from "./notifications.js";
+import {
+  createUploadedImageGallery,
+  renderSelectedImagePreviews,
+  uploadImageFiles,
+  validateImageFiles
+} from "./media-upload.js";
 
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260523a";
+const RESIDENT_SW_URL = "/resident-sw.js?v=20260523b";
 
 const apiStatusEl = document.getElementById("api-status");
 const authStateEl = document.getElementById("auth-state");
@@ -33,6 +39,11 @@ const profileEmailAddressEl = document.getElementById("profile-email-address");
 
 const profileIdentityTypeEl = document.getElementById("profile-identity-type");
 const profileIdentityNumberEl = document.getElementById("profile-identity-number");
+const profileIdentityDocumentEl = document.getElementById("profile-identity-document");
+const profileIdentityDocumentPreviewEl = document.getElementById(
+  "profile-identity-document-preview"
+);
+const profileIdNoticeEl = document.getElementById("profile-id-notice");
 const profileOccupationStatusEl = document.getElementById("profile-occupation-status");
 const profileOccupationLabelEl = document.getElementById("profile-occupation-label");
 const profileOrganizationNameEl = document.getElementById("profile-organization-name");
@@ -119,6 +130,16 @@ function optionalTrimmedValue(value) {
   return normalized || undefined;
 }
 
+function createResidentIdentityUploadRequest() {
+  return {
+    url: "/api/media/upload",
+    fields: {
+      category: "resident_identity"
+    },
+    credentials: "same-origin"
+  };
+}
+
 function formatDate(value) {
   if (!value) {
     return "Not set";
@@ -161,6 +182,97 @@ function formatCurrency(value) {
   }
 
   return `KSh ${value.toLocaleString("en-KE")}`;
+}
+
+function getIdentityRequirement(profile = state.profile) {
+  return profile?.identityRequirement ?? profile?.session?.identityRequirement ?? null;
+}
+
+function formatIdentityDeadline(requirement) {
+  if (!requirement?.dueAt) {
+    return "";
+  }
+
+  return `Deadline: ${formatDateTime(requirement.dueAt)}.`;
+}
+
+function renderIdentityNotice(profile = state.profile) {
+  if (!(profileIdNoticeEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const requirement = getIdentityRequirement(profile);
+  if (!requirement || requirement.complete) {
+    profileIdNoticeEl.textContent = "";
+    profileIdNoticeEl.className = "feedback hidden";
+    return;
+  }
+
+  const overdue = requirement.status === "overdue";
+  const hoursRemaining = Number(requirement.hoursRemaining ?? 0);
+  const remainingCopy = overdue
+    ? "Your 48-hour grace period has ended."
+    : `${hoursRemaining} hour${hoursRemaining === 1 ? "" : "s"} remaining.`;
+  profileIdNoticeEl.textContent = `${overdue ? "ID required now." : "ID required."} Add your ID type, ID number, and an ID photo. ${remainingCopy} ${formatIdentityDeadline(
+    requirement
+  )}`;
+  profileIdNoticeEl.className = `feedback ${overdue ? "error" : "info"}`;
+}
+
+function getExistingIdentityDocumentUrls() {
+  return Array.isArray(state.profile?.agreement?.identityDocumentUrls)
+    ? state.profile.agreement.identityDocumentUrls
+        .map((item) => String(item ?? "").trim())
+        .filter(Boolean)
+    : [];
+}
+
+function validateIdentityDocumentSelection() {
+  if (!(profileIdentityDocumentEl instanceof HTMLInputElement)) {
+    return [];
+  }
+
+  const selectedCount = profileIdentityDocumentEl.files?.length ?? 0;
+  const remainingSlots = Math.max(0, 4 - getExistingIdentityDocumentUrls().length);
+  if (selectedCount > 0 && remainingSlots === 0) {
+    throw new Error("ID photos are already uploaded. Contact management to replace them.");
+  }
+
+  return validateImageFiles(profileIdentityDocumentEl.files, {
+    maxFiles: remainingSlots,
+    maxSizeMb: 10
+  });
+}
+
+function renderIdentityDocumentPreview() {
+  if (!(profileIdentityDocumentPreviewEl instanceof HTMLElement)) {
+    return;
+  }
+
+  if (
+    profileIdentityDocumentEl instanceof HTMLInputElement &&
+    profileIdentityDocumentEl.files &&
+    profileIdentityDocumentEl.files.length > 0
+  ) {
+    renderSelectedImagePreviews(profileIdentityDocumentPreviewEl, profileIdentityDocumentEl.files, {
+      emptyText: "No ID photos selected."
+    });
+    return;
+  }
+
+  profileIdentityDocumentPreviewEl.replaceChildren();
+  const gallery = createUploadedImageGallery(getExistingIdentityDocumentUrls(), {
+    linkLabel: "Open ID photo"
+  });
+  if (gallery) {
+    profileIdentityDocumentPreviewEl.append(gallery);
+    return;
+  }
+
+  const empty = document.createElement("p");
+  empty.className = "upload-preview-empty";
+  empty.textContent = "No ID photo uploaded yet.";
+  profileIdentityDocumentPreviewEl.append(empty);
 }
 
 function isPendingReview(session) {
@@ -230,6 +342,11 @@ function renderProfile(profile) {
 
   profileIdentityTypeEl.value = agreement?.identityType || "";
   profileIdentityNumberEl.value = agreement?.identityNumber || "";
+  if (profileIdentityDocumentEl instanceof HTMLInputElement) {
+    profileIdentityDocumentEl.value = "";
+  }
+  renderIdentityNotice(profile);
+  renderIdentityDocumentPreview();
   profileOccupationStatusEl.value = agreement?.occupationStatus || "";
   profileOccupationLabelEl.value = agreement?.occupationLabel || "";
   profileOrganizationNameEl.value = agreement?.organizationName || "";
@@ -287,9 +404,32 @@ async function handleSave(event) {
   profileSaveBtnEl.disabled = true;
 
   try {
+    const identityType = optionalTrimmedValue(profileIdentityTypeEl.value);
+    const identityNumber = optionalTrimmedValue(profileIdentityNumberEl.value);
+    const existingDocumentUrls = getExistingIdentityDocumentUrls();
+    const selectedFiles = validateIdentityDocumentSelection();
+
+    const willHaveIdentityPhotos =
+      existingDocumentUrls.length + selectedFiles.length > 0;
+    if (
+      (identityType || identityNumber || willHaveIdentityPhotos) &&
+      (!identityType || !identityNumber)
+    ) {
+      throw new Error("Add both the ID type and ID number before saving ID photos.");
+    }
+
+    const uploadedDocumentUrls = await uploadImageFiles(selectedFiles, {
+      createUploadRequest: createResidentIdentityUploadRequest
+    });
+    const identityDocumentUrls = [
+      ...existingDocumentUrls,
+      ...uploadedDocumentUrls
+    ].slice(0, 4);
+
     const payload = {
-      identityType: optionalTrimmedValue(profileIdentityTypeEl.value),
-      identityNumber: optionalTrimmedValue(profileIdentityNumberEl.value),
+      identityType,
+      identityNumber,
+      identityDocumentUrls,
       occupationStatus: optionalTrimmedValue(profileOccupationStatusEl.value),
       occupationLabel: optionalTrimmedValue(profileOccupationLabelEl.value),
       organizationName: optionalTrimmedValue(profileOrganizationNameEl.value),
@@ -378,6 +518,22 @@ document.addEventListener("click", (event) => {
   }
 });
 residentProfileFormEl.addEventListener("submit", handleSave);
+profileIdentityDocumentEl?.addEventListener("change", () => {
+  try {
+    validateIdentityDocumentSelection();
+    renderIdentityDocumentPreview();
+    showFeedback("");
+  } catch (error) {
+    if (profileIdentityDocumentEl instanceof HTMLInputElement) {
+      profileIdentityDocumentEl.value = "";
+    }
+    renderIdentityDocumentPreview();
+    showFeedback(
+      error instanceof Error ? error.message : "Invalid ID photo.",
+      "error"
+    );
+  }
+});
 residentLogoutBtnEl.addEventListener("click", handleLogout);
 
 void boot();

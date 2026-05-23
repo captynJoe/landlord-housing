@@ -95,6 +95,11 @@ body {
   cursor: pointer;
 }
 
+.user-link.has-alert {
+  border-color: rgba(184, 121, 47, 0.55);
+  box-shadow: 0 0 0 3px rgba(184, 121, 47, 0.16);
+}
+
 .user-panel {
   position: absolute;
   right: 0;
@@ -153,6 +158,17 @@ body {
   color: var(--teal-700);
   border-top: 1px solid rgba(16, 28, 40, 0.12);
   padding-top: 10px;
+}
+
+.user-panel-link.has-alert {
+  color: #8a571d;
+}
+
+.resident-id-action {
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .mode-switch {

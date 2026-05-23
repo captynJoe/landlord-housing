@@ -1,13 +1,17 @@
-const CACHE_NAME = "jk-flats-resident-v20260523a";
+const CACHE_NAME = "jk-flats-resident-v20260523b";
 const RESIDENT_SHELL_URL = "/resident";
+const PROFILE_SHELL_URL = "/user";
 const LANDLORD_SHELL_URL = "/landlord";
 const APP_ASSETS = [
   RESIDENT_SHELL_URL,
+  PROFILE_SHELL_URL,
   LANDLORD_SHELL_URL,
-  "/users.css?v=20260509a",
+  "/users.css?v=20260523b",
+  "/user.css?v=20260523b",
   "/landlord.css?v=20260523a",
-  "/dedicated-theme.css?v=20260519a",
-  "/users.js?v=20260523a",
+  "/dedicated-theme.css?v=20260523b",
+  "/users.js?v=20260523b",
+  "/user.js?v=20260523b",
   "/landlord.js?v=20260523a",
   "/password-visibility.js",
   "/manifest.webmanifest",
@@ -22,10 +26,12 @@ function getShellCacheKey(pathname) {
 
   if (
     pathname === "/user" ||
-    pathname === "/user/" ||
-    pathname === "/users" ||
-    pathname === "/users/"
+    pathname === "/user/"
   ) {
+    return PROFILE_SHELL_URL;
+  }
+
+  if (pathname === "/users" || pathname === "/users/") {
     return RESIDENT_SHELL_URL;
   }
 
@@ -150,7 +156,9 @@ self.addEventListener("notificationclick", (event) => {
   const targetPath = new URL(targetUrl).pathname;
   const targetShellPrefix = targetPath.startsWith("/landlord")
     ? "/landlord"
-    : "/resident";
+    : targetPath.startsWith("/user")
+      ? "/user"
+      : "/resident";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {

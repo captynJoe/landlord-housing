@@ -307,6 +307,15 @@ button.resident-overview-card.is-active {
   background: rgba(255, 255, 255, 0.78) !important;
 }
 
+.user-link.has-alert {
+  border-color: rgba(184, 121, 47, 0.58) !important;
+  box-shadow: 0 0 0 3px rgba(184, 121, 47, 0.16) !important;
+}
+
+.user-panel-link.has-alert {
+  color: var(--estate-copper) !important;
+}
+
 .room-billing-hold-card.is-active {
   border-left-color: var(--estate-copper) !important;
   background: #fff8ed !important;
@@ -322,4 +331,3 @@ button.resident-overview-card.is-active {
     padding-inline: 12px;
   }
 }
-
