@@ -14,7 +14,7 @@ import {
 const RESIDENT_TOKEN_KEY = "estatedesk_resident_session_token";
 const RESIDENT_SESSION_TOKEN_KEY = "estatedesk_resident_session_token_session";
 const RESIDENT_REMEMBER_DEVICE_KEY = "estatedesk_resident_remember_device";
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260523b";
+const RESIDENT_SW_URL = "/resident-sw.js?v=20260523c";
 
 let deferredInstallPrompt = null;
 let residentSwRegistrationPromise = null;
@@ -1429,53 +1429,56 @@ function renderPaymentInstructions() {
   let hasDetail = false;
   if (method === "bank") {
     hasDetail =
-      appendPaymentInstructionDetail("Bank", effective.bankName || instructions.bankName) ||
+      appendPaymentInstructionDetail("Bank Name", effective.bankName || instructions.bankName) ||
       hasDetail;
     hasDetail =
       appendPaymentInstructionDetail(
-        "Account Name",
+        "Bank Account Name",
         effective.bankAccountName || instructions.bankAccountName
       ) || hasDetail;
     hasDetail =
       appendPaymentInstructionDetail(
-        "Account Number",
+        "Bank Account Number",
         effective.bankAccountNumber || instructions.bankAccountNumber
       ) || hasDetail;
     hasDetail =
-      appendPaymentInstructionDetail("Branch", effective.bankBranch || instructions.bankBranch) ||
+      appendPaymentInstructionDetail(
+        "Bank Branch",
+        effective.bankBranch || instructions.bankBranch
+      ) ||
       hasDetail;
     hasDetail =
       appendPaymentInstructionDetail(
-        "SWIFT",
+        "SWIFT / Bank Code",
         effective.bankSwiftCode || instructions.bankSwiftCode
       ) || hasDetail;
   } else if (method === "cash") {
     hasDetail =
       appendPaymentInstructionDetail(
-        "Cash Point",
+        "Cash Payment Point",
         effective.cashLocation || instructions.cashLocation
       ) || hasDetail;
   } else if (method === "manual") {
     hasDetail =
       appendPaymentInstructionDetail(
-        "Manual Payment",
+        "Payment Instructions",
         effective.instructions || instructions.instructions
       ) || hasDetail;
   } else {
     hasDetail =
       appendPaymentInstructionDetail(
-        "M-PESA Number",
+        "Buy Goods Till Number",
         effective.mpesaBusinessNumber || instructions.mpesaBusinessNumber
       ) || hasDetail;
     hasDetail =
       appendPaymentInstructionDetail(
-        "Account Reference",
-        effective.mpesaAccountReference || instructions.mpesaAccountReference
+        "M-PESA Account Name",
+        effective.mpesaAccountName || instructions.mpesaAccountName
       ) || hasDetail;
     hasDetail =
       appendPaymentInstructionDetail(
-        "Account Name",
-        effective.mpesaAccountName || instructions.mpesaAccountName
+        "House / Account Reference",
+        effective.mpesaAccountReference || instructions.mpesaAccountReference
       ) || hasDetail;
   }
 
