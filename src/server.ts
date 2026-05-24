@@ -28,6 +28,7 @@ import {
 import { AppStateService } from "./services/appStateService.js";
 import {
   RentLedgerService,
+  type RentLatePenaltyPolicy,
   type RentLedgerPersistedState
 } from "./services/rentLedgerService.js";
 import {
@@ -492,9 +493,15 @@ interface LandlordUtilityRegistryRow {
   hasActiveResident: boolean;
   rentEnabled: boolean;
   monthlyRentKsh: number;
+  depositKsh: number;
   rentPaymentStatus?: string;
   rentBalanceKsh: number;
   currentRentDueKsh: number;
+  currentMonthLatePenaltyKsh: number;
+  totalLatePenaltyKsh: number;
+  rentGraceDays: number;
+  lateRentPenaltyEnabled: boolean;
+  lateRentPenaltyAmountKsh: number;
   rentArrearsKsh: number;
   rentDueDate?: string;
   currentMonthRentPaidKsh: number;
@@ -1163,6 +1170,7 @@ async function bootstrap() {
     string,
     UtilityFixedChargeDefaultRecord
   >();
+  const rentLatePenaltyPoliciesByBuilding = new Map<string, RentLatePenaltyPolicy>();
   const monthlyCombinedUtilityChargesByMonth = new Map<
     string,
     MonthlyCombinedUtilityChargeRecord
@@ -2752,6 +2760,14 @@ async function bootstrap() {
   const userSupportService = new UserSupportService();
   const ownerNotificationService = new OwnerNotificationService();
   const rentLedgerService = new RentLedgerService();
+  rentLedgerService.setLatePenaltyPolicyResolver(
+    (buildingId) =>
+      rentLatePenaltyPoliciesByBuilding.get(normalizeBuildingId(buildingId)) ?? {
+        enabled: false,
+        amountKsh: 0,
+        graceDays: 0
+      }
+  );
   const utilityBillingService = new UtilityBillingService();
   const paymentAccessService = new PaymentAccessService();
   const paymentProfileService = new PaymentProfileService();
@@ -3347,6 +3363,7 @@ async function bootstrap() {
       utilityBillingService.setCombinedChargeBuildingAmounts([]);
       utilityRateDefaultsByBuilding.clear();
       utilityFixedChargeDefaultsByBuilding.clear();
+      rentLatePenaltyPoliciesByBuilding.clear();
       return;
     }
 
@@ -3374,8 +3391,14 @@ async function bootstrap() {
 
     utilityRateDefaultsByBuilding.clear();
     utilityFixedChargeDefaultsByBuilding.clear();
+    rentLatePenaltyPoliciesByBuilding.clear();
     for (const item of configs) {
       syncUtilityPricingDefaultsForBuilding(item);
+      rentLatePenaltyPoliciesByBuilding.set(normalizeBuildingId(item.buildingId), {
+        enabled: Boolean(item.lateRentPenaltyEnabled),
+        amountKsh: Math.max(0, Math.round(Number(item.lateRentPenaltyAmountKsh ?? 0))),
+        graceDays: Math.max(0, Math.round(Number(item.rentGraceDays ?? 0)))
+      });
     }
 
     utilityBillingService.setCombinedChargeBuildingIds(
@@ -4504,6 +4527,7 @@ async function bootstrap() {
         emergencyContactName?: string;
         emergencyContactPhone?: string;
         monthlyRentKsh?: number;
+        depositKsh?: number;
         paymentDueDay?: number;
         leaseStartDate?: string;
         agreementUpdatedAt?: string;
@@ -4565,6 +4589,7 @@ async function bootstrap() {
             emergencyContactName: true,
             emergencyContactPhone: true,
             monthlyRentKsh: true,
+            depositKsh: true,
             paymentDueDay: true,
             leaseStartDate: true,
             updatedAt: true
@@ -4640,6 +4665,7 @@ async function bootstrap() {
           emergencyContactName: agreement.emergencyContactName ?? undefined,
           emergencyContactPhone: agreement.emergencyContactPhone ?? undefined,
           monthlyRentKsh: agreement.monthlyRentKsh ?? undefined,
+          depositKsh: agreement.depositKsh ?? undefined,
           paymentDueDay: agreement.paymentDueDay ?? undefined,
           leaseStartDate: agreement.leaseStartDate?.toISOString().slice(0, 10),
           agreementUpdatedAt: agreement.updatedAt.toISOString()
@@ -4696,6 +4722,12 @@ async function bootstrap() {
       });
     }
     const normalizedHouses = [...houseSet].sort(compareHouseNumbers);
+    const rentLatePenaltyPolicy =
+      rentLatePenaltyPoliciesByBuilding.get(normalizeBuildingId(buildingId)) ?? {
+        enabled: false,
+        amountKsh: 0,
+        graceDays: 0
+      };
 
     return normalizedHouses.map((houseNumber) => {
       const meter = meterMap.get(houseNumber);
@@ -4709,6 +4741,7 @@ async function bootstrap() {
       const utilityDefaults = utilityDefaultsByHouse.get(houseNumber);
       const rent = rentStatusByHouse.get(houseNumber);
       const fallbackMonthlyRentKsh = Math.max(0, Number(agreement?.monthlyRentKsh ?? 0));
+      const depositKsh = Math.max(0, Number(agreement?.depositKsh ?? 0));
       const fallbackRentBalanceKsh = fallbackMonthlyRentKsh > 0 ? fallbackMonthlyRentKsh : 0;
       const fallbackRentDueDate =
         fallbackMonthlyRentKsh > 0
@@ -4745,6 +4778,14 @@ async function bootstrap() {
             )
           )
         : 0;
+      const currentMonthLatePenaltyKsh =
+        paymentAccess.rentEnabled && rent
+          ? Math.max(0, Number(rent.currentMonthLatePenaltyKsh ?? 0))
+          : 0;
+      const totalLatePenaltyKsh =
+        paymentAccess.rentEnabled && rent
+          ? Math.max(0, Number(rent.totalLatePenaltyKsh ?? 0))
+          : 0;
       const rentArrearsKsh = Math.max(0, rentBalanceKsh - currentRentDueKsh);
       const utilitySummary = utilityBalanceByHouse.get(houseNumber);
       const utilityBalanceKsh = utilitySummary?.totalOpenKsh ?? 0;
@@ -4758,6 +4799,12 @@ async function bootstrap() {
       const visibleRentBalanceKsh = billingVisible ? rentBalanceKsh : 0;
       const visibleCurrentRentDueKsh = billingVisible ? currentRentDueKsh : 0;
       const visibleRentArrearsKsh = billingVisible ? rentArrearsKsh : 0;
+      const visibleCurrentMonthLatePenaltyKsh = billingVisible ? currentMonthLatePenaltyKsh : 0;
+      const visibleTotalLatePenaltyKsh = billingVisible ? totalLatePenaltyKsh : 0;
+      const visibleRentGraceDays = billingVisible ? rentLatePenaltyPolicy.graceDays : 0;
+      const visibleLateRentPenaltyAmountKsh = billingVisible
+        ? rentLatePenaltyPolicy.amountKsh
+        : 0;
       const visibleCurrentMonthRentPaidKsh = billingVisible ? currentMonthRentPaidKsh : 0;
       const visibleRentDueDate =
         paymentAccess.rentEnabled && billingVisible
@@ -4798,9 +4845,15 @@ async function bootstrap() {
         hasActiveResident: Boolean(resident),
         rentEnabled: paymentAccess.rentEnabled,
         monthlyRentKsh,
+        depositKsh,
         rentPaymentStatus: visibleRentPaymentStatus,
         rentBalanceKsh: visibleRentBalanceKsh,
         currentRentDueKsh: visibleCurrentRentDueKsh,
+        currentMonthLatePenaltyKsh: visibleCurrentMonthLatePenaltyKsh,
+        totalLatePenaltyKsh: visibleTotalLatePenaltyKsh,
+        rentGraceDays: visibleRentGraceDays,
+        lateRentPenaltyEnabled: billingVisible && rentLatePenaltyPolicy.enabled,
+        lateRentPenaltyAmountKsh: visibleLateRentPenaltyAmountKsh,
         rentArrearsKsh: visibleRentArrearsKsh,
         rentDueDate: visibleRentDueDate,
         currentMonthRentPaidKsh: visibleCurrentMonthRentPaidKsh,
@@ -4893,6 +4946,35 @@ async function bootstrap() {
         updatedAt: item.updatedAt
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  const listPaymentAccessRowsForBuildings = async (
+    buildings: Array<{ id: string; name: string }>
+  ) => {
+    const configByBuildingId = new Map<string, BuildingConfigurationRecord>();
+    if (buildingConfigurationService && buildings.length > 0) {
+      await buildingConfigurationService.ensureDefaultsForBuildings(buildings);
+      const configs = await buildingConfigurationService.listForBuildings(
+        buildings.map((building) => building.id)
+      );
+      configs.forEach((config) => {
+        configByBuildingId.set(config.buildingId, config);
+      });
+    }
+
+    return buildings.map((building) => {
+      const config = configByBuildingId.get(building.id);
+      return {
+        ...paymentAccessService.getForBuilding(building.id),
+        buildingName: building.name,
+        rentGraceDays: Math.max(0, Number(config?.rentGraceDays ?? 0)),
+        lateRentPenaltyEnabled: Boolean(config?.lateRentPenaltyEnabled),
+        lateRentPenaltyAmountKsh: Math.max(
+          0,
+          Number(config?.lateRentPenaltyAmountKsh ?? 0)
+        )
+      };
+    });
   };
 
   const listLandlordResidentDirectoryRows = async (
@@ -5512,6 +5594,8 @@ async function bootstrap() {
       currentMonthOutstandingKsh: number;
       arrearsKsh: number;
       totalPaidKsh: number;
+      currentMonthLatePenaltyKsh: number;
+      totalLatePenaltyKsh: number;
       dueDate: string;
       latestPaymentReference?: string;
       latestPaymentAt?: string;
@@ -5531,6 +5615,8 @@ async function bootstrap() {
         currentMonthOutstandingKsh: item.currentMonthOutstandingKsh,
         arrearsKsh: item.arrearsKsh,
         totalPaidKsh: item.totalPaidKsh,
+        currentMonthLatePenaltyKsh: item.currentMonthLatePenaltyKsh,
+        totalLatePenaltyKsh: item.totalLatePenaltyKsh,
         dueDate: item.dueDate,
         latestPaymentReference: item.latestPaymentReference,
         latestPaymentAt: item.latestPaymentAt,
@@ -5594,6 +5680,8 @@ async function bootstrap() {
           currentMonthOutstandingKsh: monthlyRentKsh,
           arrearsKsh: 0,
           totalPaidKsh: 0,
+          currentMonthLatePenaltyKsh: 0,
+          totalLatePenaltyKsh: 0,
           dueDate: buildAgreementFallbackRentDueDate(
             agreement.paymentDueDay ?? undefined,
             agreement.leaseStartDate
@@ -5683,10 +5771,7 @@ async function bootstrap() {
         ticketsPromise
       ]);
 
-    const paymentAccess = buildings.map((building) => ({
-      ...paymentAccessService.getForBuilding(building.id),
-      buildingName: building.name
-    }));
+    const paymentAccess = await listPaymentAccessRowsForBuildings(buildings);
     const paymentProfiles = paymentProfileService.listProfiles(
       "/api/payments/mpesa/rent-callback"
     );
@@ -8945,10 +9030,7 @@ async function bootstrap() {
         );
       }
 
-      const data = visibleBuildings.map((building) => ({
-        ...paymentAccessService.getForBuilding(building.id),
-        buildingName: building.name
-      }));
+      const data = await listPaymentAccessRowsForBuildings(visibleBuildings);
 
       return res.json({
         data,
@@ -9145,6 +9227,8 @@ async function bootstrap() {
             defaultCombinedUtilityChargeKsh: parsed.defaultCombinedUtilityChargeKsh,
             utilityBalanceVisibleDays: parsed.utilityBalanceVisibleDays,
             rentGraceDays: parsed.rentGraceDays,
+            lateRentPenaltyEnabled: parsed.lateRentPenaltyEnabled,
+            lateRentPenaltyAmountKsh: parsed.lateRentPenaltyAmountKsh,
             allowManualRentPosting: parsed.allowManualRentPosting,
             allowManualUtilityPosting: parsed.allowManualUtilityPosting,
             wifiAccessMode: parsed.wifiAccessMode,
@@ -9804,13 +9888,27 @@ async function bootstrap() {
         }
 
         const parsed = landlordPaymentAccessUpdateSchema.parse(req.body ?? {});
+        const hasLatePenaltyPolicyChange =
+          typeof parsed.rentGraceDays === "number" ||
+          typeof parsed.lateRentPenaltyEnabled === "boolean" ||
+          typeof parsed.lateRentPenaltyAmountKsh === "number";
+        if (hasLatePenaltyPolicyChange && !buildingConfigurationService) {
+          return res.status(503).json({
+            error: "Late payment policy requires database-backed building configuration."
+          });
+        }
+
+        let configuration: BuildingConfigurationRecord | null = null;
         if (buildingConfigurationService) {
-          await buildingConfigurationService.updateForBuilding(
+          configuration = await buildingConfigurationService.updateForBuilding(
             building.id,
             {
               rentEnabled: parsed.rentEnabled,
               waterEnabled: parsed.waterEnabled,
               electricityEnabled: parsed.electricityEnabled,
+              rentGraceDays: parsed.rentGraceDays,
+              lateRentPenaltyEnabled: parsed.lateRentPenaltyEnabled,
+              lateRentPenaltyAmountKsh: parsed.lateRentPenaltyAmountKsh,
               note: parsed.note
             },
             {
@@ -9832,11 +9930,21 @@ async function bootstrap() {
             userId: context.userId
           }
         );
+        if (buildingConfigurationService) {
+          await syncDerivedBuildingConfigurationState();
+          configuration = await buildingConfigurationService.getForBuilding(building.id);
+        }
 
         return res.json({
           data: {
             ...data,
-            buildingName: building.name
+            buildingName: building.name,
+            rentGraceDays: Math.max(0, Number(configuration?.rentGraceDays ?? 0)),
+            lateRentPenaltyEnabled: Boolean(configuration?.lateRentPenaltyEnabled),
+            lateRentPenaltyAmountKsh: Math.max(
+              0,
+              Number(configuration?.lateRentPenaltyAmountKsh ?? 0)
+            )
           },
           role: context.role
         });
@@ -12739,6 +12847,8 @@ async function bootstrap() {
       balanceKsh: item.balanceKsh,
       paidAmountKsh: item.paidAmountKsh,
       totalPaidKsh: item.totalPaidKsh,
+      currentMonthLatePenaltyKsh: item.currentMonthLatePenaltyKsh,
+      totalLatePenaltyKsh: item.totalLatePenaltyKsh,
       dueDate: item.dueDate,
       latestPaymentReference: item.latestPaymentReference,
       latestPaymentAt: item.latestPaymentAt,
@@ -13032,8 +13142,11 @@ async function bootstrap() {
               hasActiveResident: row.hasActiveResident,
               verificationStatus: row.verificationStatus,
               monthlyRentKsh: row.monthlyRentKsh,
+              depositKsh: row.depositKsh,
               balanceKsh: row.rentBalanceKsh,
               currentMonthOutstandingKsh: row.currentMonthRentOutstandingKsh,
+              currentMonthLatePenaltyKsh: row.currentMonthLatePenaltyKsh,
+              totalLatePenaltyKsh: row.totalLatePenaltyKsh,
               currentMonthPaidKsh: row.currentMonthRentPaidKsh,
               arrearsKsh: row.rentArrearsKsh,
               dueDate: row.rentDueDate,
@@ -13115,6 +13228,41 @@ async function bootstrap() {
               `Bulk rent sheet for ${building.name} (${parsed.billingMonth}).`
           });
 
+          if (userAccountService && row.depositKsh != null) {
+            const roomRow = roomRowsByHouse.get(houseNumber);
+            if (roomRow?.hasActiveResident) {
+              const activeAgreement = await userAccountService.getActiveTenantAgreement({
+                buildingId: building.id,
+                houseNumber
+              });
+              const currentAgreement = activeAgreement.agreement;
+              await userAccountService.upsertActiveTenantAgreement({
+                buildingId: building.id,
+                houseNumber,
+                payload: {
+                  identityType: currentAgreement?.identityType,
+                  identityNumber: currentAgreement?.identityNumber,
+                  identityDocumentUrls: currentAgreement?.identityDocumentUrls,
+                  occupationStatus: currentAgreement?.occupationStatus,
+                  occupationLabel: currentAgreement?.occupationLabel,
+                  organizationName: currentAgreement?.organizationName,
+                  organizationLocation: currentAgreement?.organizationLocation,
+                  studentRegistrationNumber: currentAgreement?.studentRegistrationNumber,
+                  sponsorName: currentAgreement?.sponsorName,
+                  sponsorPhone: currentAgreement?.sponsorPhone,
+                  emergencyContactName: currentAgreement?.emergencyContactName,
+                  emergencyContactPhone: currentAgreement?.emergencyContactPhone,
+                  leaseStartDate: currentAgreement?.leaseStartDate,
+                  leaseEndDate: currentAgreement?.leaseEndDate,
+                  monthlyRentKsh: Math.max(0, Math.round(row.monthlyRentKsh)),
+                  depositKsh: Math.max(0, Math.round(row.depositKsh)),
+                  paymentDueDay: currentAgreement?.paymentDueDay,
+                  specialTerms: currentAgreement?.specialTerms
+                }
+              });
+            }
+          }
+
           updated.push(snapshot);
 
           await recordRoomAccountAuditEvent({
@@ -13127,6 +13275,7 @@ async function bootstrap() {
               billingMonth: parsed.billingMonth,
               dueDate: parsed.dueDate,
               monthlyRentKsh: snapshot.monthlyRentKsh,
+              depositKsh: row.depositKsh,
               balanceKsh: snapshot.balanceKsh,
               balanceOverridden: row.balanceKsh != null
             }
@@ -13153,8 +13302,11 @@ async function bootstrap() {
               hasActiveResident: row.hasActiveResident,
               verificationStatus: row.verificationStatus,
               monthlyRentKsh: row.monthlyRentKsh,
+              depositKsh: row.depositKsh,
               balanceKsh: row.rentBalanceKsh,
               currentMonthOutstandingKsh: row.currentMonthRentOutstandingKsh,
+              currentMonthLatePenaltyKsh: row.currentMonthLatePenaltyKsh,
+              totalLatePenaltyKsh: row.totalLatePenaltyKsh,
               currentMonthPaidKsh: row.currentMonthRentPaidKsh,
               arrearsKsh: row.rentArrearsKsh,
               dueDate: row.rentDueDate,

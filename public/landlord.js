@@ -2007,6 +2007,19 @@ function getResidentCurrentMonthRentPaidKsh(resident, agreement) {
   return Math.max(0, monthlyRentKsh - currentRentDueKsh);
 }
 
+function getResidentCurrentLatePenaltyKsh(resident) {
+  if (!canDisplayResidentBilling(resident) || !isResidentRentEnabled(resident)) {
+    return 0;
+  }
+
+  const explicitPenalty = Number(resident?.currentMonthLatePenaltyKsh);
+  if (Number.isFinite(explicitPenalty)) {
+    return Math.max(0, explicitPenalty);
+  }
+
+  return 0;
+}
+
 function compareIsoDateDesc(leftValue, rightValue) {
   const left = new Date(leftValue || 0).getTime();
   const right = new Date(rightValue || 0).getTime();
@@ -2467,6 +2480,12 @@ function sortResidentsForDirectory(rows) {
   });
 }
 
+function getResidentOverviewTargetSection(filter) {
+  return filter === "awaiting_readings"
+    ? "utility-room-status-section"
+    : "residents-directory-section";
+}
+
 function renderResidentsOverview(rows) {
   if (!(residentsOverviewEl instanceof HTMLElement)) {
     return;
@@ -2553,11 +2572,14 @@ function renderResidentsOverview(rows) {
   residentsOverviewEl.innerHTML = cards
     .map((card) => {
       const isActive = activeFilter === card.filter;
+      const targetSection = getResidentOverviewTargetSection(card.filter);
       return `
         <button
           type="button"
           class="resident-overview-card${isActive ? " is-active" : ""}"
           data-resident-filter="${escapeHtml(card.filter)}"
+          data-resident-target-section="${escapeHtml(targetSection)}"
+          aria-controls="${escapeHtml(targetSection)}"
           aria-pressed="${isActive ? "true" : "false"}"
         >
           <p>${escapeHtml(card.label)}</p>
@@ -6017,7 +6039,7 @@ function renderRentSheetRows(rows) {
   rentSheetBodyEl.replaceChildren();
   if (!Array.isArray(rows) || rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="9">No rooms found for this building.</td>';
+    row.innerHTML = '<td colspan="11">No rooms found for this building.</td>';
     rentSheetBodyEl.append(row);
     return;
   }
@@ -6025,6 +6047,7 @@ function renderRentSheetRows(rows) {
   [...rows].sort((a, b) => compareHouseNumber(a.houseNumber, b.houseNumber)).forEach((item) => {
     const houseNumber = normalizeHouse(item.houseNumber);
     const monthlyRentKsh = Math.max(0, Math.round(Number(item.monthlyRentKsh ?? 0)));
+    const depositKsh = Math.max(0, Math.round(Number(item.depositKsh ?? 0)));
     const balanceKsh = Math.max(0, Math.round(Number(item.balanceKsh ?? 0)));
     const currentMonthPaidKsh = Math.max(
       0,
@@ -6039,9 +6062,11 @@ function renderRentSheetRows(rows) {
       String(item.paymentStatus ?? "").trim() ||
       String(item.verificationStatus ?? "").trim() ||
       (item.hasActiveResident ? "No rent profile" : "Vacant");
+    const canEditDeposit = Boolean(item.hasActiveResident);
 
     const row = document.createElement("tr");
     row.dataset.houseNumber = houseNumber;
+    row.dataset.hasActiveResident = canEditDeposit ? "true" : "false";
     row.innerHTML = `
       <td><strong>${escapeHtml(houseNumber)}</strong></td>
       <td>
@@ -6059,6 +6084,19 @@ function renderRentSheetRows(rows) {
           step="1"
           value="${escapeHtml(String(monthlyRentKsh))}"
           required
+        />
+      </td>
+      <td>${canEditDeposit ? formatCurrency(depositKsh) : "-"}</td>
+      <td>
+        <input
+          class="registry-table-input utility-sheet-input"
+          data-field="depositKsh"
+          type="number"
+          min="0"
+          step="1"
+          value="${canEditDeposit ? escapeHtml(String(depositKsh)) : ""}"
+          placeholder="${canEditDeposit ? "" : "No resident"}"
+          ${canEditDeposit ? "required" : "disabled"}
         />
       </td>
       <td>${formatCurrency(balanceKsh)}</td>
@@ -6091,6 +6129,7 @@ function buildRentSheetPayload() {
   trList.forEach((tr) => {
     const houseNumber = normalizeHouse(tr.dataset.houseNumber);
     const rentInput = tr.querySelector('input[data-field="monthlyRentKsh"]');
+    const depositInput = tr.querySelector('input[data-field="depositKsh"]');
     const balanceInput = tr.querySelector('input[data-field="balanceKsh"]');
     if (!(rentInput instanceof HTMLInputElement)) {
       return;
@@ -6109,9 +6148,25 @@ function buildRentSheetPayload() {
       throw new Error(`Balance override for ${houseNumber} cannot be negative.`);
     }
 
+    const depositKsh =
+      depositInput instanceof HTMLInputElement && !depositInput.disabled
+        ? toOptionalNumber(depositInput.value)
+        : undefined;
+    if (depositKsh != null && depositKsh < 0) {
+      throw new Error(`Deposit for ${houseNumber} cannot be negative.`);
+    }
+    if (
+      depositInput instanceof HTMLInputElement &&
+      !depositInput.disabled &&
+      depositKsh == null
+    ) {
+      throw new Error(`Deposit is required for ${houseNumber}.`);
+    }
+
     rows.push({
       houseNumber,
       monthlyRentKsh: Math.round(monthlyRentKsh),
+      ...(depositKsh == null ? {} : { depositKsh: Math.round(depositKsh) }),
       ...(balanceKsh == null ? {} : { balanceKsh: Math.round(balanceKsh) })
     });
   });
@@ -7400,7 +7455,7 @@ function renderRentStatus(rows) {
 
   if (!Array.isArray(rows) || rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="10">No rent status data available.</td>';
+    row.innerHTML = '<td colspan="11">No rent status data available.</td>';
     rentStatusBodyEl.append(row);
     return;
   }
@@ -7409,6 +7464,7 @@ function renderRentStatus(rows) {
     const row = document.createElement("tr");
     const buildingLabel = getBuildingDisplayNameById(item.buildingId, "-");
     const currentDueKsh = Number(item.currentMonthOutstandingKsh ?? item.balanceKsh ?? 0);
+    const latePenaltyKsh = Math.max(0, Number(item.currentMonthLatePenaltyKsh ?? 0));
     const totalOutstandingKsh = Number(item.balanceKsh ?? currentDueKsh ?? 0);
     const quickPaymentAmountKsh = Math.max(0, totalOutstandingKsh || currentDueKsh);
     const billingMonth = monthKeyFromValue(item.dueDate) || currentBillingMonth();
@@ -7419,6 +7475,7 @@ function renderRentStatus(rows) {
       <td>${item.paymentStatus}</td>
       <td>${formatCurrency(item.monthlyRentKsh)}</td>
       <td>${formatCurrency(item.currentMonthPaidKsh ?? item.paidAmountKsh ?? 0)}</td>
+      <td>${formatCurrency(latePenaltyKsh)}</td>
       <td>${formatCurrency(currentDueKsh)}</td>
       <td>${formatCurrency(item.arrearsKsh ?? 0)}</td>
       <td>${formatDateTime(item.dueDate)}</td>
@@ -7453,7 +7510,7 @@ function renderOverviewCollections(rows) {
 
   if (!Array.isArray(rows) || rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="9">No rent collection records found yet.</td>';
+    row.innerHTML = '<td colspan="10">No rent collection records found yet.</td>';
     overviewCollectionsBodyEl.append(row);
     return;
   }
@@ -7473,12 +7530,14 @@ function renderOverviewCollections(rows) {
     const latestPayment = Number(item.latestPaymentAmountKsh ?? 0) > 0
       ? `${formatCurrency(item.latestPaymentAmountKsh)} • ${formatDateTime(item.latestPaymentAt)}`
       : "-";
+    const latePenaltyKsh = Math.max(0, Number(item.currentMonthLatePenaltyKsh ?? 0));
     row.innerHTML = `
       <td>${escapeHtml(buildingLabel)}</td>
       <td>${escapeHtml(item.houseNumber)}</td>
       <td>${escapeHtml(item.paymentStatus ?? "-")}</td>
       <td>${escapeHtml(formatCurrency(item.monthlyRentKsh))}</td>
       <td>${escapeHtml(formatCurrency(item.currentMonthPaidKsh ?? item.paidAmountKsh ?? 0))}</td>
+      <td>${escapeHtml(formatCurrency(latePenaltyKsh))}</td>
       <td>${escapeHtml(formatCurrency(item.currentMonthOutstandingKsh ?? item.balanceKsh))}</td>
       <td>${escapeHtml(formatCurrency(item.balanceKsh))}</td>
       <td>${escapeHtml(latestPayment)}</td>
@@ -7503,14 +7562,14 @@ function renderResidentDirectory(rows) {
 
   if (allRows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="12">No rooms found for this selection.</td>';
+    row.innerHTML = '<td colspan="13">No rooms found for this selection.</td>';
     residentsBodyEl.append(row);
     return;
   }
 
   if (filteredRows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="12">No rooms matched "${escapeHtml(
+    row.innerHTML = `<td colspan="13">No rooms matched "${escapeHtml(
       state.residentSearchQuery
     )}".</td>`;
     residentsBodyEl.append(row);
@@ -7523,6 +7582,9 @@ function renderResidentDirectory(rows) {
       resident.hasActiveResident || resident.residentUserId || resident.residentName;
     const utilitySummary = getResidentUtilityRoomSummary(resident);
     const billingStatus = hasResident ? getResidentBillingStatusLabel(resident) : "-";
+    const latePenalty = hasResident
+      ? formatCurrency(getResidentCurrentLatePenaltyKsh(resident))
+      : "-";
     const outstandingBalanceKsh = getResidentOperationalOutstandingKsh(
       resident,
       utilitySummary
@@ -7561,6 +7623,7 @@ function renderResidentDirectory(rows) {
       }</td>
       <td>${escapeHtml(emergencySummary)}</td>
       <td>${escapeHtml(billingStatus)}</td>
+      <td>${escapeHtml(latePenalty)}</td>
       <td>${escapeHtml(outstandingBalance)}</td>
       <td>${escapeHtml(dueDate)}</td>
       <td>
@@ -7752,6 +7815,7 @@ function renderResidentDrawer(resident) {
   const utilityArrearsKsh = getResidentUtilityArrearsKsh(resident);
   const expenseBalanceKsh = getResidentExpenseBalanceKsh(resident);
   const currentMonthRentPaidKsh = getResidentCurrentMonthRentPaidKsh(resident, agreement);
+  const currentMonthLatePenaltyKsh = getResidentCurrentLatePenaltyKsh(resident);
   const monthlyRent =
     hasResident && monthlyRentKsh > 0 ? formatCurrency(monthlyRentKsh) : "-";
   const currentRentDue =
@@ -7761,6 +7825,10 @@ function renderResidentDrawer(resident) {
   const rentArrears =
     hasResident && (rentEnabled || rentArrearsKsh > 0)
       ? formatCurrency(rentArrearsKsh)
+      : "-";
+  const currentLatePenalty =
+    hasResident && (rentEnabled || currentMonthLatePenaltyKsh > 0)
+      ? formatCurrency(currentMonthLatePenaltyKsh)
       : "-";
   const currentUtilityDue = hasResident ? formatCurrency(currentUtilityDueKsh) : "-";
   const utilityArrears = hasResident ? formatCurrency(utilityArrearsKsh) : "-";
@@ -8071,6 +8139,7 @@ function renderResidentDrawer(resident) {
       <div class="resident-drawer-panel-body">
         <div class="resident-grid resident-grid-secondary">
           <div><span>Current Rent Due</span><strong>${escapeHtml(currentRentDue)}</strong></div>
+          <div><span>Late Fee</span><strong>${escapeHtml(currentLatePenalty)}</strong></div>
           <div><span>Rent Arrears</span><strong>${escapeHtml(rentArrears)}</strong></div>
           <div><span>Total Rent Paid</span><strong>${escapeHtml(totalRentPaid)}</strong></div>
           <div><span>Latest Receipt</span><strong>${escapeHtml(latestReceipt)}</strong></div>
@@ -8452,7 +8521,7 @@ function renderPaymentAccess(rows) {
 
   if (!Array.isArray(rows) || rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="6">No buildings available for payment access settings.</td>';
+    row.innerHTML = '<td colspan="9">No buildings available for payment access settings.</td>';
     paymentAccessBodyEl.append(row);
     return;
   }
@@ -8464,9 +8533,17 @@ function renderPaymentAccess(rows) {
       item.buildingName ?? "Building"
     );
     const canEdit = !isCaretakerRole();
+    const rentGraceDays = Math.max(0, Math.round(Number(item.rentGraceDays ?? 0)));
+    const lateRentPenaltyAmountKsh = Math.max(
+      0,
+      Math.round(Number(item.lateRentPenaltyAmountKsh ?? 0))
+    );
     row.innerHTML = `
       <td><strong>${escapeHtml(safeBuildingName)}</strong></td>
       <td><label><input type="checkbox" data-setting="rentEnabled" ${item.rentEnabled ? "checked" : ""} ${canEdit ? "" : "disabled"} /> Enabled</label></td>
+      <td><input class="registry-table-input" type="number" data-setting="rentGraceDays" min="0" max="31" step="1" value="${escapeHtml(rentGraceDays)}" ${canEdit ? "" : "disabled"} /></td>
+      <td><label><input type="checkbox" data-setting="lateRentPenaltyEnabled" ${item.lateRentPenaltyEnabled ? "checked" : ""} ${canEdit ? "" : "disabled"} /> Enabled</label></td>
+      <td><input class="registry-table-input" type="number" data-setting="lateRentPenaltyAmountKsh" min="0" max="500000" step="1" value="${escapeHtml(lateRentPenaltyAmountKsh)}" ${canEdit ? "" : "disabled"} /></td>
       <td><label><input type="checkbox" data-setting="waterEnabled" ${item.waterEnabled ? "checked" : ""} ${canEdit ? "" : "disabled"} /> Enabled</label></td>
       <td><label><input type="checkbox" data-setting="electricityEnabled" ${item.electricityEnabled ? "checked" : ""} ${canEdit ? "" : "disabled"} /> Enabled</label></td>
       <td>${formatDateTime(item.updatedAt)}${item.updatedByRole ? `<br /><small>${item.updatedByRole}</small>` : ""}</td>
@@ -10341,10 +10418,18 @@ paymentAccessBodyEl.addEventListener("click", (event) => {
   const electricityInput = row.querySelector(
     'input[data-setting="electricityEnabled"]'
   );
+  const graceInput = row.querySelector('input[data-setting="rentGraceDays"]');
+  const latePenaltyInput = row.querySelector('input[data-setting="lateRentPenaltyEnabled"]');
+  const latePenaltyAmountInput = row.querySelector(
+    'input[data-setting="lateRentPenaltyAmountKsh"]'
+  );
   if (
     !(rentInput instanceof HTMLInputElement) ||
     !(waterInput instanceof HTMLInputElement) ||
-    !(electricityInput instanceof HTMLInputElement)
+    !(electricityInput instanceof HTMLInputElement) ||
+    !(graceInput instanceof HTMLInputElement) ||
+    !(latePenaltyInput instanceof HTMLInputElement) ||
+    !(latePenaltyAmountInput instanceof HTMLInputElement)
   ) {
     return;
   }
@@ -10355,11 +10440,24 @@ paymentAccessBodyEl.addEventListener("click", (event) => {
     return;
   }
 
+  const rentGraceDays = Math.max(0, Math.round(Number(graceInput.value || 0)));
+  const lateRentPenaltyAmountKsh = Math.max(
+    0,
+    Math.round(Number(latePenaltyAmountInput.value || 0))
+  );
   const nextValue = {
     rentEnabled: Boolean(rentInput.checked),
+    rentGraceDays,
+    lateRentPenaltyEnabled: Boolean(latePenaltyInput.checked),
+    lateRentPenaltyAmountKsh,
     waterEnabled: Boolean(waterInput.checked),
     electricityEnabled: Boolean(electricityInput.checked)
   };
+
+  if (nextValue.lateRentPenaltyEnabled && nextValue.lateRentPenaltyAmountKsh <= 0) {
+    showError("Enter a fixed late fee amount before enabling late penalties.");
+    return;
+  }
 
   const changes = [];
   if (nextValue.rentEnabled !== Boolean(current.rentEnabled)) {
@@ -10367,6 +10465,21 @@ paymentAccessBodyEl.addEventListener("click", (event) => {
       `Rent payments will be ${nextValue.rentEnabled ? "enabled" : "disabled"}`
     );
   }
+  if (nextValue.rentGraceDays !== Math.max(0, Math.round(Number(current.rentGraceDays ?? 0)))) {
+    changes.push(`Rent grace period will be ${nextValue.rentGraceDays} day${nextValue.rentGraceDays === 1 ? "" : "s"}`);
+  }
+  if (nextValue.lateRentPenaltyEnabled !== Boolean(current.lateRentPenaltyEnabled)) {
+    changes.push(
+      `Fixed late fee will be ${nextValue.lateRentPenaltyEnabled ? "enabled" : "disabled"}`
+    );
+  }
+  if (
+    nextValue.lateRentPenaltyAmountKsh !==
+    Math.max(0, Math.round(Number(current.lateRentPenaltyAmountKsh ?? 0)))
+  ) {
+    changes.push(`Fixed late fee amount will be ${formatCurrency(nextValue.lateRentPenaltyAmountKsh)}`);
+  }
+
   if (nextValue.waterEnabled !== Boolean(current.waterEnabled)) {
     changes.push(
       `Water payments will be ${nextValue.waterEnabled ? "enabled" : "disabled"}`
@@ -12485,6 +12598,9 @@ residentsOverviewEl?.addEventListener("click", (event) => {
     residentsStatusFilterEl.value = filter;
   }
   renderResidentDirectory(state.residentDirectory);
+  scrollToLandlordSection(
+    String(card.dataset.residentTargetSection || getResidentOverviewTargetSection(filter))
+  );
 });
 
 residentsOpenMatchBtnEl?.addEventListener("click", () => {

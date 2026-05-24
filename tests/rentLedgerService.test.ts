@@ -301,6 +301,68 @@ test("does not add next month rent before the rollover window opens", () => {
   assert.equal(snapshot.dueDate, dueDate);
 });
 
+test("applies fixed late rent penalty once after the grace period", () => {
+  const service = new RentLedgerService();
+  const dueDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+  service.setLatePenaltyPolicyResolver((buildingId) =>
+    buildingId === BUILDING_A
+      ? {
+          enabled: true,
+          amountKsh: 250,
+          graceDays: 1
+        }
+      : null
+  );
+  service.upsertRentDue(BUILDING_A, "LP-1", {
+    monthlyRentKsh: 1000,
+    balanceKsh: 1000,
+    dueDate
+  });
+
+  const first = service.getRentDue(BUILDING_A, "LP-1");
+  assert.ok(first);
+  assert.equal(first.balanceKsh, 1250);
+  assert.equal(first.currentMonthLatePenaltyKsh, 250);
+  assert.equal(first.totalLatePenaltyKsh, 250);
+  assert.equal(first.latePenaltyCharges.length, 1);
+  assert.equal(first.currentMonthOutstandingKsh, 1250);
+
+  const second = service.getRentDue(BUILDING_A, "LP-1");
+  assert.ok(second);
+  assert.equal(second.balanceKsh, 1250);
+  assert.equal(second.latePenaltyCharges.length, 1);
+});
+
+test("does not apply fixed late rent penalty after the room is cleared", () => {
+  const service = new RentLedgerService();
+  const dueDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+  service.setLatePenaltyPolicyResolver(() => ({
+    enabled: true,
+    amountKsh: 250,
+    graceDays: 1
+  }));
+  service.upsertRentDue(BUILDING_A, "LP-2", {
+    monthlyRentKsh: 1000,
+    balanceKsh: 1000,
+    dueDate
+  });
+  service.recordPayment({
+    buildingId: BUILDING_A,
+    houseNumber: "LP-2",
+    amountKsh: 1000,
+    provider: "cash",
+    providerReference: "lp-clear-1",
+    paidAt: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString()
+  });
+
+  const snapshot = service.getRentDue(BUILDING_A, "LP-2");
+  assert.ok(snapshot);
+  assert.equal(snapshot.balanceKsh, 0);
+  assert.equal(snapshot.latePenaltyCharges.length, 0);
+});
+
 test("rolls a cleared room into the next month with one month rent, not two", () => {
   const service = new RentLedgerService();
   const dueDate = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();

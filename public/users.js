@@ -3184,6 +3184,10 @@ function renderRentDue(rentDue, fallbackMessage) {
       <dd>${formatCurrency(rentDue.currentMonthPaidKsh ?? rentDue.paidAmountKsh ?? 0)}</dd>
     </div>
     <div>
+      <dt>Late Fee</dt>
+      <dd>${formatCurrency(rentDue.currentMonthLatePenaltyKsh ?? 0)}</dd>
+    </div>
+    <div>
       <dt>Charge Overdue</dt>
       <dd>${formatCurrency(rentDue.expenseBalanceKsh ?? rentDue.expenseArrearsKsh ?? 0)}</dd>
     </div>

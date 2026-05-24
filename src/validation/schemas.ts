@@ -310,6 +310,7 @@ export const landlordRentBulkSheetSchema = z.object({
       z.object({
         houseNumber: nonEmptyString.max(24),
         monthlyRentKsh: z.number().int().min(0).max(500_000),
+        depositKsh: z.number().int().min(0).max(10_000_000).optional(),
         balanceKsh: z.number().int().min(0).max(5_000_000).optional()
       })
     )
@@ -758,6 +759,9 @@ export const landlordPaymentAccessUpdateSchema = z
     rentEnabled: z.boolean().optional(),
     waterEnabled: z.boolean().optional(),
     electricityEnabled: z.boolean().optional(),
+    rentGraceDays: z.number().int().min(0).max(31).optional(),
+    lateRentPenaltyEnabled: z.boolean().optional(),
+    lateRentPenaltyAmountKsh: z.number().int().min(0).max(500_000).optional(),
     acknowledgeImpact: z.literal(true),
     note: z.string().trim().max(280).optional()
   })
@@ -765,9 +769,12 @@ export const landlordPaymentAccessUpdateSchema = z
     (value) =>
       typeof value.rentEnabled === "boolean" ||
       typeof value.waterEnabled === "boolean" ||
-      typeof value.electricityEnabled === "boolean",
+      typeof value.electricityEnabled === "boolean" ||
+      typeof value.rentGraceDays === "number" ||
+      typeof value.lateRentPenaltyEnabled === "boolean" ||
+      typeof value.lateRentPenaltyAmountKsh === "number",
     {
-      message: "Provide at least one payment toggle to update."
+      message: "Provide at least one payment setting to update."
     }
   );
 
@@ -813,6 +820,8 @@ export const landlordBuildingConfigurationUpdateSchema = z
     defaultCombinedUtilityChargeKsh: z.number().int().min(0).max(200_000).nullable().optional(),
     utilityBalanceVisibleDays: z.number().int().min(0).max(60).optional(),
     rentGraceDays: z.number().int().min(0).max(31).optional(),
+    lateRentPenaltyEnabled: z.boolean().optional(),
+    lateRentPenaltyAmountKsh: z.number().int().min(0).max(500_000).optional(),
     allowManualRentPosting: z.boolean().optional(),
     allowManualUtilityPosting: z.boolean().optional(),
     wifiAccessMode: wifiAccessModeSchema.optional(),
@@ -838,6 +847,8 @@ export const landlordBuildingConfigurationUpdateSchema = z
       typeof value.utilityBalanceVisibleDays === "number" ||
       value.defaultCombinedUtilityChargeKsh !== undefined ||
       typeof value.rentGraceDays === "number" ||
+      typeof value.lateRentPenaltyEnabled === "boolean" ||
+      typeof value.lateRentPenaltyAmountKsh === "number" ||
       typeof value.allowManualRentPosting === "boolean" ||
       typeof value.allowManualUtilityPosting === "boolean" ||
       typeof value.utilityBillingMode === "string" ||

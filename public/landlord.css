@@ -925,14 +925,16 @@
   border: 1px solid rgba(15, 62, 87, 0.12);
   border-radius: 16px;
   padding: 14px 16px;
-  background: rgba(247, 251, 251, 0.94);
+  background: rgba(247, 251, 251, 0.94) !important;
   min-height: 108px;
 }
 
 button.resident-overview-card {
   appearance: none;
   width: 100%;
-  color: inherit;
+  border-color: rgba(15, 62, 87, 0.12) !important;
+  background: rgba(247, 251, 251, 0.94) !important;
+  color: #102331 !important;
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -940,15 +942,17 @@ button.resident-overview-card {
 
 button.resident-overview-card:hover,
 button.resident-overview-card:focus-visible {
-  border-color: rgba(31, 138, 138, 0.48);
+  border-color: rgba(184, 121, 47, 0.48) !important;
+  background: #fffaf0 !important;
   box-shadow: 0 10px 24px rgba(16, 35, 49, 0.1);
   outline: none;
 }
 
 button.resident-overview-card.is-active {
-  border-color: rgba(31, 138, 138, 0.72);
-  background: #eefafa;
-  box-shadow: inset 0 0 0 1px rgba(31, 138, 138, 0.18);
+  border-color: rgba(184, 121, 47, 0.5) !important;
+  background: #fff7e8 !important;
+  color: #102331 !important;
+  box-shadow: inset 0 0 0 1px rgba(184, 121, 47, 0.2);
 }
 
 .resident-overview-card p {

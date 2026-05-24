@@ -409,6 +409,8 @@ model BuildingConfiguration {
   defaultCombinedUtilityChargeKsh Int?
   utilityBalanceVisibleDays  Int                @default(7)
   rentGraceDays              Int                @default(0)
+  lateRentPenaltyEnabled     Boolean            @default(false)
+  lateRentPenaltyAmountKsh   Int                @default(0)
   allowManualRentPosting     Boolean            @default(true)
   allowManualUtilityPosting  Boolean            @default(true)
   wifiAccessMode             WifiAccessMode     @default(disabled)

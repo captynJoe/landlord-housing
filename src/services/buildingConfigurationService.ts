@@ -28,6 +28,8 @@ export type BuildingConfigurationRecord = {
   defaultCombinedUtilityChargeKsh: number | null;
   utilityBalanceVisibleDays: number;
   rentGraceDays: number;
+  lateRentPenaltyEnabled: boolean;
+  lateRentPenaltyAmountKsh: number;
   allowManualRentPosting: boolean;
   allowManualUtilityPosting: boolean;
   wifiAccessMode: WifiAccessMode;
@@ -61,6 +63,8 @@ export interface UpdateBuildingConfigurationInput {
   defaultCombinedUtilityChargeKsh?: number | null;
   utilityBalanceVisibleDays?: number;
   rentGraceDays?: number;
+  lateRentPenaltyEnabled?: boolean;
+  lateRentPenaltyAmountKsh?: number;
   allowManualRentPosting?: boolean;
   allowManualUtilityPosting?: boolean;
   wifiAccessMode?: WifiAccessMode;
@@ -91,6 +95,8 @@ const DEFAULT_CONFIG = {
   defaultCombinedUtilityChargeKsh: null as number | null,
   utilityBalanceVisibleDays: 7,
   rentGraceDays: 0,
+  lateRentPenaltyEnabled: false,
+  lateRentPenaltyAmountKsh: 0,
   allowManualRentPosting: true,
   allowManualUtilityPosting: true,
   wifiAccessMode: "disabled" as WifiAccessMode
@@ -117,6 +123,8 @@ function mapConfig(value: BuildingConfiguration): BuildingConfigurationRecord {
     defaultCombinedUtilityChargeKsh: value.defaultCombinedUtilityChargeKsh,
     utilityBalanceVisibleDays: value.utilityBalanceVisibleDays,
     rentGraceDays: value.rentGraceDays,
+    lateRentPenaltyEnabled: value.lateRentPenaltyEnabled,
+    lateRentPenaltyAmountKsh: value.lateRentPenaltyAmountKsh,
     allowManualRentPosting: value.allowManualRentPosting,
     allowManualUtilityPosting: value.allowManualUtilityPosting,
     wifiAccessMode: value.wifiAccessMode,
@@ -163,7 +171,7 @@ export function toPaymentAccessRecord(
 export class BuildingConfigurationService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async ensureDefaultsForBuildings(buildings: Building[]): Promise<void> {
+  async ensureDefaultsForBuildings(buildings: Array<Pick<Building, "id">>): Promise<void> {
     if (buildings.length === 0) {
       return;
     }
@@ -272,6 +280,10 @@ export class BuildingConfigurationService {
       input.defaultCombinedUtilityChargeKsh == null
         ? input.defaultCombinedUtilityChargeKsh
         : Math.max(0, Math.round(Number(input.defaultCombinedUtilityChargeKsh) || 0));
+    const normalizedLateRentPenaltyAmountKsh =
+      input.lateRentPenaltyAmountKsh == null
+        ? input.lateRentPenaltyAmountKsh
+        : Math.max(0, Math.round(Number(input.lateRentPenaltyAmountKsh) || 0));
 
     const row = await this.prisma.buildingConfiguration.upsert({
       where: { buildingId },
@@ -282,6 +294,7 @@ export class BuildingConfigurationService {
         defaultWaterFixedChargeKsh: normalizedDefaultWaterFixedChargeKsh,
         defaultElectricityFixedChargeKsh: normalizedDefaultElectricityFixedChargeKsh,
         defaultCombinedUtilityChargeKsh: normalizedDefaultCombinedUtilityChargeKsh,
+        lateRentPenaltyAmountKsh: normalizedLateRentPenaltyAmountKsh,
         updatedByRole: actor?.role ?? null,
         updatedByUserId: actor?.userId ?? null,
         note: input.note?.trim() || null
@@ -295,6 +308,7 @@ export class BuildingConfigurationService {
         defaultWaterFixedChargeKsh: normalizedDefaultWaterFixedChargeKsh,
         defaultElectricityFixedChargeKsh: normalizedDefaultElectricityFixedChargeKsh,
         defaultCombinedUtilityChargeKsh: normalizedDefaultCombinedUtilityChargeKsh,
+        lateRentPenaltyAmountKsh: normalizedLateRentPenaltyAmountKsh,
         updatedByRole: actor?.role,
         updatedByUserId: actor?.userId,
         note: input.note?.trim() || undefined

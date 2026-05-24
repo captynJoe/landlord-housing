@@ -259,6 +259,7 @@
                   <th>Status</th>
                   <th>Monthly Rent</th>
                   <th>Paid This Month</th>
+                  <th>Late Fee</th>
                   <th>Due This Month</th>
                   <th>Total Outstanding</th>
                   <th>Latest Payment</th>
@@ -345,6 +346,9 @@
                 <tr>
                   <th>Building</th>
                   <th>Rent</th>
+                  <th>Grace Days</th>
+                  <th>Late Fee</th>
+                  <th>Fixed Fee</th>
                   <th>Water</th>
                   <th>Electricity</th>
                   <th>Updated</th>
@@ -760,6 +764,7 @@
                   <th>Status</th>
                   <th>Monthly Rent</th>
                   <th>Paid This Month</th>
+                  <th>Late Fee</th>
                   <th>Due This Month</th>
                   <th>Arrears</th>
                   <th>Due Date</th>
@@ -815,6 +820,33 @@
           <p id="residents-search-summary" class="status-text">
             Showing all rooms for the selected building filter.
           </p>
+          <div id="residents-directory-section" class="utility-summary-card">
+            <div class="panel-head">
+              <h3>Room Register</h3>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Building</th>
+                    <th>House</th>
+                    <th>Occupancy</th>
+                    <th>Resident</th>
+                    <th>Phone</th>
+                    <th>Identity</th>
+                    <th>Occupation</th>
+                    <th>Emergency</th>
+                    <th>Billing</th>
+                    <th>Late Fee</th>
+                    <th>Outstanding</th>
+                    <th>Due</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="residents-body"></tbody>
+              </table>
+            </div>
+          </div>
           <div id="utility-room-status-section" class="utility-summary-card">
             <div class="panel-head">
               <h3>Utility Room Status</h3>
@@ -1404,6 +1436,8 @@
                   <th>Status</th>
                   <th>Current Rent</th>
                   <th>New Monthly Rent</th>
+                  <th>Current Deposit</th>
+                  <th>New Deposit</th>
                   <th>Current Balance</th>
                   <th>Balance Override</th>
                   <th>Paid This Month</th>
@@ -1742,6 +1776,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260523e"></script>
+    <script type="module" src="/landlord.js?v=20260524c"></script>
   </body>
 </html>

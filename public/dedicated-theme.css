@@ -290,12 +290,25 @@ tbody td {
   color: var(--estate-ink) !important;
 }
 
+button.resident-overview-card {
+  border-color: var(--estate-line) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--estate-ink) !important;
+}
+
+button.resident-overview-card:hover,
+button.resident-overview-card:focus-visible {
+  border-color: rgba(184, 121, 47, 0.48) !important;
+  background: #fffaf0 !important;
+  color: var(--estate-ink) !important;
+}
+
 .hero-workspace-btn.active,
 .resident-nav-btn.active,
 button.resident-overview-card.is-active {
   border-color: rgba(184, 121, 47, 0.42) !important;
-  background: rgba(184, 121, 47, 0.12) !important;
-  color: var(--estate-forest-dark) !important;
+  background: #fff7e8 !important;
+  color: var(--estate-ink) !important;
 }
 
 .mode-switch,
