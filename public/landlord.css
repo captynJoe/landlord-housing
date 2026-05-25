@@ -759,6 +759,11 @@
   color: #274388;
 }
 
+.settlement-outcome-pill.is-refund {
+  background: rgba(33, 128, 111, 0.14);
+  color: #126150;
+}
+
 .settlement-status-text {
   display: block;
   margin-top: 5px;
@@ -804,9 +809,120 @@
   content: "-";
 }
 
+.secondary-ledger-panel > .panel-head,
 .secondary-ledger-panel > .status-text,
-.secondary-ledger-panel > .table-wrap {
+.secondary-ledger-panel > .table-wrap,
+.secondary-ledger-panel > form,
+.secondary-ledger-panel > details,
+.secondary-ledger-panel > p {
   margin-top: 12px;
+}
+
+.room-ledger-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.room-ledger-card .panel-head {
+  align-items: start;
+  gap: 10px;
+}
+
+.room-ledger-card h3 {
+  margin: 0;
+  color: #102331;
+  font-size: 1rem;
+}
+
+.room-ledger-table-wrap {
+  max-height: 66vh;
+  overflow: auto;
+  border: 1px solid rgba(16, 35, 49, 0.12);
+  border-radius: 10px;
+}
+
+.room-ledger-table {
+  min-width: 1280px;
+}
+
+.room-ledger-table th,
+.room-ledger-table td {
+  vertical-align: top;
+}
+
+.room-ledger-table td {
+  min-width: 92px;
+}
+
+.room-ledger-table td:nth-child(3),
+.room-ledger-table td:nth-child(4),
+.room-ledger-table td:nth-child(10),
+.room-ledger-table td:nth-child(11) {
+  min-width: 150px;
+}
+
+.room-ledger-table td small,
+.room-ledger-utility-status {
+  display: block;
+  margin-top: 5px;
+  color: rgba(16, 35, 49, 0.66);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.room-ledger-utility-status .utility-status {
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.room-ledger-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 82px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(16, 35, 49, 0.08);
+  color: #102331;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.room-ledger-status.is-active {
+  background: rgba(30, 131, 95, 0.14);
+  color: #176345;
+}
+
+.room-ledger-status.is-pending {
+  background: rgba(243, 197, 91, 0.22);
+  color: #745606;
+}
+
+.room-ledger-status.is-vacant {
+  background: rgba(16, 35, 49, 0.1);
+  color: rgba(16, 35, 49, 0.72);
+}
+
+.room-ledger-actions {
+  min-width: 170px;
+  gap: 6px;
+}
+
+.room-ledger-actions button {
+  width: auto;
+  min-height: 30px;
+  min-width: 0;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  line-height: 1.05;
+  white-space: nowrap;
 }
 
 .utility-status {

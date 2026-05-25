@@ -9,7 +9,12 @@ import type {
 export type UtilityType = UtilityTypeInput;
 export const UTILITY_LEGACY_BUILDING_ID = "__LEGACY__";
 const UTILITY_BALANCE_VISIBILITY_WINDOW_DAYS = 7;
-type UtilityPaymentSource = "manual" | "resident" | "mpesa";
+type UtilityPaymentProvider = "mpesa" | "cash" | "bank" | "card" | "deposit_credit";
+type UtilityPaymentSource = "manual" | "resident" | "mpesa" | "settlement";
+type InternalRecordUtilityPaymentInput = Omit<RecordUtilityPaymentInput, "provider"> & {
+  provider: UtilityPaymentProvider;
+  source?: UtilityPaymentSource;
+};
 
 export interface UtilityMeterRecord {
   utilityType: UtilityType;
@@ -25,7 +30,7 @@ export interface UtilityPaymentEvent {
   buildingId: string;
   houseNumber: string;
   billingMonth?: string;
-  provider: "mpesa" | "cash" | "bank" | "card";
+  provider: UtilityPaymentProvider;
   providerReference?: string;
   amountKsh: number;
   paidAt: string;
@@ -1214,7 +1219,7 @@ export class UtilityBillingService {
     utilityType: UtilityType,
     buildingId: string,
     houseNumber: string,
-    input: RecordUtilityPaymentInput & { source?: UtilityPaymentSource }
+    input: InternalRecordUtilityPaymentInput
   ): RecordUtilityPaymentResult {
     const {
       normalizedHouse,

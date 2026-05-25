@@ -91,6 +91,7 @@ import {
   type ResidentNotificationPreferencePersistedState
 } from "./services/residentNotificationPreferenceService.js";
 import {
+  accountChangePasswordSchema,
   adminAccessCredentialUpdateSchema,
   adminLoginSchema,
   deleteResidentPushSubscriptionSchema,
@@ -109,6 +110,7 @@ import {
   verifyUtilityMpesaPaymentSchema,
   recordAdminRentPaymentSchema,
   residentDebtCollectionSchema,
+  depositRefundRecordSchema,
   createBuildingSchema,
   buildingMediaUpdateSchema,
   deleteBuildingSchema,
@@ -318,6 +320,7 @@ const AUTH_RATE_LIMITED_PATHS = new Set([
   "/api/auth/resident/login-phone",
   "/api/auth/resident/password-recovery/request",
   "/api/auth/resident/change-password",
+  "/api/auth/account/change-password",
   "/api/auth/admin/login",
   "/api/auth/landlord/login"
 ]);
@@ -6103,6 +6106,81 @@ async function bootstrap() {
     return createdBills;
   };
 
+  const calculateDepositMoveOutSettlement = (input: {
+    depositKsh: number;
+    rentOutstandingKsh: number;
+    utilityOutstandingKsh: number;
+    roomChargesOutstandingKsh: number;
+  }) => {
+    const depositKsh = Math.max(0, Math.round(Number(input.depositKsh ?? 0)));
+    const grossRentOutstandingKsh = Math.max(
+      0,
+      Math.round(Number(input.rentOutstandingKsh ?? 0))
+    );
+    const grossUtilityOutstandingKsh = Math.max(
+      0,
+      Math.round(Number(input.utilityOutstandingKsh ?? 0))
+    );
+    const grossRoomChargesOutstandingKsh = Math.max(
+      0,
+      Math.round(Number(input.roomChargesOutstandingKsh ?? 0))
+    );
+    let remainingDepositKsh = depositKsh;
+    const depositAppliedToRentKsh = Math.min(
+      remainingDepositKsh,
+      grossRentOutstandingKsh
+    );
+    remainingDepositKsh -= depositAppliedToRentKsh;
+    const depositAppliedToUtilityKsh = Math.min(
+      remainingDepositKsh,
+      grossUtilityOutstandingKsh
+    );
+    remainingDepositKsh -= depositAppliedToUtilityKsh;
+    const depositAppliedToRoomChargesKsh = Math.min(
+      remainingDepositKsh,
+      grossRoomChargesOutstandingKsh
+    );
+    remainingDepositKsh -= depositAppliedToRoomChargesKsh;
+
+    const depositAppliedKsh =
+      depositAppliedToRentKsh +
+      depositAppliedToUtilityKsh +
+      depositAppliedToRoomChargesKsh;
+    const rentOutstandingKsh = Math.max(
+      0,
+      grossRentOutstandingKsh - depositAppliedToRentKsh
+    );
+    const utilityOutstandingKsh = Math.max(
+      0,
+      grossUtilityOutstandingKsh - depositAppliedToUtilityKsh
+    );
+    const roomChargesOutstandingKsh = Math.max(
+      0,
+      grossRoomChargesOutstandingKsh - depositAppliedToRoomChargesKsh
+    );
+
+    return {
+      depositKsh,
+      grossRentOutstandingKsh,
+      grossUtilityOutstandingKsh,
+      grossRoomChargesOutstandingKsh,
+      grossOutstandingKsh:
+        grossRentOutstandingKsh +
+        grossUtilityOutstandingKsh +
+        grossRoomChargesOutstandingKsh,
+      depositAppliedKsh,
+      depositAppliedToRentKsh,
+      depositAppliedToUtilityKsh,
+      depositAppliedToRoomChargesKsh,
+      depositRefundKsh: Math.max(0, remainingDepositKsh),
+      rentOutstandingKsh,
+      utilityOutstandingKsh,
+      roomChargesOutstandingKsh,
+      totalOutstandingKsh:
+        rentOutstandingKsh + utilityOutstandingKsh + roomChargesOutstandingKsh
+    };
+  };
+
   const buildResidentMoveOutSettlementSummary = async (
     buildingId: string,
     userId: string
@@ -6127,6 +6205,11 @@ async function bootstrap() {
         unit: {
           select: {
             houseNumber: true
+          }
+        },
+        agreement: {
+          select: {
+            depositKsh: true
           }
         },
         user: {
@@ -6156,7 +6239,10 @@ async function bootstrap() {
       normalizedBuildingId,
       normalizedHouseNumber
     );
-    const rentOutstandingKsh = Math.max(0, Math.round(Number(rentDue?.balanceKsh ?? 0)));
+    const grossRentOutstandingKsh = Math.max(
+      0,
+      Math.round(Number(rentDue?.balanceKsh ?? 0))
+    );
     const utilityBills = utilityBillingService
       .listBills({
         buildingId: normalizedBuildingId,
@@ -6172,7 +6258,7 @@ async function bootstrap() {
         balanceKsh: Math.max(0, Math.round(Number(item.balanceKsh ?? 0))),
         dueDate: item.dueDate
       }));
-    const utilityOutstandingKsh = utilityBills.reduce(
+    const grossUtilityOutstandingKsh = utilityBills.reduce(
       (sum, item) => sum + item.balanceKsh,
       0
     );
@@ -6190,10 +6276,16 @@ async function bootstrap() {
         amountKsh: Math.max(0, Math.round(Number(item.amountKsh ?? 0))),
         createdAt: item.createdAt
       }));
-    const roomChargesOutstandingKsh = roomCharges.reduce(
+    const grossRoomChargesOutstandingKsh = roomCharges.reduce(
       (sum, item) => sum + item.amountKsh,
       0
     );
+    const depositSettlement = calculateDepositMoveOutSettlement({
+      depositKsh: tenancy.agreement?.depositKsh ?? 0,
+      rentOutstandingKsh: grossRentOutstandingKsh,
+      utilityOutstandingKsh: grossUtilityOutstandingKsh,
+      roomChargesOutstandingKsh: grossRoomChargesOutstandingKsh
+    });
 
     return {
       building: {
@@ -6208,16 +6300,28 @@ async function bootstrap() {
       },
       tenancyId: tenancy.id,
       houseNumber: normalizedHouseNumber,
-      rentOutstandingKsh,
-      utilityOutstandingKsh,
-      roomChargesOutstandingKsh,
-      totalOutstandingKsh:
-        rentOutstandingKsh + utilityOutstandingKsh + roomChargesOutstandingKsh,
+      depositKsh: depositSettlement.depositKsh,
+      depositAppliedKsh: depositSettlement.depositAppliedKsh,
+      depositAppliedToRentKsh: depositSettlement.depositAppliedToRentKsh,
+      depositAppliedToUtilityKsh: depositSettlement.depositAppliedToUtilityKsh,
+      depositAppliedToRoomChargesKsh:
+        depositSettlement.depositAppliedToRoomChargesKsh,
+      depositRefundKsh: depositSettlement.depositRefundKsh,
+      grossRentOutstandingKsh,
+      grossUtilityOutstandingKsh,
+      grossRoomChargesOutstandingKsh,
+      grossOutstandingKsh: depositSettlement.grossOutstandingKsh,
+      rentOutstandingKsh: depositSettlement.rentOutstandingKsh,
+      utilityOutstandingKsh: depositSettlement.utilityOutstandingKsh,
+      roomChargesOutstandingKsh: depositSettlement.roomChargesOutstandingKsh,
+      totalOutstandingKsh: depositSettlement.totalOutstandingKsh,
       rent: rentDue
         ? {
             monthlyRentKsh: Math.max(0, Math.round(Number(rentDue.monthlyRentKsh ?? 0))),
             dueDate: rentDue.dueDate,
-            balanceKsh: rentOutstandingKsh
+            balanceKsh: depositSettlement.rentOutstandingKsh,
+            grossBalanceKsh: grossRentOutstandingKsh,
+            depositAppliedKsh: depositSettlement.depositAppliedToRentKsh
           }
         : null,
       utilityBills,
@@ -6309,11 +6413,159 @@ async function bootstrap() {
     };
   };
 
+  const applyDepositToOpenBalances = async (input: {
+    buildingId: string;
+    houseNumber: string;
+    tenancyId?: string | null;
+    residentUserId?: string | null;
+    residentName?: string | null;
+    depositAppliedToRentKsh?: number;
+    depositAppliedToUtilityKsh?: number;
+    depositAppliedToRoomChargesKsh?: number;
+  }) => {
+    const normalizedBuildingId = normalizeBuildingId(input.buildingId);
+    const normalizedHouseNumber = normalizeHouseNumber(input.houseNumber);
+    const settlementKey = String(input.tenancyId || randomUUID()).replace(
+      /[^A-Za-z0-9_-]/g,
+      ""
+    );
+    const paidAt = new Date().toISOString();
+    let rentAppliedKsh = 0;
+    let utilityAppliedKsh = 0;
+
+    const requestedRentKsh = Math.max(
+      0,
+      Math.round(Number(input.depositAppliedToRentKsh ?? 0))
+    );
+    if (requestedRentKsh > 0) {
+      const rentDue = rentLedgerService.getRentDue(
+        normalizedBuildingId,
+        normalizedHouseNumber
+      );
+      const openRentKsh = Math.max(
+        0,
+        Math.round(Number(rentDue?.balanceKsh ?? 0))
+      );
+      rentAppliedKsh = Math.min(requestedRentKsh, openRentKsh);
+      if (rentAppliedKsh > 0) {
+        rentLedgerService.recordPayment({
+          buildingId: normalizedBuildingId,
+          houseNumber: normalizedHouseNumber,
+          amountKsh: rentAppliedKsh,
+          provider: "deposit_credit",
+          providerReference: `DEPOSIT-${settlementKey}-RENT`,
+          paidAt,
+          tenantUserId: input.residentUserId ?? undefined,
+          tenantName: input.residentName ?? undefined,
+          source: "settlement"
+        });
+      }
+    }
+
+    let remainingUtilityDepositKsh = Math.max(
+      0,
+      Math.round(Number(input.depositAppliedToUtilityKsh ?? 0))
+    );
+    const utilityCreditByType = new Map<"water" | "electricity", number>();
+    if (remainingUtilityDepositKsh > 0) {
+      const openUtilityBills = utilityBillingService
+        .listBills({
+          buildingId: normalizedBuildingId,
+          houseNumber: normalizedHouseNumber,
+          limit: 1_000
+        })
+        .filter((item) => Math.max(0, Number(item.balanceKsh ?? 0)) > 0)
+        .sort((a, b) => {
+          const dueCompare = String(a.dueDate ?? "").localeCompare(
+            String(b.dueDate ?? "")
+          );
+          if (dueCompare !== 0) {
+            return dueCompare;
+          }
+          const monthCompare = String(a.billingMonth ?? "").localeCompare(
+            String(b.billingMonth ?? "")
+          );
+          if (monthCompare !== 0) {
+            return monthCompare;
+          }
+          return String(a.utilityType).localeCompare(String(b.utilityType));
+        });
+
+      for (const bill of openUtilityBills) {
+        if (remainingUtilityDepositKsh <= 0) {
+          break;
+        }
+
+        const utilityType =
+          bill.utilityType === "electricity" ? "electricity" : "water";
+        const appliedKsh = Math.min(
+          remainingUtilityDepositKsh,
+          Math.max(0, Math.round(Number(bill.balanceKsh ?? 0)))
+        );
+        if (appliedKsh <= 0) {
+          continue;
+        }
+
+        utilityCreditByType.set(
+          utilityType,
+          (utilityCreditByType.get(utilityType) ?? 0) + appliedKsh
+        );
+        remainingUtilityDepositKsh -= appliedKsh;
+      }
+
+      for (const [utilityType, amountKsh] of utilityCreditByType.entries()) {
+        if (amountKsh <= 0) {
+          continue;
+        }
+
+        const result = utilityBillingService.recordPayment(
+          utilityType,
+          normalizedBuildingId,
+          normalizedHouseNumber,
+          {
+            amountKsh,
+            provider: "deposit_credit",
+            providerReference: `DEPOSIT-${settlementKey}-${utilityType.toUpperCase()}`,
+            paidAt,
+            note: "Security deposit applied during move-out settlement.",
+            source: "settlement"
+          }
+        );
+        utilityAppliedKsh += Math.max(
+          0,
+          Math.round(Number(result.totalAppliedAmountKsh ?? amountKsh))
+        );
+      }
+    }
+
+    return {
+      rentAppliedKsh,
+      utilityAppliedKsh,
+      roomChargesAppliedKsh: Math.max(
+        0,
+        Math.round(Number(input.depositAppliedToRoomChargesKsh ?? 0))
+      ),
+      totalAppliedKsh:
+        rentAppliedKsh +
+        utilityAppliedKsh +
+        Math.max(0, Math.round(Number(input.depositAppliedToRoomChargesKsh ?? 0)))
+    };
+  };
+
   const settleRoomBalancesForResidentRemoval = async (
     buildingId: string,
     houseNumber: string,
     action: "write_off" | "transfer_to_resident_debt",
-    settlementNote?: string
+    settlementNote?: string,
+    depositApplication?: {
+      tenancyId?: string | null;
+      residentUserId?: string | null;
+      residentName?: string | null;
+      depositAppliedToRentKsh?: number;
+      depositAppliedToUtilityKsh?: number;
+      depositAppliedToRoomChargesKsh?: number;
+      depositRefundKsh?: number;
+    }
   ) => {
     const normalizedBuildingId = normalizeBuildingId(buildingId);
     const normalizedHouseNumber = normalizeHouseNumber(houseNumber);
@@ -6322,6 +6574,24 @@ async function bootstrap() {
       (action === "transfer_to_resident_debt"
         ? "Transferred to resident debt when resident was removed."
         : "Written off when resident was removed.");
+    const depositApplied = depositApplication
+      ? await applyDepositToOpenBalances({
+          buildingId: normalizedBuildingId,
+          houseNumber: normalizedHouseNumber,
+          tenancyId: depositApplication.tenancyId,
+          residentUserId: depositApplication.residentUserId,
+          residentName: depositApplication.residentName,
+          depositAppliedToRentKsh: depositApplication.depositAppliedToRentKsh,
+          depositAppliedToUtilityKsh: depositApplication.depositAppliedToUtilityKsh,
+          depositAppliedToRoomChargesKsh:
+            depositApplication.depositAppliedToRoomChargesKsh
+        })
+      : {
+          rentAppliedKsh: 0,
+          utilityAppliedKsh: 0,
+          roomChargesAppliedKsh: 0,
+          totalAppliedKsh: 0
+        };
     const rent = rentLedgerService.writeOffHouseBalance(
       normalizedBuildingId,
       normalizedHouseNumber,
@@ -6356,6 +6626,11 @@ async function bootstrap() {
       roomChargeCount += 1;
     }
 
+    roomChargesWrittenOffKsh = Math.max(
+      0,
+      Math.round(roomChargesWrittenOffKsh - depositApplied.roomChargesAppliedKsh)
+    );
+
     const rentWrittenOffKsh = Math.max(0, Number(rent?.previousBalanceKsh ?? 0));
     const utilityWrittenOffKsh = Math.max(
       0,
@@ -6364,10 +6639,10 @@ async function bootstrap() {
     const totalWrittenOffKsh =
       rentWrittenOffKsh + utilityWrittenOffKsh + roomChargesWrittenOffKsh;
 
-    if (rentWrittenOffKsh > 0) {
+    if (rentWrittenOffKsh > 0 || depositApplied.rentAppliedKsh > 0) {
       await persistRentLedgerStateNow();
     }
-    if (utilityWrittenOffKsh > 0) {
+    if (utilityWrittenOffKsh > 0 || depositApplied.utilityAppliedKsh > 0) {
       await persistUtilityBillingStateNow();
     }
     if (roomChargeCount > 0) {
@@ -6384,6 +6659,15 @@ async function bootstrap() {
       roomChargesSettledKsh: roomChargesWrittenOffKsh,
       totalWrittenOffKsh,
       totalSettledKsh: totalWrittenOffKsh,
+      depositAppliedKsh: depositApplied.totalAppliedKsh,
+      depositAppliedToRentKsh: depositApplied.rentAppliedKsh,
+      depositAppliedToUtilityKsh: depositApplied.utilityAppliedKsh,
+      depositAppliedToRoomChargesKsh: depositApplied.roomChargesAppliedKsh,
+      depositRefundKsh: Math.max(
+        0,
+        Math.round(Number(depositApplication?.depositRefundKsh ?? 0))
+      ),
+      totalClearedKsh: totalWrittenOffKsh + depositApplied.totalAppliedKsh,
       rent,
       utilities,
       roomChargeCount
@@ -6405,10 +6689,20 @@ async function bootstrap() {
       utilityOutstandingKsh: number;
       roomChargesOutstandingKsh: number;
       totalOutstandingKsh: number;
+      depositKsh?: number;
+      depositAppliedKsh?: number;
+      depositAppliedToRentKsh?: number;
+      depositAppliedToUtilityKsh?: number;
+      depositAppliedToRoomChargesKsh?: number;
+      depositRefundKsh?: number;
+      grossRentOutstandingKsh?: number;
+      grossUtilityOutstandingKsh?: number;
+      grossRoomChargesOutstandingKsh?: number;
+      grossOutstandingKsh?: number;
       utilityBills?: unknown;
       roomCharges?: unknown;
     };
-    action: "write_off" | "transfer_to_resident_debt";
+    action: "collect_before_move_out" | "write_off" | "transfer_to_resident_debt";
     reason?: string;
     actor: {
       userId?: string;
@@ -6417,9 +6711,41 @@ async function bootstrap() {
     };
     settlement: Awaited<ReturnType<typeof settleRoomBalancesForResidentRemoval>>;
   }) => {
-    if (!repositoryContext.prisma || input.summary.totalOutstandingKsh <= 0) {
+    const netOutstandingKsh = Math.max(
+      0,
+      Math.round(Number(input.summary.totalOutstandingKsh ?? 0))
+    );
+    const depositKsh = Math.max(0, Math.round(Number(input.summary.depositKsh ?? 0)));
+    const depositAppliedKsh = Math.max(
+      0,
+      Math.round(Number(input.summary.depositAppliedKsh ?? 0))
+    );
+    const depositRefundKsh = Math.max(
+      0,
+      Math.round(Number(input.summary.depositRefundKsh ?? 0))
+    );
+    if (
+      !repositoryContext.prisma ||
+      (netOutstandingKsh <= 0 && depositAppliedKsh <= 0 && depositRefundKsh <= 0)
+    ) {
       return null;
     }
+
+    const action =
+      depositRefundKsh > 0 && netOutstandingKsh <= 0
+        ? "deposit_refund"
+        : depositAppliedKsh > 0 && netOutstandingKsh <= 0
+          ? "deposit_applied"
+          : input.action;
+    const status =
+      action === "deposit_refund"
+        ? "deposit_refund_due"
+        : action === "deposit_applied"
+          ? "settled_by_deposit"
+          : input.action === "transfer_to_resident_debt"
+            ? "resident_debt_open"
+            : "written_off_loss";
+    const amountKsh = action === "deposit_refund" ? depositRefundKsh : netOutstandingKsh;
 
     return repositoryContext.prisma.residentMoveOutSettlement.create({
       data: {
@@ -6427,22 +6753,36 @@ async function bootstrap() {
         houseNumber: input.summary.houseNumber,
         residentUserId: input.summary.resident?.id ?? null,
         tenancyId: input.summary.tenancyId ?? null,
-        action: input.action,
-        status:
-          input.action === "transfer_to_resident_debt"
-            ? "resident_debt_open"
-            : "written_off_loss",
-        amountKsh: Math.max(0, Math.round(input.summary.totalOutstandingKsh)),
+        action,
+        status,
+        amountKsh,
         rentKsh: Math.max(0, Math.round(input.summary.rentOutstandingKsh)),
         utilityKsh: Math.max(0, Math.round(input.summary.utilityOutstandingKsh)),
         roomChargesKsh: Math.max(
           0,
           Math.round(input.summary.roomChargesOutstandingKsh)
         ),
+        depositKsh,
+        depositAppliedKsh,
+        depositRefundKsh,
         reason: input.reason,
         metadata: sanitizeAuditMetadata({
           resident: input.summary.resident,
           settlement: input.settlement,
+          deposit: {
+            depositKsh,
+            appliedKsh: depositAppliedKsh,
+            appliedToRentKsh: input.summary.depositAppliedToRentKsh,
+            appliedToUtilityKsh: input.summary.depositAppliedToUtilityKsh,
+            appliedToRoomChargesKsh: input.summary.depositAppliedToRoomChargesKsh,
+            refundKsh: depositRefundKsh
+          },
+          grossOutstanding: {
+            rentKsh: input.summary.grossRentOutstandingKsh,
+            utilityKsh: input.summary.grossUtilityOutstandingKsh,
+            roomChargesKsh: input.summary.grossRoomChargesOutstandingKsh,
+            totalKsh: input.summary.grossOutstandingKsh
+          },
           utilityBills: input.summary.utilityBills,
           roomCharges: input.summary.roomCharges
         }),
@@ -6466,6 +6806,9 @@ async function bootstrap() {
       rentKsh: number;
       utilityKsh: number;
       roomChargesKsh: number;
+      depositKsh: number;
+      depositAppliedKsh: number;
+      depositRefundKsh: number;
       reason: string | null;
       metadata: unknown;
       createdByUserId: string | null;
@@ -6499,6 +6842,9 @@ async function bootstrap() {
     rentKsh: Math.max(0, Number(settlement.rentKsh ?? 0)),
     utilityKsh: Math.max(0, Number(settlement.utilityKsh ?? 0)),
     roomChargesKsh: Math.max(0, Number(settlement.roomChargesKsh ?? 0)),
+    depositKsh: Math.max(0, Number(settlement.depositKsh ?? 0)),
+    depositAppliedKsh: Math.max(0, Number(settlement.depositAppliedKsh ?? 0)),
+    depositRefundKsh: Math.max(0, Number(settlement.depositRefundKsh ?? 0)),
     reason: settlement.reason ?? undefined,
     metadata: settlement.metadata ?? undefined,
     createdBy: {
@@ -6714,6 +7060,129 @@ async function bootstrap() {
     });
   };
 
+  const recordDepositRefundPayment = async (input: {
+    context: {
+      role: string;
+      userId?: string;
+      userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
+    };
+    settlementId: string;
+    amountKsh?: number;
+    provider: "mpesa" | "cash" | "bank" | "card";
+    providerReference?: string;
+    paidAt?: string;
+    note?: string;
+  }) => {
+    if (!repositoryContext.prisma) {
+      throw new Error("DATABASE_REQUIRED");
+    }
+
+    const settlement = await repositoryContext.prisma.residentMoveOutSettlement.findUnique({
+      where: { id: input.settlementId }
+    });
+    if (!settlement) {
+      throw new Error("SETTLEMENT_NOT_FOUND");
+    }
+
+    const hasAccess = await canManageBuildingFromLandlordContext(
+      input.context,
+      settlement.buildingId
+    );
+    if (!hasAccess) {
+      throw new Error("BUILDING_ACCESS_DENIED");
+    }
+
+    if (Math.max(0, Number(settlement.depositRefundKsh ?? 0)) <= 0) {
+      throw new Error("SETTLEMENT_NOT_DEPOSIT_REFUND");
+    }
+    if (settlement.status === "deposit_refunded") {
+      throw new Error("DEPOSIT_REFUND_ALREADY_PAID");
+    }
+    if (settlement.status !== "deposit_refund_due") {
+      throw new Error("DEPOSIT_REFUND_NOT_DUE");
+    }
+
+    const expectedAmountKsh = Math.max(
+      0,
+      Math.round(Number(settlement.depositRefundKsh ?? 0))
+    );
+    const amountKsh =
+      input.amountKsh === undefined
+        ? expectedAmountKsh
+        : Math.max(0, Math.round(Number(input.amountKsh)));
+    if (amountKsh !== expectedAmountKsh) {
+      throw new Error("DEPOSIT_REFUND_AMOUNT_MISMATCH");
+    }
+
+    const actor = actorFromLandlordContext(input.context);
+    const recordedAt = new Date().toISOString();
+    const refundPayment = {
+      amountKsh,
+      provider: input.provider,
+      providerReference: input.providerReference,
+      paidAt: input.paidAt ?? recordedAt,
+      note: input.note,
+      recordedAt,
+      recordedBy: actor
+    };
+    const existingMetadata =
+      settlement.metadata &&
+      typeof settlement.metadata === "object" &&
+      !Array.isArray(settlement.metadata)
+        ? { ...(settlement.metadata as Record<string, unknown>) }
+        : {};
+    const existingRefunds = Array.isArray(existingMetadata.depositRefundPayments)
+      ? existingMetadata.depositRefundPayments
+      : [];
+    const metadata = sanitizeAuditMetadata({
+      ...existingMetadata,
+      depositRefundPayment: refundPayment,
+      depositRefundPayments: [...existingRefunds, refundPayment]
+    });
+
+    const updated = await repositoryContext.prisma.residentMoveOutSettlement.update({
+      where: { id: settlement.id },
+      data: {
+        status: "deposit_refunded",
+        metadata
+      }
+    });
+
+    await recordRoomAccountAuditEvent({
+      buildingId: settlement.buildingId,
+      houseNumber: settlement.houseNumber,
+      tenancyId: settlement.tenancyId ?? undefined,
+      action: "deposit.refund.recorded",
+      summary: `KSh ${amountKsh.toLocaleString("en-US")} security deposit refund recorded.`,
+      actor,
+      metadata: {
+        settlementRecordId: settlement.id,
+        residentUserId: settlement.residentUserId,
+        refundPayment
+      }
+    });
+
+    const [building, resident] = await Promise.all([
+      store.getBuilding(updated.buildingId),
+      updated.residentUserId
+        ? repositoryContext.prisma.housingUser.findUnique({
+            where: { id: updated.residentUserId },
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              phone: true
+            }
+          })
+        : Promise.resolve(null)
+    ]);
+
+    return mapResidentMoveOutSettlement(updated, {
+      building: building ? { id: building.id, name: building.name } : null,
+      resident
+    });
+  };
+
   const recordResidentUtilityPaymentAndNotify = async (
     utilityType: "water" | "electricity",
     buildingId: string,
@@ -6841,6 +7310,21 @@ async function bootstrap() {
   );
   app.use(express.json({ limit: "1mb" }));
   await mkdir(uploadsDir, { recursive: true });
+  app.use((req, res, next) => {
+    const pathValue = req.path ?? "";
+    if (
+      pathValue === "/landlord-login.html" ||
+      pathValue === "/landlord-login.js" ||
+      pathValue === "/admin-login.html" ||
+      pathValue === "/admin-login.js" ||
+      pathValue === "/resident-sw.js"
+    ) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    }
+    next();
+  });
   app.use("/uploads", express.static(uploadsDir));
   app.get("/admin.html", (_req, res) => {
     return res.redirect("/landlord");
@@ -7368,7 +7852,8 @@ async function bootstrap() {
             fullName: session.fullName,
             email: session.email,
             phoneMask: maskPhone(session.phone),
-            expiresAt: session.expiresAt
+            expiresAt: session.expiresAt,
+            mustChangePassword: session.mustChangePassword
           }
         });
       } catch (error) {
@@ -7506,9 +7991,66 @@ async function bootstrap() {
         fullName: session.fullName,
         email: session.email,
         phoneMask: maskPhone(session.phone),
-        expiresAt: session.expiresAt
+        expiresAt: session.expiresAt,
+        mustChangePassword: session.mustChangePassword
       }
     });
+  });
+
+  app.post("/api/auth/account/change-password", async (req, res, next) => {
+    try {
+      if (!userAccountService) {
+        return res.status(503).json({
+          error: "Password change requires database-backed user accounts."
+        });
+      }
+
+      const session = await getUserSession(req, res, "tenant");
+      if (!session) {
+        return;
+      }
+
+      const parsed = accountChangePasswordSchema.parse(req.body ?? {});
+      const nextSession = await userAccountService.changeAccountPassword(session, parsed);
+
+      const expiresAtMs = new Date(nextSession.expiresAt).getTime();
+      const maxAgeMs = Math.max(0, expiresAtMs - Date.now());
+      res.cookie(
+        userSessionCookieName,
+        nextSession.token,
+        buildSessionCookieOptions(req, maxAgeMs)
+      );
+
+      const hasCaretakerAccess = listCaretakerBuildingIdsForUser(
+        nextSession.userId
+      ).size > 0;
+      const derivedRole =
+        hasUserRoleAtLeast(nextSession.role, "landlord") ||
+        nextSession.role === "admin" ||
+        nextSession.role === "root_admin"
+          ? nextSession.role
+          : hasCaretakerAccess
+            ? ("caretaker" as const)
+            : nextSession.role;
+
+      return res.json({
+        data: {
+          userId: nextSession.userId,
+          role: derivedRole,
+          fullName: nextSession.fullName,
+          email: nextSession.email,
+          phoneMask: maskPhone(nextSession.phone),
+          expiresAt: nextSession.expiresAt,
+          mustChangePassword: nextSession.mustChangePassword
+        }
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to change password";
+      if (message === "ACCOUNT_DISABLED") {
+        return res.status(403).json({ error: "Account is disabled. Contact support." });
+      }
+      return next(error);
+    }
   });
 
   app.post("/api/auth/logout", async (req, res) => {
@@ -8477,7 +9019,10 @@ async function bootstrap() {
             role: hasUserRoleAtLeast(userSession.role, "landlord")
               ? userSession.role
               : "caretaker",
-            expiresAt: userSession.expiresAt
+            fullName: userSession.fullName,
+            email: userSession.email,
+            expiresAt: userSession.expiresAt,
+            mustChangePassword: userSession.mustChangePassword
           }
         });
       }
@@ -10487,6 +11032,71 @@ async function bootstrap() {
         if (message === "RESIDENT_DEBT_AMOUNT_MISMATCH") {
           return res.status(409).json({
             error: "Collection amount must match the open resident debt total."
+          });
+        }
+        return next(error);
+      }
+    }
+  );
+
+  app.post(
+    "/api/landlord/move-out-settlements/:settlementId/refund",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        const settlementId = String(req.params.settlementId ?? "").trim();
+        if (!settlementId) {
+          return res.status(400).json({ error: "Settlement id is required." });
+        }
+
+        const parsed = depositRefundRecordSchema.parse(req.body ?? {});
+        const data = await recordDepositRefundPayment({
+          context,
+          settlementId,
+          amountKsh: parsed.amountKsh,
+          provider: parsed.provider,
+          providerReference: parsed.providerReference,
+          paidAt: parsed.paidAt,
+          note: parsed.note
+        });
+
+        return res.json({ data, role: context.role });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unable to record deposit refund.";
+        if (message === "DATABASE_REQUIRED") {
+          return res.status(503).json({
+            error: "Deposit refund recording requires database connection."
+          });
+        }
+        if (message === "SETTLEMENT_NOT_FOUND") {
+          return res.status(404).json({ error: "Move-out settlement not found." });
+        }
+        if (message === "BUILDING_ACCESS_DENIED") {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+        if (message === "SETTLEMENT_NOT_DEPOSIT_REFUND") {
+          return res.status(409).json({
+            error: "This settlement does not have a deposit refund due."
+          });
+        }
+        if (message === "DEPOSIT_REFUND_ALREADY_PAID") {
+          return res.status(409).json({
+            error: "Deposit refund is already recorded as paid."
+          });
+        }
+        if (message === "DEPOSIT_REFUND_NOT_DUE") {
+          return res.status(409).json({
+            error: "Deposit refund is not open for payment."
+          });
+        }
+        if (message === "DEPOSIT_REFUND_AMOUNT_MISMATCH") {
+          return res.status(409).json({
+            error: "Refund amount must match the open deposit refund total."
           });
         }
         return next(error);
@@ -15985,13 +16595,32 @@ async function bootstrap() {
           visibleBuildingIds
         });
         const actor = actorFromLandlordContext(context);
-        const billingSettlement =
+        const depositApplication = {
+          tenancyId: settlementSummary.tenancyId,
+          residentUserId: settlementSummary.resident?.id,
+          residentName: settlementSummary.resident?.fullName,
+          depositAppliedToRentKsh: settlementSummary.depositAppliedToRentKsh,
+          depositAppliedToUtilityKsh: settlementSummary.depositAppliedToUtilityKsh,
+          depositAppliedToRoomChargesKsh:
+            settlementSummary.depositAppliedToRoomChargesKsh,
+          depositRefundKsh: settlementSummary.depositRefundKsh
+        };
+        const shouldSettleRoomBalances =
           parsed.settlementAction === "write_off" ||
-          parsed.settlementAction === "transfer_to_resident_debt"
+          parsed.settlementAction === "transfer_to_resident_debt" ||
+          Math.max(0, Number(settlementSummary.depositAppliedKsh ?? 0)) > 0;
+        const billingSettlement =
+          shouldSettleRoomBalances
             ? await settleRoomBalancesForResidentRemoval(
                 buildingId,
                 data.houseNumber,
-                parsed.settlementAction
+                parsed.settlementAction === "transfer_to_resident_debt"
+                  ? "transfer_to_resident_debt"
+                  : "write_off",
+                parsed.settlementAction === "collect_before_move_out"
+                  ? "Settled by security deposit when resident was removed."
+                  : undefined,
+                depositApplication
               )
             : {
                 action: parsed.settlementAction,
@@ -16003,13 +16632,24 @@ async function bootstrap() {
                 roomChargesSettledKsh: 0,
                 totalWrittenOffKsh: 0,
                 totalSettledKsh: 0,
+                depositAppliedKsh: 0,
+                depositAppliedToRentKsh: 0,
+                depositAppliedToUtilityKsh: 0,
+                depositAppliedToRoomChargesKsh: 0,
+                depositRefundKsh: Math.max(
+                  0,
+                  Number(settlementSummary.depositRefundKsh ?? 0)
+                ),
+                totalClearedKsh: 0,
                 rent: null,
                 utilities: { totalWrittenOffKsh: 0, bills: [] },
                 roomChargeCount: 0
               };
         const settlementRecord =
           parsed.settlementAction === "write_off" ||
-          parsed.settlementAction === "transfer_to_resident_debt"
+          parsed.settlementAction === "transfer_to_resident_debt" ||
+          Math.max(0, Number(settlementSummary.depositAppliedKsh ?? 0)) > 0 ||
+          Math.max(0, Number(settlementSummary.depositRefundKsh ?? 0)) > 0
             ? await recordResidentMoveOutSettlement({
                 summary: settlementSummary,
                 action: parsed.settlementAction,
@@ -16020,6 +16660,38 @@ async function bootstrap() {
                 >
               })
             : null;
+
+        if (
+          Math.max(0, Number(billingSettlement.depositAppliedKsh ?? 0)) > 0 ||
+          Math.max(0, Number(settlementSummary.depositRefundKsh ?? 0)) > 0
+        ) {
+          await recordRoomAccountAuditEvent({
+            buildingId,
+            houseNumber: data.houseNumber,
+            tenancyId: data.tenancyId,
+            action: "deposit.settlement.recorded",
+            summary: `Security deposit settled for ${data.user.fullName}: KSh ${Math.max(
+              0,
+              Number(billingSettlement.depositAppliedKsh ?? 0)
+            ).toLocaleString("en-US")} applied, KSh ${Math.max(
+              0,
+              Number(settlementSummary.depositRefundKsh ?? 0)
+            ).toLocaleString("en-US")} refund due.`,
+            actor,
+            metadata: {
+              removedUserId: data.user.id,
+              settlementRecordId: settlementRecord?.id,
+              depositKsh: settlementSummary.depositKsh,
+              depositAppliedKsh: billingSettlement.depositAppliedKsh,
+              depositAppliedToRentKsh: billingSettlement.depositAppliedToRentKsh,
+              depositAppliedToUtilityKsh:
+                billingSettlement.depositAppliedToUtilityKsh,
+              depositAppliedToRoomChargesKsh:
+                billingSettlement.depositAppliedToRoomChargesKsh,
+              depositRefundKsh: settlementSummary.depositRefundKsh
+            }
+          });
+        }
 
         if (billingSettlement.totalSettledKsh > 0) {
           const transferred = parsed.settlementAction === "transfer_to_resident_debt";
@@ -16042,6 +16714,8 @@ async function bootstrap() {
               rentKsh: billingSettlement.rentSettledKsh,
               utilityKsh: billingSettlement.utilitySettledKsh,
               roomChargesKsh: billingSettlement.roomChargesSettledKsh,
+              depositAppliedKsh: billingSettlement.depositAppliedKsh,
+              depositRefundKsh: settlementSummary.depositRefundKsh,
               utilityBills: billingSettlement.utilities.bills,
               roomChargeCount: billingSettlement.roomChargeCount
             }
@@ -16068,7 +16742,9 @@ async function bootstrap() {
           title: "Resident Cleared",
           message: `${actor.name || "House manager"} cleared ${data.user.fullName} from ${data.building.name} house ${data.houseNumber}. Settlement: ${parsed.settlementAction.replace(/_/g, " ")}.`,
           level:
-            billingSettlement.totalSettledKsh > 0 || parsed.settlementAction === "collect_before_move_out"
+            billingSettlement.totalSettledKsh > 0 ||
+            Math.max(0, Number(settlementSummary.depositRefundKsh ?? 0)) > 0 ||
+            parsed.settlementAction === "collect_before_move_out"
               ? "warning"
               : "info",
           action: "resident.removed",
@@ -16083,6 +16759,8 @@ async function bootstrap() {
             settlementReason: parsed.settlementReason,
             settlementRecordId: settlementRecord?.id,
             totalSettledKsh: billingSettlement.totalSettledKsh,
+            depositAppliedKsh: billingSettlement.depositAppliedKsh,
+            depositRefundKsh: settlementSummary.depositRefundKsh,
             removedAt: data.removedAt
           }
         });

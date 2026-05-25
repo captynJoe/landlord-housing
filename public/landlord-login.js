@@ -12,6 +12,19 @@ const loginBtnEl = document.getElementById("landlord-login-btn");
 const loginStatusEl = document.getElementById("login-status");
 const loginErrorEl = document.getElementById("login-error");
 const landlordSecondaryErrorEl = document.getElementById("landlord-secondary-error");
+const landlordPasswordChangeFormEl = document.getElementById(
+  "landlord-password-change-form"
+);
+const landlordNewPasswordEl = document.getElementById("landlord-new-password");
+const landlordConfirmPasswordEl = document.getElementById(
+  "landlord-confirm-password"
+);
+const landlordPasswordChangeBtnEl = document.getElementById(
+  "landlord-password-change-btn"
+);
+const landlordPasswordChangeErrorEl = document.getElementById(
+  "landlord-password-change-error"
+);
 
 const landlordForgotFormEl = document.getElementById("landlord-forgot-form");
 const landlordForgotIdentifierEl = document.getElementById(
@@ -48,13 +61,14 @@ function clearPanelError(element) {
 function clearAllErrors() {
   clearPanelError(loginErrorEl);
   clearPanelError(landlordSecondaryErrorEl);
+  clearPanelError(landlordPasswordChangeErrorEl);
 }
 
 function normalizeLandlordSignInError(error, { caretakerMode = false } = {}) {
   if (!(error instanceof Error)) {
     return caretakerMode
       ? "House manager sign-in failed. Check your phone number, house number, and password."
-      : "Manager sign-in failed. Check your email or phone number and password.";
+      : "Manager sign-in failed. Check your email, phone number, or username and password.";
   }
 
   const message = error.message || "";
@@ -68,7 +82,7 @@ function normalizeLandlordSignInError(error, { caretakerMode = false } = {}) {
   if (error.status === 401) {
     return caretakerMode
       ? "House manager sign-in failed. Check your phone number, house number, and password."
-      : "Manager sign-in failed. Check your email or phone number and password.";
+      : "Manager sign-in failed. Check your email, phone number, or username and password.";
   }
 
   return message;
@@ -159,6 +173,11 @@ async function handleSignedInRole(role, identity = {}) {
     role === "root_admin" ||
     role === "caretaker"
   ) {
+    if (identity?.mustChangePassword) {
+      showPermanentPasswordForm(role, identity);
+      return true;
+    }
+
     setStatus(`Signed in as ${role}. Redirecting...`);
     window.location.href = "/landlord";
     return true;
@@ -179,6 +198,24 @@ async function handleSignedInRole(role, identity = {}) {
   }
 
   return false;
+}
+
+function showPermanentPasswordForm(role, identity = {}) {
+  loginFormEl?.classList.add("hidden");
+  landlordForgotFormEl?.classList.add("hidden");
+  landlordPasswordChangeFormEl?.classList.remove("hidden");
+
+  const label =
+    identity.fullName ||
+    identity.email ||
+    (role === "caretaker" ? "house manager account" : "manager account");
+  setStatus(
+    `Temporary password accepted for ${label}. Set a permanent password to continue.`
+  );
+
+  if (landlordNewPasswordEl instanceof HTMLInputElement) {
+    landlordNewPasswordEl.focus();
+  }
 }
 
 async function checkSession() {
@@ -209,7 +246,9 @@ async function signIn(event) {
   const caretakerPhoneLogin = Boolean(caretakerModeEl?.checked);
 
   if (!identifier) {
-    showPanelError(loginErrorEl, "Provide email or phone number.", { reveal: true });
+    showPanelError(loginErrorEl, "Provide email, phone number, or username.", {
+      reveal: true
+    });
     return;
   }
 
@@ -389,6 +428,66 @@ async function requestPasswordReset(event) {
   }
 }
 
+async function submitPermanentPasswordChange(event) {
+  event.preventDefault();
+  clearAllErrors();
+
+  const newPassword = String(landlordNewPasswordEl?.value || "");
+  const confirmPassword = String(landlordConfirmPasswordEl?.value || "");
+
+  if (newPassword.length < 8) {
+    showPanelError(
+      landlordPasswordChangeErrorEl,
+      "New password must be at least 8 characters.",
+      { reveal: true }
+    );
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    showPanelError(
+      landlordPasswordChangeErrorEl,
+      "Confirmation password must match the new password.",
+      { reveal: true }
+    );
+    return;
+  }
+
+  if (landlordPasswordChangeBtnEl instanceof HTMLButtonElement) {
+    landlordPasswordChangeBtnEl.disabled = true;
+  }
+  setStatus("Updating password...");
+
+  try {
+    const payload = await requestJson("/api/auth/account/change-password", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        newPassword,
+        confirmPassword
+      })
+    });
+
+    landlordPasswordChangeFormEl?.reset();
+    setStatus("Password updated. Redirecting...");
+    const handled = await handleSignedInRole(payload.data?.role, payload.data ?? {});
+    if (!handled) {
+      throw new Error("Password updated, but this account cannot open the manager portal.");
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to update password.";
+    showPanelError(landlordPasswordChangeErrorEl, message, { reveal: true });
+    setStatus("Password update failed.");
+  } finally {
+    if (landlordPasswordChangeBtnEl instanceof HTMLButtonElement) {
+      landlordPasswordChangeBtnEl.disabled = false;
+    }
+  }
+}
+
 loginFormEl.addEventListener("submit", (event) => {
   void signIn(event);
 });
@@ -399,6 +498,10 @@ caretakerModeEl?.addEventListener("change", () => {
 
 landlordForgotFormEl.addEventListener("submit", (event) => {
   void requestPasswordReset(event);
+});
+
+landlordPasswordChangeFormEl?.addEventListener("submit", (event) => {
+  void submitPermanentPasswordChange(event);
 });
 
 initPasswordVisibilityToggles();

@@ -4,8 +4,8 @@ import type {
   UpsertRentDueInput
 } from "../validation/schemas.js";
 
-type RentPaymentProvider = "mpesa" | "cash" | "bank" | "card";
-type RentPaymentSource = "manual" | "mpesa";
+type RentPaymentProvider = "mpesa" | "cash" | "bank" | "card" | "deposit_credit";
+type RentPaymentSource = "manual" | "mpesa" | "settlement";
 
 interface RecordRentPaymentInput {
   buildingId: string;
@@ -285,6 +285,7 @@ function normalizeRentPaymentProvider(value: string | undefined): RentPaymentPro
     case "cash":
     case "bank":
     case "card":
+    case "deposit_credit":
     case "mpesa":
       return value;
     default:

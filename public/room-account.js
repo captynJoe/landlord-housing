@@ -190,6 +190,9 @@ function formatPaymentProvider(value) {
   if (normalized === "mpesa") {
     return "M-PESA";
   }
+  if (normalized === "deposit_credit") {
+    return "Deposit credit";
+  }
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
@@ -207,6 +210,10 @@ function formatAuditActionLabel(value) {
       return "Resident removed";
     case "resident.balance.writeoff":
       return "Balance written off";
+    case "deposit.settlement.recorded":
+      return "Deposit settlement recorded";
+    case "deposit.refund.recorded":
+      return "Deposit refund recorded";
     case "resident.debt.transferred":
       return "Debt transferred";
     case "room.removed":

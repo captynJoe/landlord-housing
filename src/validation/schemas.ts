@@ -491,6 +491,21 @@ export const residentChangePasswordSchema = z
     }
   });
 
+export const accountChangePasswordSchema = z
+  .object({
+    newPassword: z.string().min(8).max(128),
+    confirmPassword: z.string().min(8).max(128)
+  })
+  .superRefine((value, context) => {
+    if (value.newPassword !== value.confirmPassword) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Confirmation password must match the new password."
+      });
+    }
+  });
+
 export const residentAdminPasswordResetSchema = z.object({
   buildingId: nonEmptyString,
   houseNumber: nonEmptyString.max(24),
@@ -1053,6 +1068,14 @@ export const residentDebtCollectionSchema = z.object({
   note: z.string().trim().max(280).optional()
 });
 
+export const depositRefundRecordSchema = z.object({
+  amountKsh: z.number().positive().max(10_000_000).optional(),
+  provider: utilityPaymentProviderSchema.default("cash"),
+  providerReference: nonEmptyString.max(120).optional(),
+  paidAt: z.string().datetime().optional(),
+  note: z.string().trim().max(280).optional()
+});
+
 export const roomBillingHoldScopeSchema = z.enum(["rent", "utilities", "all"]);
 
 export const createRoomBillingHoldSchema = z
@@ -1149,6 +1172,7 @@ export type RecordAdminRentPaymentInput = z.infer<typeof recordAdminRentPaymentS
 export type ResidentDebtCollectionInput = z.infer<
   typeof residentDebtCollectionSchema
 >;
+export type DepositRefundRecordInput = z.infer<typeof depositRefundRecordSchema>;
 export type UpdateTicketStatusInput = z.infer<typeof updateTicketStatusSchema>;
 export type AdminAccessCredentialUpdateInput = z.infer<
   typeof adminAccessCredentialUpdateSchema
@@ -1166,6 +1190,9 @@ export type UpdateResidentNotificationPreferencesInput = z.infer<
 >;
 export type ResidentChangePasswordInput = z.infer<
   typeof residentChangePasswordSchema
+>;
+export type AccountChangePasswordInput = z.infer<
+  typeof accountChangePasswordSchema
 >;
 export type ResidentAdminPasswordResetInput = z.infer<
   typeof residentAdminPasswordResetSchema

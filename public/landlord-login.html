@@ -89,6 +89,44 @@
             tabindex="-1"
           ></section>
         </form>
+        <form id="landlord-password-change-form" class="package-card hidden">
+          <h2 style="margin: 0;">Set Permanent Password</h2>
+          <p class="status-text">
+            Temporary password accepted. Set and confirm a permanent password to continue.
+          </p>
+          <label>
+            New Password
+            <input
+              id="landlord-new-password"
+              type="password"
+              minlength="8"
+              maxlength="128"
+              autocomplete="new-password"
+              placeholder="Minimum 8 characters"
+              required
+            />
+          </label>
+          <label>
+            Confirm New Password
+            <input
+              id="landlord-confirm-password"
+              type="password"
+              minlength="8"
+              maxlength="128"
+              autocomplete="new-password"
+              placeholder="Repeat new password"
+              required
+            />
+          </label>
+          <button id="landlord-password-change-btn" type="submit">Update Password</button>
+          <section
+            id="landlord-password-change-error"
+            class="error-box hidden inline-error-box"
+            role="alert"
+            aria-live="polite"
+            tabindex="-1"
+          ></section>
+        </form>
         <p id="login-status" class="status-text">Session not established.</p>
       </section>
 
@@ -121,6 +159,6 @@
       </section>
     </main>
 
-    <script type="module" src="/landlord-login.js?v=20260521b"></script>
+    <script type="module" src="/landlord-login.js?v=20260525b"></script>
   </body>
 </html>

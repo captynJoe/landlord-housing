@@ -7,6 +7,7 @@ import type {
   UserRole
 } from "@prisma/client";
 import type {
+  AccountChangePasswordInput,
   AdminRevokeLandlordInput,
   CreateLandlordAccessRequestInput,
   LandlordDecisionInput,
@@ -923,6 +924,36 @@ export class UserAccountService {
   async changeResidentPassword(
     session: Pick<AuthenticatedUserSession, "userId" | "residentTenancyId">,
     input: ResidentChangePasswordInput
+  ): Promise<AuthenticatedUserSession> {
+    await this.purgeExpiredSessions();
+
+    const user = await this.prisma.housingUser.update({
+      where: { id: session.userId },
+      data: {
+        passwordHash: hashPassword(input.newPassword),
+        requirePasswordChange: false
+      }
+    });
+
+    if (user.status !== "active") {
+      throw new Error("ACCOUNT_DISABLED");
+    }
+
+    await this.prisma.userSession.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() }
+    });
+
+    this.loginRateByPhone.delete(normalizeKenyaPhone(user.phone));
+    this.loginRateByEmail.delete(normalizeEmail(user.email));
+    return this.issueSessionForUser(user, {
+      residentTenancyId: session.residentTenancyId
+    });
+  }
+
+  async changeAccountPassword(
+    session: Pick<AuthenticatedUserSession, "userId" | "residentTenancyId">,
+    input: AccountChangePasswordInput
   ): Promise<AuthenticatedUserSession> {
     await this.purgeExpiredSessions();
 

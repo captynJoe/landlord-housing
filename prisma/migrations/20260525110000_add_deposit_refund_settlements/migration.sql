@@ -1,0 +1,4 @@
+ALTER TABLE "ResidentMoveOutSettlement"
+  ADD COLUMN "depositKsh" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "depositAppliedKsh" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN "depositRefundKsh" INTEGER NOT NULL DEFAULT 0;

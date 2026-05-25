@@ -1,4 +1,4 @@
-const CACHE_NAME = "jk-flats-resident-v20260523e";
+const CACHE_NAME = "jk-flats-resident-v20260525a";
 const RESIDENT_SHELL_URL = "/resident";
 const PROFILE_SHELL_URL = "/user";
 const LANDLORD_SHELL_URL = "/landlord";
@@ -81,6 +81,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   if (request.mode === "navigate" && url.origin === self.location.origin) {
+    if (url.pathname === "/landlord/login" || url.pathname === "/admin/login") {
+      return;
+    }
+
     const shellCacheKey = getShellCacheKey(url.pathname);
     event.respondWith(
       fetch(request)

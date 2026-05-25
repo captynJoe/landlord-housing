@@ -12,7 +12,7 @@ import {
   getLandlordShellBrand
 } from "./portal-branding.js?v=20260521b";
 
-const LANDLORD_SW_URL = "/resident-sw.js?v=20260523e";
+const LANDLORD_SW_URL = "/resident-sw.js?v=20260525a";
 const authStatusEl = document.getElementById("auth-status");
 const landlordRoleEl = document.getElementById("landlord-role");
 const landlordBrandTagEl = document.getElementById("landlord-brand-tag");
@@ -165,6 +165,8 @@ const residentsSearchInputEl = document.getElementById("residents-search-input")
 const residentsOpenMatchBtnEl = document.getElementById("residents-open-match-btn");
 const residentsOverviewEl = document.getElementById("residents-overview");
 const residentsSearchSummaryEl = document.getElementById("residents-search-summary");
+const roomLedgerSummaryEl = document.getElementById("room-ledger-summary");
+const roomLedgerBodyEl = document.getElementById("room-ledger-body");
 const residentsBodyEl = document.getElementById("residents-body");
 const refreshResidentsBtnEl = document.getElementById("refresh-residents");
 const landlordTicketFilterStatusEl = document.getElementById(
@@ -1059,6 +1061,11 @@ function scrollToLandlordSection(sectionId) {
         return;
       }
 
+      if (section instanceof HTMLDetailsElement) {
+        section.open = true;
+      }
+      section.closest("details")?.setAttribute("open", "");
+
       const top = Math.max(0, window.scrollY + section.getBoundingClientRect().top - 16);
       window.scrollTo({ top, behavior: "smooth" });
     });
@@ -1089,7 +1096,7 @@ function openMetricTarget(target) {
     case "unpaid-bills":
     case "overdue-bills":
       setActiveLandlordView("tenants");
-      scrollToLandlordSection("utility-room-status-section");
+      scrollToLandlordSection("residents-section");
       break;
     case "outstanding":
       setActiveLandlordView("tenants");
@@ -1382,7 +1389,8 @@ function formatUtilityPaymentCoverage(data, fallbackBillingMonth) {
 }
 
 function formatCurrency(value) {
-  return `KSh ${Number(value ?? 0).toLocaleString("en-US")}`;
+  const amount = Number(value ?? 0);
+  return `KSh ${(Number.isFinite(amount) ? amount : 0).toLocaleString("en-US")}`;
 }
 
 const DEFAULT_WATER_RATE_PER_UNIT_KSH = 150;
@@ -2086,6 +2094,9 @@ function formatPaymentProvider(value) {
 
   if (normalized === "mpesa") {
     return "M-PESA";
+  }
+  if (normalized === "deposit_credit") {
+    return "Deposit credit";
   }
 
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
@@ -4968,7 +4979,7 @@ async function openUtilitySheetModal() {
     ]);
     renderUtilitySheetRows(state.registryRows);
   } catch (error) {
-    handleLandlordError(error, "Failed to load bulk utility sheet.");
+    handleLandlordError(error, "Failed to load bulk utility entry.");
   }
 }
 
@@ -6127,7 +6138,7 @@ function buildRentSheetPayload() {
   const billingMonth = toBillingMonth(rentSheetBillingMonthEl?.value);
   const dueDate = toIsoFromDateTimeLocal(rentSheetDueDateEl?.value);
   if (!billingMonth || !dueDate) {
-    throw new Error("Rent sheet requires billing month and due date.");
+    throw new Error("Bulk rent update requires billing month and due date.");
   }
 
   const rows = [];
@@ -6178,7 +6189,7 @@ function buildRentSheetPayload() {
   });
 
   if (rows.length === 0) {
-    throw new Error("No rooms available in rent sheet.");
+    throw new Error("No rooms available for bulk rent update.");
   }
 
   return {
@@ -6254,7 +6265,7 @@ async function openRentSheetModal() {
   try {
     await loadRentSheetRows();
   } catch (error) {
-    handleLandlordError(error, "Failed to load bulk rent sheet.");
+    handleLandlordError(error, "Failed to load bulk rent update.");
   }
 }
 
@@ -6772,6 +6783,10 @@ function formatSettlementAction(action) {
       return "Resident debt";
     case "collect_before_move_out":
       return "Collect first";
+    case "deposit_refund":
+      return "Deposit refund";
+    case "deposit_applied":
+      return "Settled by deposit";
     default:
       return String(action ?? "Recorded").replaceAll("_", " ") || "Recorded";
   }
@@ -6785,6 +6800,12 @@ function formatSettlementStatus(status) {
       return "Open debt";
     case "resident_debt_closed":
       return "Debt closed";
+    case "deposit_refund_due":
+      return "Refund due";
+    case "deposit_refunded":
+      return "Refund paid";
+    case "settled_by_deposit":
+      return "Deposit applied";
     default:
       return String(status ?? "recorded").replaceAll("_", " ") || "Recorded";
   }
@@ -6797,6 +6818,9 @@ function getSettlementOutcomeClass(action) {
   if (action === "transfer_to_resident_debt") {
     return "is-debt";
   }
+  if (action === "deposit_refund" || action === "deposit_applied") {
+    return "is-refund";
+  }
   return "is-recorded";
 }
 
@@ -6806,6 +6830,9 @@ function renderMoveOutSettlementReport(rows) {
   const debtRows = reportRows.filter(
     (item) => item?.action === "transfer_to_resident_debt"
   );
+  const refundRows = reportRows.filter((item) => Number(item?.depositRefundKsh ?? 0) > 0);
+  const openRefundRows = refundRows.filter((item) => item?.status !== "deposit_refunded");
+  const paidRefundRows = refundRows.filter((item) => item?.status === "deposit_refunded");
   const openDebtRows = debtRows.filter((item) => item?.status !== "resident_debt_closed");
   const closedDebtRows = debtRows.filter((item) => item?.status === "resident_debt_closed");
   const sumBy = (items, field) =>
@@ -6813,6 +6840,9 @@ function renderMoveOutSettlementReport(rows) {
   const totalLossKsh = sumBy(lossRows, "amountKsh");
   const totalOpenDebtKsh = sumBy(openDebtRows, "amountKsh");
   const totalClosedDebtKsh = sumBy(closedDebtRows, "amountKsh");
+  const totalDepositAppliedKsh = sumBy(reportRows, "depositAppliedKsh");
+  const totalOpenRefundKsh = sumBy(openRefundRows, "depositRefundKsh");
+  const totalPaidRefundKsh = sumBy(paidRefundRows, "depositRefundKsh");
   const totalRentKsh = sumBy(reportRows, "rentKsh");
   const totalUtilityKsh = sumBy(reportRows, "utilityKsh");
   const totalRoomChargeKsh = sumBy(reportRows, "roomChargesKsh");
@@ -6833,6 +6863,16 @@ function renderMoveOutSettlementReport(rows) {
         label: "Collected Debt",
         value: formatCurrency(totalClosedDebtKsh),
         detail: `${closedDebtRows.length} account${closedDebtRows.length === 1 ? "" : "s"}`
+      },
+      {
+        label: "Deposit Applied",
+        value: formatCurrency(totalDepositAppliedKsh),
+        detail: `${refundRows.length} refund account${refundRows.length === 1 ? "" : "s"}`
+      },
+      {
+        label: "Refund Due",
+        value: formatCurrency(totalOpenRefundKsh),
+        detail: `Paid ${formatCurrency(totalPaidRefundKsh)}`
       },
       {
         label: "Settled Accounts",
@@ -6867,7 +6907,7 @@ function renderMoveOutSettlementReport(rows) {
   if (reportRows.length === 0) {
     const row = document.createElement("tr");
     row.innerHTML =
-      '<td colspan="12">No move-out loss or resident debt has been recorded for this building.</td>';
+      '<td colspan="14">No move-out settlement has been recorded for this building.</td>';
     moveOutSettlementsBodyEl.append(row);
     return;
   }
@@ -6897,12 +6937,22 @@ function renderMoveOutSettlementReport(rows) {
         !isCaretakerRole() &&
         item.action === "transfer_to_resident_debt" &&
         item.status === "resident_debt_open";
+      const canRecordRefund =
+        !isCaretakerRole() &&
+        Number(item.depositRefundKsh ?? 0) > 0 &&
+        item.status === "deposit_refund_due";
       const actionCell = canCollectDebt
         ? `<button type="button" class="ghost-btn" data-action="collect-resident-debt" data-settlement-id="${escapeHtml(
             item.id
           )}" data-resident-name="${escapeHtml(residentName)}" data-amount-ksh="${escapeHtml(
             String(Math.max(0, Number(item.amountKsh ?? 0)))
           )}">Record Collection</button>`
+        : canRecordRefund
+          ? `<button type="button" class="ghost-btn" data-action="record-deposit-refund" data-settlement-id="${escapeHtml(
+              item.id
+            )}" data-resident-name="${escapeHtml(residentName)}" data-amount-ksh="${escapeHtml(
+              String(Math.max(0, Number(item.depositRefundKsh ?? 0)))
+            )}">Mark Refunded</button>`
         : "-";
 
       row.innerHTML = `
@@ -6925,6 +6975,8 @@ function renderMoveOutSettlementReport(rows) {
         <td>${escapeHtml(formatCurrency(item.rentKsh))}</td>
         <td>${escapeHtml(formatCurrency(item.utilityKsh))}</td>
         <td>${escapeHtml(formatCurrency(item.roomChargesKsh))}</td>
+        <td>${escapeHtml(formatCurrency(item.depositAppliedKsh))}</td>
+        <td>${escapeHtml(formatCurrency(item.depositRefundKsh))}</td>
         <td>${escapeHtml(actorLabel || "-")}</td>
         <td>${escapeHtml(item.reason || "-")}</td>
         <td>${actionCell}</td>
@@ -6979,6 +7031,58 @@ function handleCollectResidentDebtClick(target, settlementId, residentName, amou
       await loadMoveOutSettlements();
     } catch (error) {
       handleLandlordError(error, "Failed to record resident debt collection.");
+    } finally {
+      target.disabled = false;
+    }
+  })();
+}
+
+function handleRecordDepositRefundClick(target, settlementId, residentName, amountKsh) {
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot close deposit refunds.");
+    return;
+  }
+
+  if (!settlementId) {
+    showError("Settlement details are missing. Refresh and try again.");
+    return;
+  }
+
+  const amount = Math.max(0, Number(amountKsh ?? 0));
+  const shouldProceed = window.confirm(
+    `Mark ${formatCurrency(amount)} deposit refund paid to ${residentName || "this resident"}?`
+  );
+  if (!shouldProceed) {
+    return;
+  }
+
+  target.disabled = true;
+  clearError();
+
+  void (async () => {
+    try {
+      const response = await requestJson(
+        `/api/landlord/move-out-settlements/${encodeURIComponent(settlementId)}/refund`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            amountKsh: Math.round(amount)
+          })
+        }
+      );
+
+      const refunded = Number(response?.data?.depositRefundKsh ?? amount);
+      setStatus(
+        `${formatCurrency(refunded)} deposit refund marked as paid for ${
+          response?.data?.residentName || residentName || "resident"
+        }.`
+      );
+      await loadMoveOutSettlements();
+    } catch (error) {
+      handleLandlordError(error, "Failed to record deposit refund.");
     } finally {
       target.disabled = false;
     }
@@ -7059,9 +7163,17 @@ function setMoveOutSettlementLoading(loading) {
 function updateMoveOutSettlementHelp() {
   const summary = state.moveOutSettlement?.summary;
   const total = Number(summary?.totalOutstandingKsh ?? 0);
+  const refundDue = Number(summary?.depositRefundKsh ?? 0);
+  const depositApplied = Number(summary?.depositAppliedKsh ?? 0);
   const action = getMoveOutSettlementAction();
   if (moveOutSettlementHelpEl instanceof HTMLElement) {
-    if (action === "collect_before_move_out" && total > 0) {
+    if (refundDue > 0) {
+      moveOutSettlementHelpEl.textContent =
+        `A ${formatCurrency(refundDue)} deposit refund will be recorded when this resident is cleared.`;
+    } else if (depositApplied > 0 && total <= 0) {
+      moveOutSettlementHelpEl.textContent =
+        "The deposit covers the open balance, so the room can clear without resident debt.";
+    } else if (action === "collect_before_move_out" && total > 0) {
       moveOutSettlementHelpEl.textContent =
         "Resident access will stay active so the landlord can collect first.";
     } else if (action === "transfer_to_resident_debt") {
@@ -7080,6 +7192,8 @@ function updateMoveOutSettlementHelp() {
     moveOutSettlementSubmitBtnEl.textContent =
       action === "collect_before_move_out" && total > 0
         ? "Keep Active Until Paid"
+        : refundDue > 0
+          ? "Clear + Record Refund Due"
         : "Confirm Settlement";
   }
 }
@@ -7107,10 +7221,14 @@ function renderMoveOutSettlement(summary, context) {
 
   if (moveOutSettlementTotalsEl instanceof HTMLElement) {
     const totals = [
+      ["Gross Balance", summary?.grossOutstandingKsh ?? total],
+      ["Deposit Held", summary?.depositKsh ?? 0],
+      ["Deposit Applied", summary?.depositAppliedKsh ?? 0],
+      ["Refund Due", summary?.depositRefundKsh ?? 0],
+      ["Remaining Pending", total],
       ["Rent", summary?.rentOutstandingKsh ?? 0],
       ["Utilities", summary?.utilityOutstandingKsh ?? 0],
-      ["Room Charges", summary?.roomChargesOutstandingKsh ?? 0],
-      ["Total Pending", total]
+      ["Room Charges", summary?.roomChargesOutstandingKsh ?? 0]
     ];
     moveOutSettlementTotalsEl.innerHTML = totals
       .map(
@@ -7553,12 +7671,283 @@ function renderOverviewCollections(rows) {
   });
 }
 
+function getLatestRoomSettlement(buildingId, houseNumber) {
+  const normalizedBuildingId = normalizeLookupBuildingId(buildingId);
+  const normalizedHouseNumber = normalizeHouse(houseNumber);
+  return (Array.isArray(state.moveOutSettlements) ? state.moveOutSettlements : [])
+    .filter(
+      (item) =>
+        normalizeLookupBuildingId(item?.buildingId) === normalizedBuildingId &&
+        normalizeHouse(item?.houseNumber) === normalizedHouseNumber
+    )
+    .sort((left, right) => compareIsoDateDesc(left?.createdAt, right?.createdAt))[0] ?? null;
+}
+
+function formatRoomLedgerSettlement(settlement) {
+  if (!settlement) {
+    return "";
+  }
+
+  const refundKsh = Math.max(0, utilityAmount(settlement.depositRefundKsh));
+  const debtKsh = Math.max(0, utilityAmount(settlement.amountKsh));
+  if (refundKsh > 0 && settlement.status === "deposit_refund_due") {
+    return `Refund due ${formatCurrency(refundKsh)}`;
+  }
+  if (refundKsh > 0 && settlement.status === "deposit_refunded") {
+    return `Refund paid ${formatCurrency(refundKsh)}`;
+  }
+  if (settlement.status === "resident_debt_open") {
+    return `Resident debt ${formatCurrency(debtKsh)}`;
+  }
+  if (settlement.status === "resident_debt_closed") {
+    return `Debt collected ${formatCurrency(debtKsh)}`;
+  }
+  if (settlement.status === "settled_by_deposit") {
+    return "Settled by deposit";
+  }
+
+  return "";
+}
+
+function renderRoomLedgerActions(resident, totalBalanceKsh) {
+  const buildingId = String(resident?.buildingId ?? "").trim();
+  const houseNumber = normalizeHouse(resident?.houseNumber);
+  const residentUserId = String(resident?.residentUserId ?? "").trim();
+  const residentName = String(resident?.residentName ?? "Resident").trim() || "Resident";
+  const hasResident = Boolean(
+    residentUserId ||
+      resident?.hasActiveResident ||
+      String(resident?.residentName ?? "").trim()
+  );
+  const currentRentDueKsh = getResidentCurrentRentDueKsh(resident);
+  const rentArrearsKsh = getResidentRentArrearsKsh(resident);
+  const rentBalanceKsh = Math.max(
+    currentRentDueKsh + rentArrearsKsh,
+    Math.max(0, utilityAmount(resident?.rentBalanceKsh))
+  );
+  const billingMonth = monthKeyFromValue(resident?.rentDueDate) || currentBillingMonth();
+  const buttons = [
+    `<button type="button" data-action="open-room-account" data-building-id="${escapeHtml(
+      buildingId
+    )}" data-house-number="${escapeHtml(houseNumber)}">Account</button>`
+  ];
+
+  if (hasResident) {
+    buttons.push(
+      `<button type="button" data-action="open-resident-drawer" data-building-id="${escapeHtml(
+        buildingId
+      )}" data-house-number="${escapeHtml(houseNumber)}">Profile</button>`
+    );
+  }
+
+  if (hasResident && rentBalanceKsh > 0) {
+    buttons.push(
+      `<button type="button" data-action="prefill-rent-payment" data-building-id="${escapeHtml(
+        buildingId
+      )}" data-house-number="${escapeHtml(houseNumber)}" data-billing-month="${escapeHtml(
+        billingMonth
+      )}" data-amount-ksh="${escapeHtml(rentBalanceKsh)}">Rent Pay</button>`
+    );
+  }
+
+  if (hasResident && residentUserId) {
+    buttons.push(
+      `<button type="button" class="btn-danger" data-action="remove-resident" data-building-id="${escapeHtml(
+        buildingId
+      )}" data-house-number="${escapeHtml(houseNumber)}" data-user-id="${escapeHtml(
+        residentUserId
+      )}" data-resident-name="${escapeHtml(residentName)}">Clear</button>`
+    );
+  }
+
+  if (!hasResident && !isCaretakerRole() && totalBalanceKsh > 0) {
+    buttons.push(
+      `<button type="button" class="btn-danger" data-action="write-off-room-balance" data-building-id="${escapeHtml(
+        buildingId
+      )}" data-house-number="${escapeHtml(houseNumber)}" data-amount-ksh="${escapeHtml(
+        totalBalanceKsh
+      )}">Clear Balance</button>`
+    );
+  }
+
+  if (!hasResident && !isCaretakerRole() && totalBalanceKsh <= 0) {
+    buttons.push(
+      `<button type="button" class="btn-danger" data-action="remove-room" data-building-id="${escapeHtml(
+        buildingId
+      )}" data-house-number="${escapeHtml(houseNumber)}">Remove Room</button>`
+    );
+  }
+
+  return `<div class="resident-row-actions room-ledger-actions">${buttons.join("")}</div>`;
+}
+
+function renderRoomLedger(rows) {
+  if (!(roomLedgerBodyEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const allRows = Array.isArray(rows) ? rows : [];
+  const visibleRows = getVisibleResidentDirectoryRows(allRows);
+  roomLedgerBodyEl.replaceChildren();
+
+  const totals = visibleRows.reduce(
+    (summary, resident) => {
+      const hasResident =
+        resident?.hasActiveResident || resident?.residentUserId || resident?.residentName;
+      const utilitySummary = getResidentUtilityRoomSummary(resident);
+      const totalBalanceKsh = getResidentOperationalOutstandingKsh(
+        resident,
+        utilitySummary
+      );
+      const latestSettlement = getLatestRoomSettlement(
+        resident?.buildingId,
+        resident?.houseNumber
+      );
+      summary.balanceKsh += Math.max(0, utilityAmount(totalBalanceKsh));
+      summary.depositKsh += Math.max(0, utilityAmount(resident?.depositKsh));
+      summary.refundKsh +=
+        latestSettlement?.status === "deposit_refund_due"
+          ? Math.max(0, utilityAmount(latestSettlement.depositRefundKsh))
+          : 0;
+      if (hasResident) {
+        summary.occupied += 1;
+      } else {
+        summary.vacant += 1;
+      }
+      return summary;
+    },
+    { balanceKsh: 0, depositKsh: 0, refundKsh: 0, occupied: 0, vacant: 0 }
+  );
+
+  if (roomLedgerSummaryEl instanceof HTMLElement) {
+    roomLedgerSummaryEl.textContent =
+      `${visibleRows.length} room${visibleRows.length === 1 ? "" : "s"} | ` +
+      `${totals.occupied} occupied | ${totals.vacant} vacant | ` +
+      `Outstanding ${formatCurrency(totals.balanceKsh)} | ` +
+      `Deposits ${formatCurrency(totals.depositKsh)} | ` +
+      `Refund due ${formatCurrency(totals.refundKsh)}`;
+  }
+
+  if (allRows.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = '<td colspan="11">No rooms found for this selection.</td>';
+    roomLedgerBodyEl.append(row);
+    return;
+  }
+
+  if (visibleRows.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="11">No rooms matched "${escapeHtml(
+      state.residentSearchQuery
+    )}".</td>`;
+    roomLedgerBodyEl.append(row);
+    return;
+  }
+
+  visibleRows.forEach((resident) => {
+    const row = document.createElement("tr");
+    const hasResident =
+      resident.hasActiveResident || resident.residentUserId || resident.residentName;
+    const utilitySummary = getResidentUtilityRoomSummary(resident);
+    const latestSettlement = getLatestRoomSettlement(
+      resident.buildingId,
+      resident.houseNumber
+    );
+    const buildingLabel = resident.buildingName ?? resident.buildingId ?? "-";
+    const houseNumber = normalizeHouse(resident.houseNumber);
+    const residentName = hasResident
+      ? `${resident.residentName ?? "Resident"}${
+          isResidentPendingVerification(resident) ? " (Unverified)" : ""
+        }`
+      : "Vacant";
+    const residentPhone = hasResident ? resident.residentPhone ?? "" : "";
+    const occupancy = hasResident
+      ? isResidentPendingVerification(resident)
+        ? "Pending review"
+        : "Active"
+      : "Vacant";
+    const occupancyClass = hasResident
+      ? isResidentPendingVerification(resident)
+        ? "is-pending"
+        : "is-active"
+      : "is-vacant";
+    const billingStatus = hasResident
+      ? getResidentBillingStatusLabel(resident)
+      : formatRoomLedgerSettlement(latestSettlement) || "Vacant";
+    const rentCurrentDueKsh = getResidentCurrentRentDueKsh(resident);
+    const rentArrearsKsh = getResidentRentArrearsKsh(resident);
+    const rentBalanceKsh = Math.max(
+      rentCurrentDueKsh + rentArrearsKsh,
+      Math.max(0, utilityAmount(resident.rentBalanceKsh))
+    );
+    const monthlyRentKsh = getResidentMonthlyRentKsh(resident);
+    const utilityOpenKsh = Math.max(
+      getResidentUtilityBalanceKsh(resident),
+      utilityAmount(utilitySummary?.totalOpenBalanceKsh)
+    );
+    const utilityStatus = utilitySummary
+      ? renderUtilityStatusAction(utilitySummary)
+      : '<span class="utility-status clear">No utility balance</span>';
+    const chargeBalanceKsh = getResidentExpenseBalanceKsh(resident);
+    const totalBalanceKsh = getResidentOperationalOutstandingKsh(
+      resident,
+      utilitySummary
+    );
+    const depositKsh = Math.max(0, utilityAmount(resident.depositKsh));
+    const settlementText = hasResident
+      ? ""
+      : formatRoomLedgerSettlement(latestSettlement);
+    const nextDueDate = getResidentNextDueDate(resident);
+    const dueOrRefund = settlementText
+      ? settlementText
+      : nextDueDate
+        ? formatDateTime(nextDueDate)
+        : "-";
+
+    row.className = "account-drilldown-row room-ledger-row";
+    row.dataset.action = "open-room-account-row";
+    row.dataset.buildingId = String(resident.buildingId ?? "");
+    row.dataset.houseNumber = houseNumber;
+    row.tabIndex = 0;
+    row.setAttribute("role", "link");
+    row.setAttribute("title", `Open room account ${houseNumber}`);
+    row.innerHTML = `
+      <td>${escapeHtml(buildingLabel)}</td>
+      <td><strong>${escapeHtml(houseNumber)}</strong></td>
+      <td>
+        <strong>${escapeHtml(residentName)}</strong>
+        ${residentPhone ? `<br /><small>${escapeHtml(residentPhone)}</small>` : ""}
+      </td>
+      <td>
+        <span class="room-ledger-status ${occupancyClass}">${escapeHtml(occupancy)}</span>
+        <small>${escapeHtml(billingStatus)}</small>
+      </td>
+      <td>
+        <strong>${escapeHtml(formatCurrency(rentBalanceKsh))}</strong>
+        <small>Monthly ${escapeHtml(formatCurrency(monthlyRentKsh))}</small>
+      </td>
+      <td>${escapeHtml(formatCurrency(depositKsh))}</td>
+      <td>
+        <strong>${escapeHtml(formatCurrency(utilityOpenKsh))}</strong>
+        <span class="room-ledger-utility-status">${utilityStatus}</span>
+      </td>
+      <td>${escapeHtml(formatCurrency(chargeBalanceKsh))}</td>
+      <td><strong>${escapeHtml(formatCurrency(totalBalanceKsh))}</strong></td>
+      <td>${escapeHtml(dueOrRefund)}</td>
+      <td>${renderRoomLedgerActions(resident, totalBalanceKsh)}</td>
+    `;
+
+    roomLedgerBodyEl.append(row);
+  });
+}
+
 function renderResidentDirectory(rows) {
   const allRows = Array.isArray(rows) ? rows : [];
   renderResidentsOverview(allRows);
   const filteredRows = getVisibleResidentDirectoryRows(allRows);
   updateResidentsSearchSummary(allRows.length, filteredRows.length);
   renderUtilityRoomSummary(state.bills);
+  renderRoomLedger(allRows);
 
   if (!(residentsBodyEl instanceof HTMLElement)) {
     return;
@@ -9426,6 +9815,7 @@ async function loadRentStatus() {
   state.rentStatus = payload.data ?? [];
   renderRentStatus(state.rentStatus);
   renderOverviewCollections(state.rentStatus);
+  renderRoomLedger(state.residentDirectory);
 }
 
 async function loadResidents() {
@@ -9667,6 +10057,7 @@ async function loadBills() {
   setBills(payload.data ?? []);
   syncRegistryReadingMonthInput();
   renderUtilityRoomSummary(state.bills);
+  renderRoomLedger(state.residentDirectory);
   renderUtilityBills(state.bills);
   renderRegistryRows(state.registryRows);
   if (
@@ -9730,10 +10121,12 @@ async function loadMoveOutSettlements() {
     );
     state.moveOutSettlements = payload.data ?? [];
     renderMoveOutSettlementReport(state.moveOutSettlements);
+    renderRoomLedger(state.residentDirectory);
   } catch (error) {
     if (isMissingRouteError(error)) {
       state.moveOutSettlements = [];
       renderMoveOutSettlementReport(state.moveOutSettlements);
+      renderRoomLedger(state.residentDirectory);
       return;
     }
     throw error;
@@ -10119,7 +10512,7 @@ utilitySheetReloadBtnEl?.addEventListener("click", () => {
 
 rentSheetReloadBtnEl?.addEventListener("click", () => {
   void loadRentSheetRows().catch((error) => {
-    handleLandlordError(error, "Failed to reload rent sheet.");
+    handleLandlordError(error, "Failed to reload bulk rent update.");
   });
 });
 
@@ -10299,7 +10692,7 @@ caretakerFormEl?.addEventListener("submit", (event) => {
   const houseNumber = normalizeHouse(caretakerHouseNumberEl?.value || "");
   const note = String(caretakerNoteEl?.value || "").trim() || undefined;
   if (!buildingId || !identifier || !houseNumber) {
-    showError("House manager approval requires building, phone/email, and house.");
+    showError("House manager approval requires building, phone, and house.");
     return;
   }
 
@@ -11224,6 +11617,8 @@ async function submitMoveOutSettlement(event) {
 
   const action = getMoveOutSettlementAction();
   const total = Number(summary.totalOutstandingKsh ?? 0);
+  const depositApplied = Number(summary.depositAppliedKsh ?? 0);
+  const refundDue = Number(summary.depositRefundKsh ?? 0);
   const buildingId = String(moveOutSettlementFormEl?.dataset.buildingId ?? "").trim();
   const userId = String(moveOutSettlementFormEl?.dataset.userId ?? "").trim();
   const houseNumber = normalizeHouse(moveOutSettlementFormEl?.dataset.houseNumber);
@@ -11282,6 +11677,18 @@ async function submitMoveOutSettlement(event) {
         `Removed ${residentName} from house ${houseNumber}. ${formatCurrency(
           settled
         )} written off.`
+      );
+    } else if (refundDue > 0) {
+      setStatus(
+        `Removed ${residentName} from house ${houseNumber}. ${formatCurrency(
+          refundDue
+        )} deposit refund recorded as due.`
+      );
+    } else if (depositApplied > 0) {
+      setStatus(
+        `Removed ${residentName} from house ${houseNumber}. ${formatCurrency(
+          depositApplied
+        )} deposit applied to close the room balance.`
       );
     } else {
       setStatus(`Removed ${residentName} from house ${houseNumber}.`);
@@ -11426,6 +11833,106 @@ residentsBodyEl?.addEventListener("click", (event) => {
   }
 
   void openResidentDirectoryEntry(buildingId, houseNumber);
+});
+
+roomLedgerBodyEl?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const button = target.closest("button[data-action]");
+  if (button instanceof HTMLButtonElement) {
+    const action = String(button.dataset.action || "").trim();
+    const buildingId = String(button.dataset.buildingId || "").trim();
+    const houseNumber = String(button.dataset.houseNumber || "").trim();
+
+    if (action === "open-overview-utility-payment") {
+      openOverviewUtilityPaymentModal({
+        buildingId,
+        houseNumber,
+        utilityType: button.dataset.utilityType,
+        billingMonth: button.dataset.billingMonth,
+        amountKsh: Number(button.dataset.amountKsh ?? 0),
+        statusLabel: button.dataset.statusLabel
+      });
+      return;
+    }
+
+    if (action === "prefill-rent-payment") {
+      prefillRentPaymentFromStatus({
+        buildingId,
+        houseNumber,
+        billingMonth: button.dataset.billingMonth,
+        amountKsh: button.dataset.amountKsh
+      });
+      return;
+    }
+
+    if (!buildingId || !houseNumber) {
+      showError("Room ledger details missing. Refresh and retry.");
+      return;
+    }
+
+    if (action === "open-room-account") {
+      openRoomAccountPage(buildingId, houseNumber);
+      return;
+    }
+
+    if (action === "open-resident-drawer") {
+      void openResidentDirectoryEntry(buildingId, houseNumber);
+      return;
+    }
+
+    if (action === "remove-resident") {
+      const userId = String(button.dataset.userId || "").trim();
+      const residentName = String(button.dataset.residentName || "Resident").trim();
+      handleRemoveResidentClick(button, buildingId, userId, houseNumber, residentName);
+      return;
+    }
+
+    if (action === "remove-room") {
+      handleRemoveRoomClick(button, buildingId, houseNumber);
+      return;
+    }
+
+    if (action === "write-off-room-balance") {
+      handleWriteOffRoomBalanceClick(
+        button,
+        buildingId,
+        houseNumber,
+        Number(button.dataset.amountKsh ?? 0)
+      );
+    }
+
+    return;
+  }
+
+  const row = target.closest("[data-action='open-room-account-row']");
+  if (!(row instanceof HTMLElement)) {
+    return;
+  }
+
+  openRoomAccountPage(row.dataset.buildingId, row.dataset.houseNumber);
+});
+
+roomLedgerBodyEl?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || target.closest("button[data-action]")) {
+    return;
+  }
+
+  const row = target.closest("[data-action='open-room-account-row']");
+  if (!(row instanceof HTMLElement)) {
+    return;
+  }
+
+  event.preventDefault();
+  openRoomAccountPage(row.dataset.buildingId, row.dataset.houseNumber);
 });
 
 residentDrawerBodyEl?.addEventListener("click", (event) => {
@@ -11584,7 +12091,7 @@ utilitySheetBuildingSelectEl?.addEventListener("change", () => {
     loadUtilitySheetBuildingConfiguration(),
     loadUtilitySheetMonthlyCombinedCharge()
   ]).catch((error) => {
-    handleLandlordError(error, "Failed to load selected building in utility sheet.");
+    handleLandlordError(error, "Failed to load selected building for bulk utility entry.");
   });
 });
 
@@ -11605,7 +12112,7 @@ rentSheetBuildingSelectEl?.addEventListener("change", () => {
   syncRentSheetBuildingOptions();
 
   void loadRentSheetRows().catch((error) => {
-    handleLandlordError(error, "Failed to load selected building in rent sheet.");
+    handleLandlordError(error, "Failed to load selected building for bulk rent update.");
   });
 });
 
@@ -11735,7 +12242,7 @@ utilitySheetFormEl?.addEventListener("submit", (event) => {
   const billingMonth = toBillingMonth(utilitySheetBillingMonthEl?.value);
   const dueDate = toIsoFromDateTimeLocal(utilitySheetDueDateEl?.value);
   if (!billingMonth || !dueDate) {
-    showError("Bulk utility sheet requires billing month and due date.");
+    showError("Bulk utility entry requires billing month and due date.");
     return;
   }
 
@@ -11823,17 +12330,17 @@ utilitySheetFormEl?.addEventListener("submit", (event) => {
       combinedUtilityChargeKsh
     );
   } catch (error) {
-    handleLandlordError(error, "Invalid values in utility sheet.");
+    handleLandlordError(error, "Invalid values in bulk utility entry.");
     return;
   }
 
   if (!Array.isArray(registryRows) || registryRows.length === 0) {
-    showError("No houses available in utility sheet.");
+    showError("No houses available for bulk utility entry.");
     return;
   }
 
   if (!Array.isArray(auditRows) || auditRows.length === 0) {
-    showError("No utility sheet snapshot available to audit.");
+    showError("No utility entry snapshot available to audit.");
     return;
   }
 
@@ -12022,14 +12529,14 @@ utilitySheetFormEl?.addEventListener("submit", (event) => {
       if (failures.length > 0) {
         const preview = failures.slice(0, 3).join(" | ");
         showError(
-          `Saved meter sheet. Posted ${postedCount}/${billRequests.length} bills. Failed: ${preview}${failures.length > 3 ? " ..." : ""}`
+          `Saved meter updates. Posted ${postedCount}/${billRequests.length} bills. Failed: ${preview}${failures.length > 3 ? " ..." : ""}`
         );
         setStatus(
           `Bulk save completed for ${buildingId} with ${failures.length} bill error(s).`
         );
       } else {
         setStatus(
-          `Saved bulk utility sheet for ${buildingId}. Posted ${postedCount} bill(s).`
+          `Saved bulk utility entry for ${buildingId}. Posted ${postedCount} bill(s).`
         );
         closeUtilitySheetModal();
       }
@@ -12048,7 +12555,7 @@ utilitySheetFormEl?.addEventListener("submit", (event) => {
           console.error("Failed to finalize utility bulk audit", auditFinalizeError);
         }
       }
-      handleLandlordError(error, "Failed to save bulk utility sheet.");
+      handleLandlordError(error, "Failed to save bulk utility entry.");
     } finally {
       if (utilitySheetSubmitBtnEl instanceof HTMLButtonElement) {
         utilitySheetSubmitBtnEl.disabled = false;
@@ -12381,7 +12888,7 @@ rentSheetFormEl?.addEventListener("submit", (event) => {
   try {
     payload = buildRentSheetPayload();
   } catch (error) {
-    handleLandlordError(error, "Invalid values in rent sheet.");
+    handleLandlordError(error, "Invalid values in bulk rent update.");
     return;
   }
 
@@ -12407,11 +12914,11 @@ rentSheetFormEl?.addEventListener("submit", (event) => {
       renderRentSheetRows(state.rentSheetRows);
       await Promise.all([loadRentStatus(), loadResidents()]);
       setStatus(
-        `Saved rent sheet for ${getBuildingDisplayNameById(buildingId, buildingId)} (${payload.billingMonth}).`
+        `Saved rent updates for ${getBuildingDisplayNameById(buildingId, buildingId)} (${payload.billingMonth}).`
       );
       closeRentSheetModal();
     } catch (error) {
-      handleLandlordError(error, "Failed to save rent sheet.");
+      handleLandlordError(error, "Failed to save bulk rent update.");
     } finally {
       if (rentSheetSubmitBtnEl instanceof HTMLButtonElement) {
         rentSheetSubmitBtnEl.disabled = false;
@@ -12838,16 +13345,24 @@ moveOutSettlementsBodyEl?.addEventListener("click", (event) => {
     return;
   }
 
-  if (target.dataset.action !== "collect-resident-debt") {
+  if (target.dataset.action === "collect-resident-debt") {
+    handleCollectResidentDebtClick(
+      target,
+      String(target.dataset.settlementId || "").trim(),
+      String(target.dataset.residentName || "Resident").trim(),
+      Number(target.dataset.amountKsh ?? 0)
+    );
     return;
   }
 
-  handleCollectResidentDebtClick(
-    target,
-    String(target.dataset.settlementId || "").trim(),
-    String(target.dataset.residentName || "Resident").trim(),
-    Number(target.dataset.amountKsh ?? 0)
-  );
+  if (target.dataset.action === "record-deposit-refund") {
+    handleRecordDepositRefundClick(
+      target,
+      String(target.dataset.settlementId || "").trim(),
+      String(target.dataset.residentName || "Resident").trim(),
+      Number(target.dataset.amountKsh ?? 0)
+    );
+  }
 });
 
 expendituresBodyEl?.addEventListener("click", (event) => {

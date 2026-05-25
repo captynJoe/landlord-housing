@@ -85,7 +85,7 @@
             data-landlord-view="tenants"
             data-landlord-section-target="residents-section"
           >
-            Tenants
+            Ledger
           </button>
           <button
             type="button"
@@ -176,14 +176,7 @@
               data-landlord-focus-target-view="tenants"
               data-landlord-focus-target-section="residents-section"
             >
-              Tenants
-            </button>
-            <button
-              type="button"
-              data-landlord-focus-target-view="tenants"
-              data-landlord-focus-target-section="utility-room-status-section"
-            >
-              Utility Status
+              Ledger
             </button>
             <button
               type="button"
@@ -521,12 +514,12 @@
                 <select id="caretaker-building-select"></select>
               </label>
               <label>
-                House Manager Phone/Email
+                House Manager Phone
                 <input
                   id="caretaker-identifier"
                   type="text"
                   maxlength="160"
-                  placeholder="+254711111111 or name@email.com"
+                  placeholder="+254711111111"
                   required
                 />
               </label>
@@ -693,15 +686,16 @@
           </div>
         </section>
 
-        <section
-          class="panel wide-panel landlord-view hidden"
+        <details
+          class="panel wide-panel landlord-view hidden secondary-ledger-panel"
           data-landlord-view-panel="tenants"
           id="overview-rent-status-section"
         >
+          <summary>Rent Collection Source Details</summary>
           <div class="panel-head">
             <h2>Rent Collection + Manual Payments</h2>
             <div class="action-row">
-              <button id="open-rent-sheet-btn" type="button">Rent Bulk Sheet</button>
+              <button id="open-rent-sheet-btn" type="button">Bulk Rent Update</button>
               <button id="refresh-rent-status" type="button">Refresh</button>
             </div>
           </div>
@@ -775,7 +769,7 @@
               <tbody id="rent-status-body"></tbody>
             </table>
           </div>
-        </section>
+        </details>
 
         <section
           class="panel wide-panel landlord-view hidden"
@@ -783,7 +777,7 @@
           id="residents-section"
         >
           <div class="panel-head">
-            <h2>Tenants</h2>
+            <h2>Room Ledger</h2>
             <div class="action-row">
               <label>
                 Building
@@ -820,7 +814,41 @@
           <p id="residents-search-summary" class="status-text">
             Showing all rooms for the selected building filter.
           </p>
-          <div id="residents-directory-section" class="utility-summary-card">
+
+          <div id="room-ledger-section" class="utility-summary-card room-ledger-card">
+            <div class="panel-head">
+              <h3>Room Accounts</h3>
+              <p id="room-ledger-summary" class="status-text">
+                Rent, utilities, deposits, charges, and settlement state in one sheet.
+              </p>
+            </div>
+            <div class="table-wrap room-ledger-table-wrap">
+              <table class="room-ledger-table">
+                <thead>
+                  <tr>
+                    <th>Building</th>
+                    <th>House</th>
+                    <th>Resident</th>
+                    <th>Status</th>
+                    <th>Rent</th>
+                    <th>Deposit</th>
+                    <th>Utilities</th>
+                    <th>Charges</th>
+                    <th>Total</th>
+                    <th>Due / Refund</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="room-ledger-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <details
+            id="residents-directory-section"
+            class="secondary-ledger-panel utility-summary-card"
+          >
+            <summary>Tenant Register Source Details</summary>
             <div class="panel-head">
               <h3>Room Register</h3>
             </div>
@@ -846,8 +874,12 @@
                 <tbody id="residents-body"></tbody>
               </table>
             </div>
-          </div>
-          <div id="utility-room-status-section" class="utility-summary-card">
+          </details>
+          <details
+            id="utility-room-status-section"
+            class="secondary-ledger-panel utility-summary-card"
+          >
+            <summary>Utility Status Source Details</summary>
             <div class="panel-head">
               <h3>Utility Room Status</h3>
             </div>
@@ -870,27 +902,29 @@
                 <tbody id="utility-room-summary-body" data-utility-room-summary-body></tbody>
               </table>
             </div>
-          </div>
+          </details>
         </section>
 
-        <section
-          class="panel wide-panel landlord-view"
+        <details
+          class="panel wide-panel landlord-view secondary-ledger-panel"
           data-landlord-view-panel="tenants"
           id="utilities-registry-section"
         >
+          <summary>Meter Setup Source Tools</summary>
           <div class="panel-head">
             <h2>Meters + Bulk Utility Setup</h2>
             <div class="action-row">
               <button id="open-utility-setup-btn" type="button">Open Setup</button>
             </div>
           </div>
-        </section>
+        </details>
 
-        <section
-          class="panel wide-panel landlord-view hidden"
+        <details
+          class="panel wide-panel landlord-view hidden secondary-ledger-panel"
           data-landlord-view-panel="tenants"
           id="utilities-bills-section"
         >
+          <summary>Utility Billing Source Details</summary>
           <div class="panel-head">
             <h2>Post Monthly Utility Bill</h2>
             <button id="refresh-bills" type="button">Refresh</button>
@@ -969,13 +1003,14 @@
               </table>
             </div>
           </details>
-        </section>
+        </details>
 
-        <section
-          class="panel wide-panel landlord-view hidden"
+        <details
+          class="panel wide-panel landlord-view hidden secondary-ledger-panel"
           data-landlord-view-panel="tenants"
           id="utilities-payments-section"
         >
+          <summary>Utility Payment Source Details</summary>
           <div class="panel-head">
             <h2>Utility Payments</h2>
             <button id="refresh-payments" type="button">Refresh</button>
@@ -1061,7 +1096,7 @@
               <tbody id="utility-payments-body"></tbody>
             </table>
           </div>
-        </section>
+        </details>
 
         <section
           class="panel wide-panel landlord-view hidden"
@@ -1132,7 +1167,7 @@
           </div>
 
           <div class="section-head move-out-report-head">
-            <h4>Move-Out Losses + Resident Debt</h4>
+            <h4>Move-Out Settlements</h4>
             <button id="refresh-move-out-settlements" type="button" class="ghost-btn">
               Refresh
             </button>
@@ -1154,6 +1189,8 @@
                   <th>Rent</th>
                   <th>Utilities</th>
                   <th>Room Charges</th>
+                  <th>Deposit Applied</th>
+                  <th>Refund</th>
                   <th>Recorded By</th>
                   <th>Reason</th>
                   <th>Action</th>
@@ -1192,7 +1229,7 @@
                 <input id="registry-reading-month" type="month" />
               </label>
               <button id="registry-load-btn" type="button">Load</button>
-              <button id="open-utility-sheet-btn" type="button">Bulk Utility Sheet</button>
+              <button id="open-utility-sheet-btn" type="button">Bulk Utility Entry</button>
               <button id="registry-save-btn" type="button">Save All</button>
             </div>
             <div id="registry-charge-summary" class="landlord-generator registry-charge-summary">
@@ -1269,15 +1306,15 @@
       </aside>
 
       <div id="utility-sheet-backdrop" class="landlord-drawer-backdrop hidden"></div>
-      <aside id="utility-sheet-modal" class="landlord-sheet-modal hidden" aria-label="Bulk utility sheet">
+      <aside id="utility-sheet-modal" class="landlord-sheet-modal hidden" aria-label="Bulk utility entry">
         <header class="landlord-drawer-head">
-          <h2>Bulk Utility Sheet</h2>
+          <h2>Bulk Utility Entry</h2>
           <button id="close-utility-sheet-btn" type="button" class="ghost-btn">Close</button>
         </header>
 
         <form id="utility-sheet-form" class="package-card landlord-sheet-form">
           <p class="status-text">
-            Spreadsheet-style entry for all houses in the selected building. Fill meter numbers,
+            Bulk entry for all houses in the selected building. Fill meter numbers,
             then add readings or fixed charges where needed and submit once.
           </p>
 
@@ -1390,9 +1427,9 @@
       </aside>
 
       <div id="rent-sheet-backdrop" class="landlord-drawer-backdrop hidden"></div>
-      <aside id="rent-sheet-modal" class="landlord-sheet-modal hidden" aria-label="Bulk rent sheet">
+      <aside id="rent-sheet-modal" class="landlord-sheet-modal hidden" aria-label="Bulk rent update">
         <header class="landlord-drawer-head">
-          <h2>Bulk Rent Sheet</h2>
+          <h2>Bulk Rent Update</h2>
           <button id="close-rent-sheet-btn" type="button" class="ghost-btn">Close</button>
         </header>
 
@@ -1449,7 +1486,7 @@
           </div>
 
           <div class="action-row">
-            <button id="rent-sheet-submit-btn" type="submit">Save Rent Sheet</button>
+            <button id="rent-sheet-submit-btn" type="submit">Save Rent Updates</button>
             <button id="rent-sheet-reload-btn" type="button" class="ghost-btn">Reload Rooms</button>
           </div>
         </form>

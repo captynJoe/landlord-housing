@@ -326,6 +326,9 @@ model ResidentMoveOutSettlement {
   rentKsh           Int      @default(0)
   utilityKsh        Int      @default(0)
   roomChargesKsh    Int      @default(0)
+  depositKsh        Int      @default(0)
+  depositAppliedKsh Int      @default(0)
+  depositRefundKsh  Int      @default(0)
   reason            String?
   metadata          Json?
   createdByUserId   String?
