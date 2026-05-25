@@ -26,12 +26,13 @@ services:
   nginx:
     environment:
       ESTATEDESK_SERVER_NAME: ${ESTATEDESK_SERVER_NAME:?ESTATEDESK_SERVER_NAME must be set}
+      ESTATEDESK_CANONICAL_HOST: ${ESTATEDESK_CANONICAL_HOST:?ESTATEDESK_CANONICAL_HOST must be set}
       ESTATEDESK_WEB_UPSTREAM: http://estatedesk_web:8080
       ESTATEDESK_API_UPSTREAM: ${ESTATEDESK_API_UPSTREAM:?ESTATEDESK_API_UPSTREAM must be set}
       ESTATEDESK_SSL_CERTIFICATE: ${ESTATEDESK_SSL_CERTIFICATE:-/etc/letsencrypt/live/captyn.shop/fullchain.pem}
       ESTATEDESK_SSL_CERTIFICATE_KEY: ${ESTATEDESK_SSL_CERTIFICATE_KEY:-/etc/letsencrypt/live/captyn.shop/privkey.pem}
     volumes:
       - ${ESTATEDESK_NGINX_TEMPLATE:-/home/captyn/landlord-housing/deploy/vps1/estatedesk.vps1.conf.template}:/etc/nginx/templates/estatedesk.conf.template:ro
+      - ${ESTATEDESK_LOCAL_CERT_DIR:-/home/captyn/landlord-housing/deploy/certs}:/etc/estatedesk-certs:ro
     depends_on:
       - estatedesk_web
-

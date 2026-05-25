@@ -56,7 +56,11 @@ run_with_timeout() {
   echo "$label..."
   set +e
   if command -v timeout >/dev/null 2>&1; then
-    timeout "${seconds}s" "$@"
+    if timeout --help 2>&1 | grep -q -- "--kill-after"; then
+      timeout --kill-after=30s "${seconds}s" "$@"
+    else
+      timeout "${seconds}s" "$@"
+    fi
   else
     echo "Warning: timeout command not found; running $label without a timeout." >&2
     "$@"
@@ -91,6 +95,11 @@ wait_for_database() {
   return 1
 }
 
+stop_api_for_migrations() {
+  echo "Stopping API before migrations to release database connections..."
+  "${compose_command[@]}" stop landlord_housing_api >/dev/null 2>&1 || true
+}
+
 compose_command=(docker compose --env-file "$env_file" -f "$app_root/docker-compose.vps2.yml")
 migration_timeout="$(read_env_value ESTATEDESK_MIGRATION_TIMEOUT_SECONDS)"
 migration_timeout="${migration_timeout:-180}"
@@ -98,10 +107,11 @@ migration_timeout="${migration_timeout:-180}"
 "${compose_command[@]}" build landlord_housing_api
 "${compose_command[@]}" up -d landlord_housing_db
 wait_for_database
+stop_api_for_migrations
 
 if [ "$skip_migrations" != "true" ]; then
   if ! run_with_timeout "Running Prisma migrations" "$migration_timeout" \
-    "${compose_command[@]}" run --rm --no-deps landlord_housing_api npm run prisma:deploy; then
+    "${compose_command[@]}" run --rm --no-deps -T landlord_housing_api npm run prisma:deploy; then
     echo "API container was not recreated. Fix migrations, then rerun deploy/vps2/deploy.sh." >&2
     exit 1
   fi
@@ -111,7 +121,7 @@ fi
 
 if [ "$run_seed" = "true" ]; then
   if ! run_with_timeout "Running Prisma seed" "$migration_timeout" \
-    "${compose_command[@]}" run --rm --no-deps landlord_housing_api npm run prisma:seed; then
+    "${compose_command[@]}" run --rm --no-deps -T landlord_housing_api npm run prisma:seed; then
     echo "Seed failed. API container was not recreated." >&2
     exit 1
   fi

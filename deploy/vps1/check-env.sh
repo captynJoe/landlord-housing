@@ -66,14 +66,46 @@ require_real_value() {
   esac
 }
 
+host_path_for_cert() {
+  local value="$1"
+  local local_cert_dir
+  local_cert_dir="$(read_env_value ESTATEDESK_LOCAL_CERT_DIR)"
+
+  case "$value" in
+    /etc/estatedesk-certs/*)
+      if [ -n "$local_cert_dir" ]; then
+        printf '%s/%s\n' "$local_cert_dir" "${value#/etc/estatedesk-certs/}"
+        return
+      fi
+      ;;
+  esac
+
+  printf '%s\n' "$value"
+}
+
 failed=0
 require_real_value ESTATEDESK_SERVER_NAME || failed=1
+require_real_value ESTATEDESK_CANONICAL_HOST || failed=1
 require_real_value ESTATEDESK_PUBLIC_DIR || failed=1
 require_real_value ESTATEDESK_API_UPSTREAM || failed=1
 
 public_dir="$(read_env_value ESTATEDESK_PUBLIC_DIR)"
 if [ -n "$public_dir" ] && [ ! -d "$public_dir" ]; then
   echo "Missing ESTATEDESK_PUBLIC_DIR directory: $public_dir" >&2
+  failed=1
+fi
+
+cert_file="$(read_env_value ESTATEDESK_SSL_CERTIFICATE)"
+cert_host_file="$(host_path_for_cert "$cert_file")"
+if [ -n "$cert_host_file" ] && [ ! -f "$cert_host_file" ]; then
+  echo "Missing ESTATEDESK_SSL_CERTIFICATE file: $cert_host_file" >&2
+  failed=1
+fi
+
+cert_key_file="$(read_env_value ESTATEDESK_SSL_CERTIFICATE_KEY)"
+cert_key_host_file="$(host_path_for_cert "$cert_key_file")"
+if [ -n "$cert_key_host_file" ] && [ ! -f "$cert_key_host_file" ]; then
+  echo "Missing ESTATEDESK_SSL_CERTIFICATE_KEY file: $cert_key_host_file" >&2
   failed=1
 fi
 

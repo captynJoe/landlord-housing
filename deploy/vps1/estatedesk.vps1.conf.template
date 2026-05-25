@@ -8,7 +8,7 @@ server {
     listen [::]:80;
 
     server_name ${ESTATEDESK_SERVER_NAME};
-    return 301 https://${ESTATEDESK_SERVER_NAME}$request_uri;
+    return 301 https://${ESTATEDESK_CANONICAL_HOST}$request_uri;
 }
 
 server {
@@ -24,6 +24,10 @@ server {
     ssl_certificate ${ESTATEDESK_SSL_CERTIFICATE};
     ssl_certificate_key ${ESTATEDESK_SSL_CERTIFICATE_KEY};
     include /etc/nginx/snippets/ssl-common.conf;
+
+    if ($host != ${ESTATEDESK_CANONICAL_HOST}) {
+        return 301 https://${ESTATEDESK_CANONICAL_HOST}$request_uri;
+    }
 
     if ($http_cf_ray = "") {
         return 403;
@@ -101,4 +105,3 @@ server {
         proxy_read_timeout 86400;
     }
 }
-

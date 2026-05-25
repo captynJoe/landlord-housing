@@ -9,6 +9,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 uploads/
+deploy/certs/
 
 # Prisma client output is generated locally by `npm run prisma:generate`.
 generated/prisma/
