@@ -3750,9 +3750,7 @@ async function loadResidentSession() {
     state.residentSession = payload.data;
     state.identityRequirement = payload.data?.identityRequirement ?? null;
     showSignedInState();
-    await loadResidentPushConfig();
-    await loadResidentSmsConfig();
-    await syncResidentPushState({ subscribeIfAllowed: true });
+    void refreshResidentBackgroundServices();
     return true;
   } catch (_error) {
     saveResidentToken("");
@@ -3763,13 +3761,12 @@ async function loadResidentSession() {
   }
 }
 
-async function refreshRentDueCard(fallbackMessage) {
+async function refreshResidentBackgroundServices() {
   try {
-    const payload = await requestJson("/api/user/rent-due", {}, { auth: true });
-    state.rentDue = payload.data ?? null;
-    renderRentDue(state.rentDue, payload.message ?? fallbackMessage);
+    await Promise.all([loadResidentPushConfig(), loadResidentSmsConfig()]);
+    await syncResidentPushState({ subscribeIfAllowed: true });
   } catch (_error) {
-    renderRentDue(state.rentDue, fallbackMessage);
+    // Push and SMS preferences should not block the resident dashboard paint.
   }
 }
 
@@ -3801,7 +3798,7 @@ async function loadTenantData() {
     renderReports(state.reports);
     renderNotifications(state.notifications);
     renderPaymentInstructions();
-    await refreshRentDueCard(messages.rentDue);
+    renderRentDue(state.rentDue, messages.rentDue);
     state.rentPayments = data.rentPayments ?? [];
     renderRentPayments(state.rentPayments, messages.rentPayments);
     state.utilityBills = data.utilityBills ?? [];
@@ -4881,29 +4878,27 @@ async function boot() {
   apiStatusEl.textContent = "Checking...";
   renderAuthBuildingLoading();
 
-  const [healthResult, buildingsResult] = await Promise.allSettled([
-    requestJson("/health", { cache: "no-store" }),
-    loadBuildingsWithRetry()
-  ]);
-
-  if (healthResult.status === "fulfilled") {
-    apiStatusEl.textContent = healthResult.value.status ?? "ok";
-  } else {
-    apiStatusEl.textContent = "degraded";
-  }
-
-  if (buildingsResult.status === "fulfilled") {
-    state.buildings = buildingsResult.value;
-    renderAuthBuildingOptions(state.buildings);
-  } else {
-    state.buildings = [];
-    renderAuthBuildingOptions([]);
-    const message =
-      buildingsResult.reason instanceof Error
-        ? buildingsResult.reason.message
-        : "Failed to load buildings.";
-    showFeedback(message);
-  }
+  const healthPromise = requestJson("/health", { cache: "no-store" })
+    .then((payload) => {
+      apiStatusEl.textContent = payload.status ?? "ok";
+    })
+    .catch(() => {
+      apiStatusEl.textContent = "degraded";
+    });
+  const buildingsPromise = loadBuildingsWithRetry()
+    .then((buildings) => {
+      state.buildings = buildings;
+      renderAuthBuildingOptions(state.buildings);
+      return true;
+    })
+    .catch((error) => {
+      state.buildings = [];
+      renderAuthBuildingOptions([]);
+      const message =
+        error instanceof Error ? error.message : "Failed to load buildings.";
+      showFeedback(message);
+      return false;
+    });
 
   try {
     const loaded = await loadResidentSession();
@@ -4917,6 +4912,7 @@ async function boot() {
         await loadTenantData();
       }
     } else {
+      await buildingsPromise;
       showSignedOutState();
       await syncAuthConflictState();
     }
@@ -4926,6 +4922,7 @@ async function boot() {
       error instanceof Error ? error.message : "Failed to initialize session.";
     showFeedback(message);
   } finally {
+    await healthPromise;
     document.body.classList.remove("app-loading");
     if (!Array.isArray(state.buildings) || state.buildings.length === 0) {
       residentLoginBtnEl.disabled = false;

@@ -1147,12 +1147,6 @@ async function cancelBillingHold(button) {
   }
 }
 
-async function ensureSession() {
-  const payload = await requestJson("/api/auth/landlord/session");
-  state.role = payload?.data?.role || "landlord";
-  setStatus(`Signed in as ${formatRoleLabel(state.role)}. Loading room account...`);
-}
-
 async function loadRoomAccount() {
   setLoading(true);
   showError("");
@@ -1310,7 +1304,7 @@ async function init() {
     const route = parseRoomRoute();
     state.buildingId = route.buildingId;
     state.houseNumber = route.houseNumber;
-    await ensureSession();
+    setStatus("Loading room account...");
     await loadRoomAccount();
   } catch (error) {
     if (error?.status === 401) {

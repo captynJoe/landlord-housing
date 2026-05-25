@@ -5724,7 +5724,8 @@ async function bootstrap() {
     role: string;
     userId?: string;
     userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
-  }) => {
+  }, options: { mode?: "quick" | "full" } = {}) => {
+    const quickStartup = options.mode === "quick";
     scheduleStartupRecurringUtilityBackfill("landlord.startup");
     const buildings = await listLandlordBuildingSummaries(context);
     const visibleBuildingIds = new Set(buildings.map((item) => item.id));
@@ -5753,14 +5754,18 @@ async function bootstrap() {
     })();
 
     const residentDirectoryPromise = listLandlordResidentDirectoryRows(buildings);
-    const visibleHouseNumbersPromise = listVisibleHouseNumbersForBuildings(buildings);
-    const ticketsPromise = Promise.resolve(
-      userSupportService
-        .listAllReports({
-          limit: 300
-        })
-        .filter((item) => !visibleBuildingIds.size || visibleBuildingIds.has(item.buildingId))
-    );
+    const visibleHouseNumbersPromise = quickStartup
+      ? Promise.resolve(new Set<string>())
+      : listVisibleHouseNumbersForBuildings(buildings);
+    const ticketsPromise = quickStartup
+      ? Promise.resolve([] as ReturnType<typeof userSupportService.listAllReports>)
+      : Promise.resolve(
+          userSupportService
+            .listAllReports({
+              limit: 300
+            })
+            .filter((item) => !visibleBuildingIds.size || visibleBuildingIds.has(item.buildingId))
+        );
 
     const [applications, rentStatus, residentDirectory, visibleHouseNumbers, tickets] =
       await Promise.all([
@@ -5805,7 +5810,14 @@ async function bootstrap() {
       : rentEnabledBuildings[0]?.id ?? "";
     const wifiPackageBuildingId = buildings.find((building) => building.wifiEnabled)?.id ?? "";
 
-    const wifiPackagesPromise = (async () => {
+    const wifiPackagesPromise = quickStartup
+      ? Promise.resolve({
+          wifiPackages: [] as unknown[],
+          wifiPackagesUnavailableReason: wifiPackageBuildingId
+            ? "Wi-Fi package controls are loading."
+            : "Wi-Fi is hidden because no building has it enabled."
+        })
+      : (async () => {
       if (!wifiPackageBuildingId) {
         return {
           wifiPackages: [] as unknown[],
@@ -5828,17 +5840,33 @@ async function bootstrap() {
       };
     })();
     const utilityBuildingConfigurationPromise =
-      registryBuildingId && buildingConfigurationService
+      !quickStartup && registryBuildingId && buildingConfigurationService
         ? buildingConfigurationService.getForBuilding(registryBuildingId)
         : Promise.resolve(null);
-    const moveOutSettlementsPromise = registryBuildingId
+    const moveOutSettlementsPromise = !quickStartup && registryBuildingId
       ? listLandlordMoveOutSettlements({
           context,
           buildingId: registryBuildingId,
           limit: 500
         })
       : Promise.resolve([]);
-    const caretakerAccessPromise = (async () => {
+    const caretakerAccessPromise = quickStartup
+      ? Promise.resolve({
+          caretakerRequests: [] as Array<ReturnType<typeof mapCaretakerAccessRequestWithUser>>,
+          caretakers: [] as Array<
+            CaretakerAccessRecord & {
+              user: {
+                id: string;
+                fullName: string;
+                email: string | null;
+                phone: string;
+                role: string;
+                status: string;
+              } | null;
+            }
+          >
+        })
+      : (async () => {
       if (!registryBuildingId) {
         return {
           caretakerRequests: [] as Array<
@@ -5904,7 +5932,7 @@ async function bootstrap() {
       };
     })();
     const ownerStaffPromise =
-      context.role === "caretaker" || !userAccountService
+      quickStartup || context.role === "caretaker" || !userAccountService
         ? Promise.resolve({
             users: [],
             limit: OWNER_STAFF_LIMIT,
@@ -5912,24 +5940,24 @@ async function bootstrap() {
           })
         : userAccountService.listOwnerStaffUsers();
 
-    const registryRows = registryBuildingId
+    const registryRows = !quickStartup && registryBuildingId
       ? residentDirectory
           .filter((item) => item.buildingId === registryBuildingId)
           .map(({ buildingId: _buildingId, buildingName: _buildingName, ...row }) => row)
       : [];
-    const utilityRateDefaults = registryBuildingId
+    const utilityRateDefaults = !quickStartup && registryBuildingId
       ? getUtilityRateDefaultsForBuilding(registryBuildingId) ?? { buildingId: registryBuildingId }
       : null;
     if (utilityRateDefaults && !utilityRateDefaults.buildingId) {
       utilityRateDefaults.buildingId = registryBuildingId;
     }
 
-    const meters = registryBuildingId
+    const meters = !quickStartup && registryBuildingId
       ? utilityBillingService
           .listMeters({ buildingId: registryBuildingId })
           .filter((item) => visibleHouseNumbers.has(normalizeHouseNumber(item.houseNumber)))
       : [];
-    const bills = registryBuildingId
+    const bills = !quickStartup && registryBuildingId
       ? utilityBillingService
           .listBills({
             buildingId: registryBuildingId,
@@ -5937,7 +5965,7 @@ async function bootstrap() {
           })
           .filter((item) => visibleHouseNumbers.has(normalizeHouseNumber(item.houseNumber)))
       : [];
-    const payments = registryBuildingId
+    const payments = !quickStartup && registryBuildingId
       ? utilityBillingService
           .listPayments({
             buildingId: registryBuildingId,
@@ -5945,7 +5973,7 @@ async function bootstrap() {
           })
           .filter((item) => visibleHouseNumbers.has(normalizeHouseNumber(item.houseNumber)))
       : [];
-    const expenditures = registryBuildingId
+    const expenditures = !quickStartup && registryBuildingId
       ? [...buildingExpenditures.values()]
           .filter((item) => item.buildingId === normalizeBuildingId(registryBuildingId))
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -8634,8 +8662,9 @@ async function bootstrap() {
         return;
       }
 
-      const data = await buildLandlordStartupPayload(context);
-      return res.json({ data, role: context.role });
+      const mode = req.query.mode === "quick" ? "quick" : "full";
+      const data = await buildLandlordStartupPayload(context, { mode });
+      return res.json({ data, role: context.role, mode });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load landlord data.";
       if (message === "Landlord authentication required") {

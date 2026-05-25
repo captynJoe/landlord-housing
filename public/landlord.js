@@ -466,6 +466,7 @@ const buildingLabelCollator = new Intl.Collator(undefined, {
   sensitivity: "base"
 });
 let landlordSwRegistrationPromise = null;
+let landlordDeferredHydrationPromise = null;
 
 initResponsiveTables();
 
@@ -5501,22 +5502,27 @@ function isMissingRouteError(error) {
   );
 }
 
+function applyLandlordRole(roleValue) {
+  const role = String(roleValue || "").trim() || "tenant";
+  if (
+    role !== "landlord" &&
+    role !== "admin" &&
+    role !== "root_admin" &&
+    role !== "caretaker"
+  ) {
+    throw new Error("This account does not have landlord access.");
+  }
+
+  state.role = role;
+  landlordRoleEl.textContent = `role: ${formatRoleLabel(role)}`;
+  applyRoleCapabilities();
+  return role;
+}
+
 async function ensureSession() {
   try {
     const payload = await requestJson("/api/auth/landlord/session", { cache: "no-store" });
-    const role = payload.data?.role ?? "tenant";
-    if (
-      role !== "landlord" &&
-      role !== "admin" &&
-      role !== "root_admin" &&
-      role !== "caretaker"
-    ) {
-      throw new Error("This account does not have landlord access.");
-    }
-
-    state.role = role;
-    landlordRoleEl.textContent = `role: ${formatRoleLabel(role)}`;
-    applyRoleCapabilities();
+    const role = applyLandlordRole(payload.data?.role);
     setStatus(`Signed in as ${formatRoleLabel(role)}.`);
     return true;
   } catch (error) {
@@ -9926,15 +9932,68 @@ async function loadDataLegacy() {
   }
 }
 
-async function loadData() {
+async function hydrateDeferredLandlordData() {
+  if (landlordDeferredHydrationPromise) {
+    return landlordDeferredHydrationPromise;
+  }
+
+  const loaders = [
+    loadPaymentAccess,
+    loadPaymentProfiles,
+    loadPaymentInstructions,
+    loadLandlordWifiPackages,
+    loadOwnerStaff,
+    loadCaretakerAccessRequests,
+    loadCaretakers,
+    loadLandlordTickets,
+    loadRegistryRows,
+    loadMeters,
+    loadBills,
+    loadPayments,
+    loadExpenditures,
+    loadMoveOutSettlements
+  ];
+
+  landlordDeferredHydrationPromise = Promise.allSettled(loaders.map((loader) => loader()))
+    .then((results) => {
+      const unauthorized = results.find(
+        (result) => result.status === "rejected" && result.reason?.status === 401
+      );
+      if (unauthorized?.status === "rejected") {
+        handleLandlordError(unauthorized.reason, "Manager session is not available.");
+        return;
+      }
+
+      const failures = results.filter((result) => result.status === "rejected");
+      if (failures.length > 0) {
+        console.error("Deferred landlord data failed to load.", failures);
+      }
+    })
+    .finally(() => {
+      landlordDeferredHydrationPromise = null;
+    });
+
+  return landlordDeferredHydrationPromise;
+}
+
+async function loadData(options = {}) {
   clearError();
+  const quick = options.quick !== false;
 
   try {
-    const payload = await requestJson("/api/landlord/startup");
+    const payload = await requestJson(`/api/landlord/startup${quick ? "?mode=quick" : ""}`);
+    const role = applyLandlordRole(payload.role ?? payload.data?.role ?? state.role);
     applyLandlordStartupData(payload.data ?? {});
-    setStatus(`Signed in as ${formatRoleLabel(state.role)}. Data refreshed.`);
+    setStatus(`Signed in as ${formatRoleLabel(role)}. Data refreshed.`);
+    if (payload.mode === "quick") {
+      void hydrateDeferredLandlordData();
+    }
   } catch (error) {
     if (isMissingRouteError(error)) {
+      const ok = await ensureSession();
+      if (!ok) {
+        return;
+      }
       await loadDataLegacy();
       return;
     }
@@ -12944,11 +13003,6 @@ landlordLogoutBtnEl.addEventListener("click", () => {
 });
 
 void (async () => {
-  const ok = await ensureSession();
-  if (!ok) {
-    return;
-  }
-
   const now = new Date();
   utilityBillMonthEl.value = toMonthInputValue(now);
   if (registryReadingMonthEl instanceof HTMLInputElement) {
