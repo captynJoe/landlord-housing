@@ -32,8 +32,6 @@
         <form id="landlord-login-form" class="package-card">
           <p class="status-text">
             Manager login: use email, phone, or recovery username + password.
-            House manager login: enable house manager mode and use phone + house number.
-            First-time house managers leave password empty, set a new password once, then future sign-ins use that password.
           </p>
           <label>
             Email, Phone, or Username
@@ -45,38 +43,14 @@
               required
             />
           </label>
-          <label style="display: flex; align-items: center; gap: 8px;">
-            <input id="landlord-caretaker-mode" type="checkbox" />
-            Use house manager sign-in (phone + house number)
-          </label>
-          <label>
-            House Number (House manager only)
-            <input
-              id="landlord-house-number"
-              type="text"
-              maxlength="24"
-              autocomplete="off"
-              placeholder="A-12 (house manager only)"
-            />
-          </label>
           <label>
             Password
             <input
               id="landlord-password"
               type="password"
               autocomplete="current-password"
-              placeholder="Your password (leave empty for first-time house manager setup)"
-            />
-          </label>
-          <label>
-            New Password (House manager first-time setup)
-            <input
-              id="landlord-caretaker-new-password"
-              type="password"
-              minlength="8"
-              maxlength="128"
-              autocomplete="new-password"
-              placeholder="Minimum 8 characters"
+              placeholder="Your password"
+              required
             />
           </label>
 
@@ -159,6 +133,6 @@
       </section>
     </main>
 
-    <script type="module" src="/landlord-login.js?v=20260525b"></script>
+    <script type="module" src="/landlord-login.js?v=20260528c"></script>
   </body>
 </html>

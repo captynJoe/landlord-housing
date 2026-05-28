@@ -2,12 +2,7 @@ import { initPasswordVisibilityToggles } from "./password-visibility.js";
 
 const loginFormEl = document.getElementById("landlord-login-form");
 const identifierEl = document.getElementById("landlord-email");
-const caretakerModeEl = document.getElementById("landlord-caretaker-mode");
-const houseNumberEl = document.getElementById("landlord-house-number");
 const passwordEl = document.getElementById("landlord-password");
-const caretakerNewPasswordEl = document.getElementById(
-  "landlord-caretaker-new-password"
-);
 const loginBtnEl = document.getElementById("landlord-login-btn");
 const loginStatusEl = document.getElementById("login-status");
 const loginErrorEl = document.getElementById("login-error");
@@ -33,7 +28,7 @@ const landlordForgotIdentifierEl = document.getElementById(
 const landlordForgotBtnEl = document.getElementById("landlord-forgot-btn");
 
 function setStatus(message) {
-  loginStatusEl.textContent = formatHouseManagerText(message);
+  loginStatusEl.textContent = String(message ?? "");
 }
 
 function focusInlineFeedback(element) {
@@ -46,7 +41,7 @@ function focusInlineFeedback(element) {
 }
 
 function showPanelError(element, message, { reveal = false } = {}) {
-  element.textContent = formatHouseManagerText(message);
+  element.textContent = String(message ?? "");
   element.classList.remove("hidden");
   if (reveal) {
     focusInlineFeedback(element);
@@ -64,38 +59,30 @@ function clearAllErrors() {
   clearPanelError(landlordPasswordChangeErrorEl);
 }
 
-function normalizeLandlordSignInError(error, { caretakerMode = false } = {}) {
+function normalizeLandlordSignInError(error) {
   if (!(error instanceof Error)) {
-    return caretakerMode
-      ? "House manager sign-in failed. Check your phone number, house number, and password."
-      : "Manager sign-in failed. Check your email, phone number, or username and password.";
+    return "Check your email, phone, or username and password.";
   }
 
   const message = error.message || "";
 
+  if (/invalid email/i.test(message)) {
+    return "Manager sign-in accepts email, phone, or username. Check the identifier and password.";
+  }
+
   if (/incorrect password/i.test(message)) {
-    return caretakerMode
-      ? "Incorrect password for this house manager account. Try again or request help."
-      : "Incorrect password for this landlord account. Try again or request reset.";
+    return "Incorrect password for this manager account. Try again or request reset.";
+  }
+
+  if (/no account found/i.test(message)) {
+    return "No manager account found for that email, phone, or username.";
   }
 
   if (error.status === 401) {
-    return caretakerMode
-      ? "House manager sign-in failed. Check your phone number, house number, and password."
-      : "Manager sign-in failed. Check your email, phone number, or username and password.";
+    return "Check your email, phone, username, or password.";
   }
 
   return message;
-}
-
-function formatHouseManagerText(message) {
-  return String(message ?? "")
-    .replace(/\bcaretakers\b/gi, (match) =>
-      match[0] === "C" ? "House managers" : "house managers"
-    )
-    .replace(/\bcaretaker\b/gi, (match) =>
-      match[0] === "C" ? "House manager" : "house manager"
-    );
 }
 
 function formatDateTime(value) {
@@ -127,23 +114,6 @@ function looksLikeEmail(value) {
 
 function looksLikeKenyaPhone(value) {
   return /^(\+254|254|0)\d{9}$/.test(String(value ?? "").trim().replace(/[\s-]/g, ""));
-}
-
-function normalizeHouseNumber(value) {
-  return String(value ?? "").trim().toUpperCase();
-}
-
-function setCaretakerMode(enabled) {
-  const controls = [houseNumberEl, caretakerNewPasswordEl];
-
-  controls.forEach((control) => {
-    if (control instanceof HTMLInputElement) {
-      control.disabled = !enabled;
-      if (!enabled) {
-        control.value = "";
-      }
-    }
-  });
 }
 
 async function requestJson(url, options = {}) {
@@ -240,27 +210,10 @@ async function signIn(event) {
   clearAllErrors();
 
   const identifier = identifierEl.value.trim();
-  const houseNumber = normalizeHouseNumber(houseNumberEl?.value);
   const password = passwordEl.value.trim();
-  const newPassword = String(caretakerNewPasswordEl?.value || "").trim();
-  const caretakerPhoneLogin = Boolean(caretakerModeEl?.checked);
 
   if (!identifier) {
     showPanelError(loginErrorEl, "Provide email, phone number, or username.", {
-      reveal: true
-    });
-    return;
-  }
-
-  if (caretakerPhoneLogin && !looksLikeKenyaPhone(identifier)) {
-    showPanelError(loginErrorEl, "House manager sign-in requires a phone number.", {
-      reveal: true
-    });
-    return;
-  }
-
-  if (caretakerPhoneLogin && !houseNumber) {
-    showPanelError(loginErrorEl, "House manager sign-in requires house number.", {
       reveal: true
     });
     return;
@@ -270,120 +223,57 @@ async function signIn(event) {
   setStatus("Signing in...");
 
   try {
-    if (caretakerPhoneLogin) {
-      if (!password) {
-        if (!newPassword) {
-          const probe = await requestJson("/api/auth/caretaker/resolve", {
-            method: "POST",
-            headers: {
-              "content-type": "application/json"
-            },
-            body: JSON.stringify({
-              phoneNumber: identifier,
-              houseNumber
-            })
-          });
-
-          if (probe.data?.requiresPasswordSetup) {
-            setStatus(
-              `House manager verified for ${probe.data?.buildingName ?? probe.data?.buildingId}. Enter a new password below to finish first-time setup.`
-            );
-            return;
-          }
-
-          showPanelError(
-            loginErrorEl,
-            "House manager password already set. Enter password to sign in.",
-            { reveal: true }
-          );
-          return;
-        }
-
-        if (newPassword.length < 8) {
-          showPanelError(loginErrorEl, "New password must be at least 8 characters.", {
-            reveal: true
-          });
-          return;
-        }
-
-        const setupPayload = await requestJson("/api/auth/caretaker/setup-password", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({
-            phoneNumber: identifier,
-            houseNumber,
-            newPassword
-          })
-        });
-
-        const setupRole = setupPayload.data?.role ?? "caretaker";
-        const handledSetup = await handleSignedInRole(
-          setupRole,
-          setupPayload.data ?? {}
-        );
-        if (!handledSetup) {
-          throw new Error("House manager setup completed, but portal access was denied.");
-        }
-        return;
-      }
-
-      const caretakerPayload = await requestJson("/api/auth/caretaker/login-phone", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          phoneNumber: identifier,
-          houseNumber,
-          password
-        })
-      });
-
-      const caretakerRole = caretakerPayload.data?.role ?? "caretaker";
-      const handledCaretaker = await handleSignedInRole(
-        caretakerRole,
-        caretakerPayload.data ?? {}
-      );
-      if (!handledCaretaker) {
-        throw new Error("This house manager account is not eligible for landlord portal.");
-      }
-      return;
-    }
-
     if (!password) {
       showPanelError(loginErrorEl, "Provide password.", { reveal: true });
       return;
     }
 
     const managerUsernameLogin = !looksLikeKenyaPhone(identifier) && !looksLikeEmail(identifier);
-    const payload = await requestJson(
-      managerUsernameLogin ? "/api/auth/landlord/login" : "/api/auth/login",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify(
-          managerUsernameLogin
-            ? { username: identifier, password }
-            : identifierLoginPayload(identifier, password)
-        )
-      }
-    );
+    const attempts = managerUsernameLogin
+      ? [
+          {
+            url: "/api/auth/landlord/login",
+            body: { username: identifier, password }
+          }
+        ]
+      : [
+          {
+            url: "/api/auth/login",
+            body: identifierLoginPayload(identifier, password)
+          },
+          {
+            url: "/api/auth/landlord/login",
+            body: { username: identifier, password }
+          }
+        ];
+    let lastError = null;
 
-    const role = payload.data?.role;
-    const handled = await handleSignedInRole(role, payload.data ?? {});
-    if (!handled) {
-      throw new Error("This account is not eligible for landlord portal access.");
+    for (const attempt of attempts) {
+      try {
+        const payload = await requestJson(attempt.url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify(attempt.body)
+        });
+
+        const role = payload.data?.role;
+        const handled = await handleSignedInRole(role, payload.data ?? {});
+        if (!handled) {
+          throw new Error("This account is not eligible for landlord portal access.");
+        }
+        return;
+      } catch (error) {
+        lastError = error;
+      }
     }
+
+    throw lastError ?? new Error("Check your email, phone, or username and password.");
   } catch (error) {
-    const message = normalizeLandlordSignInError(error, {
-      caretakerMode: caretakerPhoneLogin
-    });
+    const message = normalizeLandlordSignInError(error);
     showPanelError(loginErrorEl, message, { reveal: true });
-    setStatus(caretakerPhoneLogin ? "House manager sign-in failed." : "Manager sign-in failed.");
+    setStatus("Check the message above and try again.");
   } finally {
     loginBtnEl.disabled = false;
   }
@@ -492,10 +382,6 @@ loginFormEl.addEventListener("submit", (event) => {
   void signIn(event);
 });
 
-caretakerModeEl?.addEventListener("change", () => {
-  setCaretakerMode(Boolean(caretakerModeEl.checked));
-});
-
 landlordForgotFormEl.addEventListener("submit", (event) => {
   void requestPasswordReset(event);
 });
@@ -505,5 +391,4 @@ landlordPasswordChangeFormEl?.addEventListener("submit", (event) => {
 });
 
 initPasswordVisibilityToggles();
-setCaretakerMode(Boolean(caretakerModeEl?.checked));
 void checkSession();

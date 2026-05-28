@@ -247,6 +247,7 @@ const PAYMENT_SYNC_INTERVAL_MS = 2500;
 const PAYMENT_SYNC_MAX_ATTEMPTS = 6;
 const BUILDINGS_FETCH_MAX_ATTEMPTS = 3;
 const BUILDINGS_FETCH_RETRY_DELAYS_MS = [250, 750];
+const RESIDENT_ONLINE_RENT_PAYMENT_ENABLED = false;
 
 const REQUIRED_DOM_BINDINGS = Object.freeze([
   ["api-status", apiStatusEl],
@@ -465,7 +466,7 @@ function renderResidentIdentityNotice() {
   residentIdNoticeEl.replaceChildren(
     lead,
     document.createTextNode(
-      `Add your ID type, ID number, and ID photo. ${remainingCopy} ${formatIdentityDeadline(
+      `Add your ID type and ID number. ${remainingCopy} ${formatIdentityDeadline(
         requirement
       )} `
     ),
@@ -1108,7 +1109,9 @@ function syncPaymentShortcutButtons() {
     if (shortcut === "rent-full") {
       button.disabled = !billingEnabled || rentOutstanding <= 0;
       button.textContent =
-        rentOutstanding > 0 ? `Use rent ${formatCurrency(rentOutstanding)}` : "Rent cleared";
+        rentOutstanding > 0
+          ? `View rent ${formatCurrency(rentOutstanding)}`
+          : "Rent cleared";
       return;
     }
 
@@ -1149,7 +1152,7 @@ function updatePaymentsSummaryCard() {
 
   if (totalOutstanding <= 0) {
     paymentsSummaryActionEl.textContent =
-      "All balances are clear right now. If a new bill is posted, you can still pay it in small steps.";
+      "All balances are clear right now. If a new bill is posted, use the payment details on this page.";
     syncPaymentShortcutButtons();
     return;
   }
@@ -1157,15 +1160,15 @@ function updatePaymentsSummaryCard() {
   const suggestedStarter = computeSuggestedStarterAmount(totalOutstanding);
   if (suggestedStarter >= totalOutstanding) {
     paymentsSummaryActionEl.textContent =
-      "Your current balance is manageable. You can clear it now or still enter a smaller custom amount.";
+      "Your current balance is manageable. Use the instructions below and management will confirm the receipt.";
     return;
   }
 
   paymentsSummaryActionEl.textContent = `You do not need to pay ${formatCurrency(
     totalOutstanding
-  )} at once. A good start today is ${formatCurrency(
+  )} at once. A good start is ${formatCurrency(
     suggestedStarter
-  )}, and the remainder stays on your account.`;
+  )}; pay using the instructions below and the remainder stays on your account.`;
   syncPaymentShortcutButtons();
 }
 
@@ -1342,6 +1345,15 @@ function applyResidentPaymentShortcut(shortcut) {
       return;
     }
 
+    if (!RESIDENT_ONLINE_RENT_PAYMENT_ENABLED) {
+      showFeedback(
+        `Rent balance is ${formatCurrency(rentOutstanding)}. Use the payment instructions and include your house reference.`,
+        "info"
+      );
+      focusResidentPaymentSection(paymentInstructionsCardEl, null);
+      return;
+    }
+
     rentPaymentAmountEl.value = formatAmountValue(rentOutstanding);
     updateRentPaymentGuidance();
     focusResidentPaymentSection(rentPaymentSectionEl, rentPaymentAmountEl);
@@ -1369,6 +1381,17 @@ function applyResidentPaymentShortcut(shortcut) {
   }
 
   if (rentOutstanding > 0) {
+    if (!RESIDENT_ONLINE_RENT_PAYMENT_ENABLED) {
+      showFeedback(
+        `Suggested rent starter: ${formatCurrency(
+          computeSuggestedStarterAmount(rentOutstanding)
+        )}. Use the payment instructions and include your house reference.`,
+        "info"
+      );
+      focusResidentPaymentSection(paymentInstructionsCardEl, null);
+      return;
+    }
+
     rentPaymentAmountEl.value = formatAmountValue(computeSuggestedStarterAmount(rentOutstanding));
     updateRentPaymentGuidance();
     focusResidentPaymentSection(rentPaymentSectionEl, rentPaymentAmountEl);
@@ -1427,6 +1450,9 @@ function renderPaymentInstructions() {
   paymentInstructionsMethodEl.textContent = instructions.methodLabel || method.toUpperCase();
 
   let hasDetail = false;
+  hasDetail =
+    appendPaymentInstructionDetail("House Number", state.residentSession?.houseNumber) ||
+    hasDetail;
   if (method === "bank") {
     hasDetail =
       appendPaymentInstructionDetail("Bank Name", effective.bankName || instructions.bankName) ||
@@ -2088,12 +2114,17 @@ function applyPaymentAccessUi() {
   }
 
   const rentEnabled = isRentPaymentEnabled();
+  const onlineRentPaymentEnabled = RESIDENT_ONLINE_RENT_PAYMENT_ENABLED;
   if (rentPaymentClusterEl instanceof HTMLElement) {
     rentPaymentClusterEl.classList.toggle("hidden", !rentEnabled);
   }
   setSectionInteractive(rentPaymentSectionEl, rentEnabled);
+  if (rentPaymentFormEl instanceof HTMLElement) {
+    rentPaymentFormEl.classList.toggle("hidden", !onlineRentPaymentEnabled);
+    setSectionInteractive(rentPaymentFormEl, false);
+  }
   rentPaymentStateEl.textContent = rentEnabled
-    ? "Rent payment is active for your building."
+    ? "Use the payment instructions above. Management will record or confirm your rent payment after it is received."
     : state.paymentAccess?.rentConfigured === false
       ? "Rent payment will appear once rent is configured for your room."
       : "Rent payment is currently disabled by your landlord.";
@@ -3142,6 +3173,33 @@ function renderNotifications(notifications) {
   });
 }
 
+function formatRentSetupSourceLabel(source) {
+  const normalized = String(source ?? "").trim();
+  if (normalized === "room_default") {
+    return "Room Default";
+  }
+  if (normalized === "building_default") {
+    return "Building Default";
+  }
+  if (normalized === "agreement_legacy") {
+    return "Tenant Record";
+  }
+  if (normalized === "room_disabled") {
+    return "No Charge";
+  }
+  if (normalized === "ledger") {
+    return "Rent Ledger";
+  }
+  return "Not Set";
+}
+
+function formatRentDueDay(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 1
+    ? `Day ${Math.round(numeric)}`
+    : "-";
+}
+
 function renderRentDue(rentDue, fallbackMessage) {
   state.rentDue = rentDue ?? null;
   rentDueEl.replaceChildren();
@@ -3170,6 +3228,8 @@ function renderRentDue(rentDue, fallbackMessage) {
 
   const keyvals = document.createElement("dl");
   keyvals.className = "rent-keyvals";
+  const rentSetup = rentDue.rentSetup ?? {};
+  const paymentDueDay = rentDue.paymentDueDay ?? rentSetup.paymentDueDay;
   keyvals.innerHTML = `
     <div>
       <dt>Monthly Rent</dt>
@@ -3196,12 +3256,20 @@ function renderRentDue(rentDue, fallbackMessage) {
       <dd>${formatDateTime(rentDue.dueDate)}</dd>
     </div>
     <div>
+      <dt>Due Day</dt>
+      <dd>${escapeHtml(formatRentDueDay(paymentDueDay))}</dd>
+    </div>
+    <div>
       <dt>Overdue Starts</dt>
       <dd>${formatDateTime(rentDue.overdueStartsAt ?? rentDue.dueDate)}</dd>
     </div>
     <div>
       <dt>Grace Days</dt>
       <dd>${Number(rentDue.graceDays ?? 0)}</dd>
+    </div>
+    <div>
+      <dt>Rent Setup</dt>
+      <dd>${escapeHtml(formatRentSetupSourceLabel(rentDue.rentSetupSource ?? rentSetup.source))}</dd>
     </div>
     <div>
       <dt>Days To Due</dt>
@@ -4014,6 +4082,7 @@ async function signupResident() {
       rememberDevice: getRememberDeviceSelection()
     });
     authPasswordEl.value = "";
+    signupIdentityTypeEl.value = "";
     signupIdentityNumberEl.value = "";
     signupOccupationStatusEl.value = "";
     signupOccupationLabelEl.value = "";
@@ -4257,6 +4326,12 @@ function syncUtilityPaymentProviderUi() {
 }
 
 function syncRentPaymentButtonUi() {
+  if (!RESIDENT_ONLINE_RENT_PAYMENT_ENABLED) {
+    rentPaymentBtnEl.textContent = "Online Rent Payment Disabled";
+    rentPaymentBtnEl.disabled = true;
+    return;
+  }
+
   rentPaymentBtnEl.textContent = state.rentCheckoutRequestId
     ? "Resume M-PESA Check"
     : "Pay with M-PESA";
@@ -4755,6 +4830,15 @@ async function pollRentMpesaPayment(checkoutRequestId, { manual = false } = {}) 
 async function submitRentPayment(event) {
   event.preventDefault();
   clearFeedback();
+
+  if (!RESIDENT_ONLINE_RENT_PAYMENT_ENABLED) {
+    showFeedback(
+      "Online rent payment is not enabled yet. Use the payment instructions and wait for management to confirm your rent receipt.",
+      "info"
+    );
+    focusResidentPaymentSection(paymentInstructionsCardEl, null);
+    return;
+  }
 
   if (!isRentPaymentEnabled()) {
     showFeedback("Rent payments are disabled by your landlord for this building.");

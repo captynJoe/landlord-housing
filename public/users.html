@@ -210,9 +210,8 @@
             </label>
           </div>
           <p class="item-guidance">
-            ID type, ID number, and an ID photo are required for the tenant
-            record. If you skip them now, the dashboard will remind you after
-            access is requested.
+            ID type and ID number complete the resident ID requirement. Management
+            may still attach an ID photo from the room account when they need one.
           </p>
 
           <div class="action-row auth-request-actions">
@@ -440,9 +439,9 @@
               <section class="payment-summary-card">
                 <div class="payment-summary-copy">
                   <p class="subheading">Payment plan</p>
-                  <h3>Pay any amount today</h3>
+                  <h3>Use your payment instructions</h3>
                   <p id="payments-summary-action" class="item-details">
-                    Even a small payment is recorded instantly and reduces what you owe.
+                    Send payment using the details below. Management will record and confirm it on your ledger.
                   </p>
                 </div>
                 <dl class="payment-summary-grid">
@@ -475,8 +474,7 @@
                   </button>
                 </div>
                 <p class="quick-pay-note payment-summary-note">
-                  Pick a shortcut and the form below fills in for you. Rent and utilities still
-                  pay separately.
+                  Rent and utilities still pay separately. Use the room/account reference shown below.
                 </p>
               </section>
               <section id="payment-instructions-card" class="payment-instructions-card">
@@ -606,15 +604,18 @@
                   <section class="payment-cluster payment-cluster-rent">
                     <section id="rent-due" class="rent-wrap"></section>
 
-                    <section id="rent-payment-section" class="payment-section mpesa-section">
-                      <p class="subheading">Pay rent (M-PESA)</p>
+                    <section id="rent-payment-section" class="payment-section manual-payment-section">
+                      <p class="subheading">Rent payment instructions</p>
                       <p id="rent-payment-state" class="item-details payment-state">
-                        Active for your building.
+                        Payment instructions will load with your room details.
                       </p>
-                      <form id="rent-payment-form" class="report-form">
+                      <p class="item-details payment-inline-note">
+                        Use the building payment details above and include your house number or account reference.
+                        Rent receipts are confirmed by management after payment is received.
+                      </p>
+                      <form id="rent-payment-form" class="report-form hidden" aria-hidden="true">
                         <p class="item-details payment-encouragement">
-                          Pay any amount today. You do not need to clear the full rent balance at
-                          once.
+                          Online rent payment is disabled until automated payment confirmation is enabled.
                         </p>
                         <div class="field-grid payment-channel-grid">
                           <label class="hidden">
@@ -630,7 +631,7 @@
                             </select>
                           </label>
                           <label class="payment-phone-field">
-                            M-PESA Number (optional)
+                            Payment Phone
                             <input
                               id="rent-payment-phone"
                               type="tel"
@@ -640,8 +641,7 @@
                           </label>
                         </div>
                         <p class="item-details payment-inline-note">
-                          Your rent payment reduces the open balance immediately and the receipt
-                          month stays in sync automatically.
+                          This hidden form is retained for future automated payment support.
                         </p>
                         <label>
                           Amount (KSh)
@@ -666,7 +666,7 @@
                         </p>
 
                         <div class="action-row">
-                          <button id="rent-payment-btn" type="submit">Pay with M-PESA</button>
+                          <button id="rent-payment-btn" type="submit">Online Rent Payment Disabled</button>
                         </div>
                       </form>
                     </section>

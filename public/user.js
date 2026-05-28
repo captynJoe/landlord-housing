@@ -213,7 +213,7 @@ function renderIdentityNotice(profile = state.profile) {
   const remainingCopy = overdue
     ? "Your 48-hour grace period has ended."
     : `${hoursRemaining} hour${hoursRemaining === 1 ? "" : "s"} remaining.`;
-  profileIdNoticeEl.textContent = `${overdue ? "ID required now." : "ID required."} Add your ID type, ID number, and an ID photo. ${remainingCopy} ${formatIdentityDeadline(
+  profileIdNoticeEl.textContent = `${overdue ? "ID required now." : "ID required."} Add your ID type and ID number. You may attach an ID photo if management asks for one. ${remainingCopy} ${formatIdentityDeadline(
     requirement
   )}`;
   profileIdNoticeEl.className = `feedback ${overdue ? "error" : "info"}`;
@@ -417,7 +417,6 @@ async function handleSave(event) {
     ) {
       throw new Error("Add both the ID type and ID number before saving ID photos.");
     }
-
     const uploadedDocumentUrls = await uploadImageFiles(selectedFiles, {
       createUploadRequest: createResidentIdentityUploadRequest
     });

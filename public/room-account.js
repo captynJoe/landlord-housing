@@ -4,6 +4,12 @@ import {
   getLandlordShellBrand
 } from "./portal-branding.js?v=20260521b";
 import { notifyError, notifyStatus } from "./notifications.js";
+import {
+  createUploadedImageGallery,
+  renderSelectedImagePreviews,
+  uploadImageFiles,
+  validateImageFiles
+} from "./media-upload.js";
 
 const roomAccountTagEl = document.getElementById("room-account-tag");
 const roomAccountTitleEl = document.getElementById("room-account-title");
@@ -46,12 +52,22 @@ const roomBillingHoldEndEl = document.getElementById("room-billing-hold-end");
 const roomBillingHoldReasonEl = document.getElementById("room-billing-hold-reason");
 const roomBillingHoldSubmitEl = document.getElementById("room-billing-hold-submit");
 const roomBillingHoldsEl = document.getElementById("room-billing-holds");
+const roomManagementStatusEl = document.getElementById("room-management-status");
+const roomAgreementFormEl = document.getElementById("room-agreement-form");
+const roomAgreementStateEl = document.getElementById("room-agreement-state");
+const roomAgreementSubmitEl = document.getElementById("room-agreement-submit");
+const roomRentSetupFormEl = document.getElementById("room-rent-setup-form");
+const roomRentSetupStateEl = document.getElementById("room-rent-setup-state");
+const roomRentSetupSubmitEl = document.getElementById("room-rent-setup-submit");
+const roomIdentityDocumentEl = document.getElementById("room-identity-document");
+const roomIdentityDocumentPreviewEl = document.getElementById("room-identity-document-preview");
 
 const state = {
   buildingId: "",
   houseNumber: "",
   role: "-",
   loading: false,
+  formSaving: false,
   data: null
 };
 
@@ -138,6 +154,99 @@ function formatDateOnly(value) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium"
   }).format(date);
+}
+
+function toDateInputValue(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    date.getUTCDate()
+  ).padStart(2, "0")}`;
+}
+
+function dateInputToIso(value) {
+  const normalized = toDateInputValue(value);
+  return normalized ? `${normalized}T00:00:00.000Z` : "";
+}
+
+function numberToInputString(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? String(Math.max(0, Math.round(number))) : "";
+}
+
+function toOptionalNumber(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : undefined;
+}
+
+function setManagementStatus(message) {
+  if (roomManagementStatusEl instanceof HTMLElement) {
+    roomManagementStatusEl.textContent = message;
+  }
+}
+
+function setPillText(element, message) {
+  if (element instanceof HTMLElement) {
+    element.textContent = message;
+  }
+}
+
+function setFormControlsEnabled(form, enabled) {
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+
+  form
+    .querySelectorAll("input, select, textarea, button")
+    .forEach((element) => {
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement ||
+        element instanceof HTMLButtonElement
+      ) {
+        element.disabled = !enabled;
+      }
+    });
+}
+
+function setFormFieldValue(form, name, value) {
+  const field = form?.elements?.namedItem(name);
+  if (
+    field instanceof HTMLInputElement ||
+    field instanceof HTMLSelectElement ||
+    field instanceof HTMLTextAreaElement
+  ) {
+    field.value = String(value ?? "");
+  }
+}
+
+function getFormFieldValue(form, name) {
+  const field = form?.elements?.namedItem(name);
+  if (
+    field instanceof HTMLInputElement ||
+    field instanceof HTMLSelectElement ||
+    field instanceof HTMLTextAreaElement
+  ) {
+    return String(field.value ?? "").trim();
+  }
+  return "";
 }
 
 function toBillingMonth(value) {
@@ -397,13 +506,13 @@ function describeChargeSource(source, utilityBillingMode) {
       };
     case "room_custom_combined":
       return {
-        label: "Room custom amount",
-        detail: "This room overrides the building-level combined utility charge."
+        label: "Room default",
+        detail: "This room has its own normal combined utility charge."
       };
     case "monthly_override_combined":
       return {
-        label: "Month override",
-        detail: "This room is following the selected month override because no room custom amount is set."
+        label: "Monthly adjustment",
+        detail: "This room is following this month's building adjustment because no room default is set."
       };
     case "building_default_combined":
       return {
@@ -421,7 +530,7 @@ function describeChargeSource(source, utilityBillingMode) {
           String(utilityBillingMode ?? "").trim() === "combined_charge"
             ? "Needs combined-charge setup"
             : "Needs charge setup",
-        detail: "Add meters, fixed charges, or a custom combined amount before relying on recurring billing."
+        detail: "Add meters, fixed charges, or a room default amount before relying on recurring billing."
       };
   }
 }
@@ -702,6 +811,178 @@ function renderProfile(payload) {
     .join("");
 }
 
+function getAgreementState(payload = state.data) {
+  return payload?.agreementState && typeof payload.agreementState === "object"
+    ? payload.agreementState
+    : {};
+}
+
+function getAgreement(payload = state.data) {
+  return getAgreementState(payload).agreement ?? null;
+}
+
+function getExistingIdentityDocumentUrls(payload = state.data) {
+  const urls = getAgreement(payload)?.identityDocumentUrls;
+  return Array.isArray(urls)
+    ? urls.map((item) => String(item ?? "").trim()).filter(Boolean).slice(0, 4)
+    : [];
+}
+
+function canEditTenantDetails(payload = state.data) {
+  return (
+    String(state.role ?? "").trim() !== "caretaker" &&
+    Boolean(getAgreementState(payload).hasActiveResident || payload?.room?.hasActiveResident)
+  );
+}
+
+function canEditRentSetup() {
+  return String(state.role ?? "").trim() !== "caretaker";
+}
+
+function renderIdentityDocumentPreview() {
+  if (!(roomIdentityDocumentPreviewEl instanceof HTMLElement)) {
+    return;
+  }
+
+  roomIdentityDocumentPreviewEl.replaceChildren();
+  const existingUrls = getExistingIdentityDocumentUrls();
+  const existingGallery = createUploadedImageGallery(existingUrls, {
+    linkLabel: "Open ID photo"
+  });
+  if (existingGallery) {
+    roomIdentityDocumentPreviewEl.append(existingGallery);
+  }
+
+  const selectedPreview = document.createElement("div");
+  roomIdentityDocumentPreviewEl.append(selectedPreview);
+  renderSelectedImagePreviews(selectedPreview, roomIdentityDocumentEl?.files, {
+    emptyText:
+      existingUrls.length > 0
+        ? "No new ID photos selected."
+        : "No ID photo saved yet."
+  });
+}
+
+function renderManagementForms(payload) {
+  const room = payload?.room ?? {};
+  const agreementState = getAgreementState(payload);
+  const agreement = agreementState.agreement ?? {};
+  const buildingConfiguration = payload?.buildingConfiguration ?? {};
+  const hasActiveResident = Boolean(agreementState.hasActiveResident || room.hasActiveResident);
+  const canEditAgreement = canEditTenantDetails(payload);
+  const canEditRent = canEditRentSetup();
+
+  setManagementStatus(
+    hasActiveResident
+      ? "Edit the resident profile and rent setup from this room account."
+      : "This room has no active resident. Rent setup can be prepared, but tenant details unlock after assignment."
+  );
+  setPillText(
+    roomAgreementStateEl,
+    hasActiveResident ? (canEditAgreement ? "Editable" : "Read only") : "Vacant"
+  );
+  setPillText(roomRentSetupStateEl, canEditRent ? "Editable" : "Read only");
+
+  if (roomAgreementFormEl instanceof HTMLFormElement) {
+    setFormFieldValue(roomAgreementFormEl, "identityType", agreement.identityType ?? "");
+    setFormFieldValue(roomAgreementFormEl, "identityNumber", agreement.identityNumber ?? "");
+    setFormFieldValue(roomAgreementFormEl, "occupationStatus", agreement.occupationStatus ?? "");
+    setFormFieldValue(roomAgreementFormEl, "occupationLabel", agreement.occupationLabel ?? "");
+    setFormFieldValue(roomAgreementFormEl, "organizationName", agreement.organizationName ?? "");
+    setFormFieldValue(
+      roomAgreementFormEl,
+      "organizationLocation",
+      agreement.organizationLocation ?? ""
+    );
+    setFormFieldValue(
+      roomAgreementFormEl,
+      "studentRegistrationNumber",
+      agreement.studentRegistrationNumber ?? ""
+    );
+    setFormFieldValue(roomAgreementFormEl, "sponsorName", agreement.sponsorName ?? "");
+    setFormFieldValue(roomAgreementFormEl, "sponsorPhone", agreement.sponsorPhone ?? "");
+    setFormFieldValue(
+      roomAgreementFormEl,
+      "emergencyContactName",
+      agreement.emergencyContactName ?? ""
+    );
+    setFormFieldValue(
+      roomAgreementFormEl,
+      "emergencyContactPhone",
+      agreement.emergencyContactPhone ?? ""
+    );
+    setFormFieldValue(
+      roomAgreementFormEl,
+      "leaseStartDate",
+      toDateInputValue(agreement.leaseStartDate)
+    );
+    setFormFieldValue(
+      roomAgreementFormEl,
+      "leaseEndDate",
+      toDateInputValue(agreement.leaseEndDate)
+    );
+    setFormFieldValue(roomAgreementFormEl, "specialTerms", agreement.specialTerms ?? "");
+    if (roomIdentityDocumentEl instanceof HTMLInputElement) {
+      roomIdentityDocumentEl.value = "";
+    }
+    setFormControlsEnabled(roomAgreementFormEl, canEditAgreement);
+    if (roomAgreementSubmitEl instanceof HTMLButtonElement) {
+      roomAgreementSubmitEl.disabled = !canEditAgreement || state.formSaving;
+    }
+  }
+
+  if (roomRentSetupFormEl instanceof HTMLFormElement) {
+    setFormFieldValue(
+      roomRentSetupFormEl,
+      "monthlyRentKsh",
+      numberToInputString(
+        room.roomDefaultMonthlyRentKsh ??
+          room.configuredMonthlyRentKsh ??
+          room.monthlyRentKsh ??
+          agreement.monthlyRentKsh
+      )
+    );
+    setFormFieldValue(
+      roomRentSetupFormEl,
+      "balanceKsh",
+      numberToInputString(room.rentBalanceKsh)
+    );
+    setFormFieldValue(roomRentSetupFormEl, "dueDate", toDateInputValue(room.rentDueDate));
+    setFormFieldValue(
+      roomRentSetupFormEl,
+      "paymentDueDay",
+      numberToInputString(
+        room.roomDefaultRentDueDay ??
+          room.roomDefaultDueDay ??
+          room.configuredPaymentDueDay ??
+          agreement.paymentDueDay
+      )
+    );
+    setFormFieldValue(
+      roomRentSetupFormEl,
+      "rentGraceDays",
+      numberToInputString(
+        room.roomDefaultGraceDays ??
+          room.configuredRentGraceDays ??
+          buildingConfiguration.rentGraceDays ??
+          room.rentGraceDays
+      )
+    );
+    setFormFieldValue(
+      roomRentSetupFormEl,
+      "depositKsh",
+      numberToInputString(agreement.depositKsh ?? room.depositKsh)
+    );
+    setFormFieldValue(roomRentSetupFormEl, "note", "");
+    setFormControlsEnabled(roomRentSetupFormEl, canEditRent);
+    if (roomRentSetupSubmitEl instanceof HTMLButtonElement) {
+      roomRentSetupSubmitEl.disabled = !canEditRent || state.formSaving;
+    }
+  }
+
+  renderIdentityDocumentPreview();
+}
+
 function renderAnomalies(payload) {
   if (!(roomAnomaliesEl instanceof HTMLElement)) {
     return;
@@ -759,7 +1040,7 @@ function renderAnomalies(payload) {
 
   if (String(chargeSetup?.source ?? "").trim() === "unconfigured") {
     anomalies.push(
-      "This room still needs a reliable utility charge rule. Add meters, a room custom amount, or a building default before future months post."
+      "This room still needs a reliable utility charge rule. Add meters, a room default amount, or a building default before future months post."
     );
   }
 
@@ -997,6 +1278,7 @@ function renderRoomAccount(payload) {
   }
 
   renderMetrics(payload);
+  renderManagementForms(payload);
   renderChargeSetup(payload);
   renderProfile(payload);
   renderBillingHolds(payload);
@@ -1151,6 +1433,290 @@ async function cancelBillingHold(button) {
   } finally {
     button.disabled = false;
     setLoading(false);
+  }
+}
+
+function normalizeOptionalString(value) {
+  const normalized = String(value ?? "").trim();
+  return normalized || undefined;
+}
+
+function buildAgreementPayloadFromRecord(overrides = {}) {
+  const agreement = getAgreement() ?? {};
+  return {
+    identityType: agreement.identityType || undefined,
+    identityNumber: agreement.identityNumber || undefined,
+    identityDocumentUrls: getExistingIdentityDocumentUrls(),
+    occupationStatus: agreement.occupationStatus || undefined,
+    occupationLabel: agreement.occupationLabel || undefined,
+    organizationName: agreement.organizationName || undefined,
+    organizationLocation: agreement.organizationLocation || undefined,
+    studentRegistrationNumber: agreement.studentRegistrationNumber || undefined,
+    sponsorName: agreement.sponsorName || undefined,
+    sponsorPhone: agreement.sponsorPhone || undefined,
+    emergencyContactName: agreement.emergencyContactName || undefined,
+    emergencyContactPhone: agreement.emergencyContactPhone || undefined,
+    leaseStartDate: toDateInputValue(agreement.leaseStartDate) || undefined,
+    leaseEndDate: toDateInputValue(agreement.leaseEndDate) || undefined,
+    monthlyRentKsh: toOptionalNumber(agreement.monthlyRentKsh),
+    depositKsh: toOptionalNumber(agreement.depositKsh),
+    paymentDueDay: toOptionalNumber(agreement.paymentDueDay),
+    specialTerms: agreement.specialTerms || undefined,
+    ...overrides
+  };
+}
+
+function createLandlordIdentityUploadRequest() {
+  return {
+    url: "/api/media/upload",
+    method: "POST",
+    fields: {
+      category: "resident_identity",
+      buildingId: state.buildingId,
+      houseNumber: state.houseNumber
+    }
+  };
+}
+
+function validateRoomIdentityFiles() {
+  if (!(roomIdentityDocumentEl instanceof HTMLInputElement)) {
+    return [];
+  }
+
+  return validateImageFiles(roomIdentityDocumentEl.files, {
+    maxFiles: 4,
+    maxSizeMb: 10
+  });
+}
+
+async function buildAgreementPayloadFromForm(form) {
+  const identityType = normalizeOptionalString(getFormFieldValue(form, "identityType"));
+  const identityNumber = normalizeOptionalString(getFormFieldValue(form, "identityNumber"));
+  const existingDocumentUrls = getExistingIdentityDocumentUrls();
+  const selectedFiles = validateRoomIdentityFiles();
+  const willHaveIdentityPhotos = existingDocumentUrls.length + selectedFiles.length > 0;
+
+  if ((identityType || identityNumber || willHaveIdentityPhotos) && (!identityType || !identityNumber)) {
+    throw new Error("Add both the ID type and ID number before saving ID photos.");
+  }
+
+  const uploadedDocumentUrls = await uploadImageFiles(selectedFiles, {
+    createUploadRequest: createLandlordIdentityUploadRequest
+  });
+  const identityDocumentUrls = [
+    ...existingDocumentUrls,
+    ...uploadedDocumentUrls
+  ].slice(0, 4);
+
+  return buildAgreementPayloadFromRecord({
+    identityType,
+    identityNumber,
+    identityDocumentUrls,
+    occupationStatus: normalizeOptionalString(getFormFieldValue(form, "occupationStatus")),
+    occupationLabel: normalizeOptionalString(getFormFieldValue(form, "occupationLabel")),
+    organizationName: normalizeOptionalString(getFormFieldValue(form, "organizationName")),
+    organizationLocation: normalizeOptionalString(getFormFieldValue(form, "organizationLocation")),
+    studentRegistrationNumber: normalizeOptionalString(
+      getFormFieldValue(form, "studentRegistrationNumber")
+    ),
+    sponsorName: normalizeOptionalString(getFormFieldValue(form, "sponsorName")),
+    sponsorPhone: normalizeOptionalString(getFormFieldValue(form, "sponsorPhone")),
+    emergencyContactName: normalizeOptionalString(getFormFieldValue(form, "emergencyContactName")),
+    emergencyContactPhone: normalizeOptionalString(getFormFieldValue(form, "emergencyContactPhone")),
+    leaseStartDate: normalizeOptionalString(getFormFieldValue(form, "leaseStartDate")),
+    leaseEndDate: normalizeOptionalString(getFormFieldValue(form, "leaseEndDate")),
+    specialTerms: normalizeOptionalString(getFormFieldValue(form, "specialTerms"))
+  });
+}
+
+function setRoomFormsSaving(saving) {
+  state.formSaving = saving;
+  const tenantEnabled = !saving && canEditTenantDetails();
+  const rentEnabled = !saving && canEditRentSetup();
+  setFormControlsEnabled(roomAgreementFormEl, tenantEnabled);
+  setFormControlsEnabled(roomRentSetupFormEl, rentEnabled);
+  if (roomAgreementSubmitEl instanceof HTMLButtonElement) {
+    roomAgreementSubmitEl.disabled = !tenantEnabled;
+  }
+  if (roomRentSetupSubmitEl instanceof HTMLButtonElement) {
+    roomRentSetupSubmitEl.disabled = !rentEnabled;
+  }
+}
+
+async function saveRoomAgreement(event) {
+  event.preventDefault();
+  if (state.loading || state.formSaving || !canEditTenantDetails()) {
+    return;
+  }
+
+  const form = event.currentTarget;
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+
+  setRoomFormsSaving(true);
+  showError("");
+  setManagementStatus("Saving tenant details...");
+
+  try {
+    const payload = await buildAgreementPayloadFromForm(form);
+    await requestJson(
+      `/api/landlord/buildings/${encodeURIComponent(state.buildingId)}/houses/${encodeURIComponent(
+        state.houseNumber
+      )}/agreement`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+    await loadRoomAccount();
+    setManagementStatus("Tenant details saved.");
+    notifyStatus("Tenant details saved.");
+  } catch (error) {
+    if (error?.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : "Unable to save tenant details.";
+    showError(message);
+    setManagementStatus("Tenant details save failed.");
+  } finally {
+    setRoomFormsSaving(false);
+  }
+}
+
+async function saveRoomRentSetup(event) {
+  event.preventDefault();
+  if (state.loading || state.formSaving || !canEditRentSetup()) {
+    return;
+  }
+
+  const form = event.currentTarget;
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+
+  const room = getRoom();
+  const roomDefaultMonthlyRentKsh = toOptionalNumber(
+    getFormFieldValue(form, "monthlyRentKsh")
+  );
+  const fallbackMonthlyRentKsh =
+    roomDefaultMonthlyRentKsh ??
+    toOptionalNumber(room.configuredMonthlyRentKsh ?? room.monthlyRentKsh) ??
+    0;
+  const requestedBalanceKsh = toOptionalNumber(getFormFieldValue(form, "balanceKsh"));
+  const dueDate = dateInputToIso(getFormFieldValue(form, "dueDate"));
+  const roomDefaultPaymentDueDay = toOptionalNumber(
+    getFormFieldValue(form, "paymentDueDay")
+  );
+  const paymentDueDay =
+    roomDefaultPaymentDueDay ??
+    toOptionalNumber(room.configuredPaymentDueDay ?? room.paymentDueDay);
+  const roomDefaultGraceDays = toOptionalNumber(getFormFieldValue(form, "rentGraceDays"));
+  const depositKsh = toOptionalNumber(getFormFieldValue(form, "depositKsh"));
+  const note = normalizeOptionalString(getFormFieldValue(form, "note"));
+
+  if (!dueDate) {
+    showError("Choose the rent due date.");
+    return;
+  }
+
+  setRoomFormsSaving(true);
+  showError("");
+  setManagementStatus("Saving rent setup...");
+
+  try {
+    const rentSetupResponse = await requestJson(
+      `/api/landlord/buildings/${encodeURIComponent(state.buildingId)}/rent-setup-sheet`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          note,
+          rows: [
+            {
+              houseNumber: state.houseNumber,
+              monthlyRentKsh:
+                roomDefaultMonthlyRentKsh == null
+                  ? null
+                  : Math.round(roomDefaultMonthlyRentKsh),
+              paymentDueDay:
+                roomDefaultPaymentDueDay == null ? null : Math.round(roomDefaultPaymentDueDay),
+              graceDays:
+                roomDefaultGraceDays == null ? null : Math.round(roomDefaultGraceDays),
+              active: true,
+              note
+            }
+          ]
+        })
+      }
+    );
+    const savedSetupRow = Array.isArray(rentSetupResponse?.data?.rows)
+      ? rentSetupResponse.data.rows.find(
+          (item) => normalizeHouse(item.houseNumber) === normalizeHouse(state.houseNumber)
+        )
+      : null;
+    const monthlyRentKsh =
+      toOptionalNumber(savedSetupRow?.resolvedMonthlyRentKsh) ?? fallbackMonthlyRentKsh;
+    const resolvedPaymentDueDay =
+      toOptionalNumber(savedSetupRow?.resolvedDueDay) ?? paymentDueDay;
+    const balanceKsh = requestedBalanceKsh ?? monthlyRentKsh;
+
+    await requestJson(`/api/landlord/rent-due/${encodeURIComponent(state.houseNumber)}`, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        buildingId: state.buildingId,
+        monthlyRentKsh,
+        balanceKsh,
+        dueDate,
+        note: note || "Room rent setup updated from room account."
+      })
+    });
+
+    if (getAgreementState().hasActiveResident) {
+      await requestJson(
+        `/api/landlord/buildings/${encodeURIComponent(state.buildingId)}/houses/${encodeURIComponent(
+          state.houseNumber
+        )}/agreement`,
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify(
+            buildAgreementPayloadFromRecord({
+              monthlyRentKsh,
+              depositKsh,
+              paymentDueDay: resolvedPaymentDueDay
+            })
+          )
+        }
+      );
+    }
+
+    await loadRoomAccount();
+    setManagementStatus("Rent setup saved.");
+    notifyStatus("Rent setup saved.");
+  } catch (error) {
+    if (error?.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : "Unable to save rent setup.";
+    showError(message);
+    setManagementStatus("Rent setup save failed.");
+  } finally {
+    setRoomFormsSaving(false);
   }
 }
 
@@ -1345,6 +1911,20 @@ roomPaymentsBodyEl?.addEventListener("click", handlePaymentActionClick);
 roomBillingHoldScopeEl?.addEventListener("change", syncBillingHoldUtilityVisibility);
 roomBillingHoldFormEl?.addEventListener("submit", createBillingHold);
 roomBillingHoldsEl?.addEventListener("click", handleBillingHoldClick);
+roomAgreementFormEl?.addEventListener("submit", saveRoomAgreement);
+roomRentSetupFormEl?.addEventListener("submit", saveRoomRentSetup);
+roomIdentityDocumentEl?.addEventListener("change", () => {
+  try {
+    validateRoomIdentityFiles();
+    renderIdentityDocumentPreview();
+  } catch (error) {
+    if (roomIdentityDocumentEl instanceof HTMLInputElement) {
+      roomIdentityDocumentEl.value = "";
+    }
+    renderIdentityDocumentPreview();
+    showError(error instanceof Error ? error.message : "Invalid ID photo.");
+  }
+});
 
 setDefaultBillingHoldMonths();
 syncBillingHoldUtilityVisibility();

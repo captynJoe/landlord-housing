@@ -1684,6 +1684,46 @@ export class UserAccountService {
       houseNumber,
       phoneNumber
     });
+    if (tenancy) {
+      const identityNumber = normalizeOptionalText(input.identityNumber);
+      const occupationLabel = normalizeOptionalText(input.occupationLabel);
+      const hasTenantDetailSeed =
+        Boolean(input.identityType && identityNumber) ||
+        Boolean(input.occupationStatus) ||
+        Boolean(occupationLabel);
+
+      if (hasTenantDetailSeed) {
+        await this.prisma.tenantAgreement.upsert({
+          where: { tenancyId: tenancy.id },
+          update: {
+            buildingId: input.buildingId,
+            houseNumber,
+            residentUserId: provisionedUser.id,
+            ...(input.identityType && identityNumber
+              ? {
+                  identityType: input.identityType,
+                  identityNumber
+                }
+              : {}),
+            ...(input.occupationStatus
+              ? { occupationStatus: input.occupationStatus }
+              : {}),
+            ...(occupationLabel ? { occupationLabel } : {})
+          },
+          create: {
+            tenancyId: tenancy.id,
+            buildingId: input.buildingId,
+            houseNumber,
+            residentUserId: provisionedUser.id,
+            identityType: input.identityType ?? null,
+            identityNumber: identityNumber ?? null,
+            occupationStatus: input.occupationStatus ?? null,
+            occupationLabel: occupationLabel ?? null
+          }
+        });
+      }
+    }
+
     const session = await this.issueSessionForUser(provisionedUser, {
       residentTenancyId: tenancy?.id
     });

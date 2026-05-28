@@ -58,6 +58,76 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.room-management-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.room-management-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+}
+
+.room-management-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(28, 126, 124, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.room-management-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.room-management-form-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.room-management-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.room-management-fields label {
+  display: grid;
+  gap: 5px;
+  color: rgba(16, 35, 49, 0.72);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.room-management-fields input,
+.room-management-fields select,
+.room-management-fields textarea {
+  width: 100%;
+  min-height: 38px;
+}
+
+.room-management-fields textarea {
+  resize: vertical;
+}
+
+.room-management-span,
+.room-management-preview,
+.room-management-form .action-row {
+  grid-column: 1 / -1;
+}
+
+.room-management-preview {
+  display: grid;
+  gap: 8px;
+}
+
 .room-account-grid .resident-agreement-overview,
 .room-account-shell .resident-agreement-overview {
   gap: 12px;
@@ -180,6 +250,10 @@
     grid-template-columns: 1fr;
   }
 
+  .room-management-grid {
+    grid-template-columns: 1fr;
+  }
+
   .room-billing-hold-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -207,6 +281,10 @@
 
   .room-account-shell .resident-agreement-overview div {
     min-height: auto;
+  }
+
+  .room-management-fields {
+    grid-template-columns: 1fr;
   }
 
   .room-billing-hold-form {
@@ -847,6 +925,24 @@
   min-width: 1280px;
 }
 
+.room-ledger-table.is-single-building {
+  min-width: 1160px;
+}
+
+.room-ledger-table.is-single-building thead th:first-child,
+.resident-source-table.is-single-building thead th:first-child {
+  display: none;
+}
+
+.room-ledger-table thead th,
+.resident-source-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eaf4f4;
+  box-shadow: 0 1px 0 rgba(47, 93, 80, 0.18);
+}
+
 .room-ledger-table th,
 .room-ledger-table td {
   vertical-align: top;
@@ -910,7 +1006,7 @@
 }
 
 .room-ledger-actions {
-  min-width: 170px;
+  min-width: 112px;
   gap: 6px;
 }
 

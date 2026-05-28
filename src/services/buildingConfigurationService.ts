@@ -26,6 +26,8 @@ export type BuildingConfigurationRecord = {
   defaultWaterFixedChargeKsh: number | null;
   defaultElectricityFixedChargeKsh: number | null;
   defaultCombinedUtilityChargeKsh: number | null;
+  defaultMonthlyRentKsh: number | null;
+  defaultRentDueDay: number | null;
   utilityBalanceVisibleDays: number;
   rentGraceDays: number;
   lateRentPenaltyEnabled: boolean;
@@ -61,6 +63,8 @@ export interface UpdateBuildingConfigurationInput {
   defaultWaterFixedChargeKsh?: number | null;
   defaultElectricityFixedChargeKsh?: number | null;
   defaultCombinedUtilityChargeKsh?: number | null;
+  defaultMonthlyRentKsh?: number | null;
+  defaultRentDueDay?: number | null;
   utilityBalanceVisibleDays?: number;
   rentGraceDays?: number;
   lateRentPenaltyEnabled?: boolean;
@@ -93,6 +97,8 @@ const DEFAULT_CONFIG = {
   defaultWaterFixedChargeKsh: null as number | null,
   defaultElectricityFixedChargeKsh: null as number | null,
   defaultCombinedUtilityChargeKsh: null as number | null,
+  defaultMonthlyRentKsh: null as number | null,
+  defaultRentDueDay: null as number | null,
   utilityBalanceVisibleDays: 7,
   rentGraceDays: 0,
   lateRentPenaltyEnabled: false,
@@ -121,6 +127,8 @@ function mapConfig(value: BuildingConfiguration): BuildingConfigurationRecord {
     defaultWaterFixedChargeKsh: value.defaultWaterFixedChargeKsh,
     defaultElectricityFixedChargeKsh: value.defaultElectricityFixedChargeKsh,
     defaultCombinedUtilityChargeKsh: value.defaultCombinedUtilityChargeKsh,
+    defaultMonthlyRentKsh: value.defaultMonthlyRentKsh,
+    defaultRentDueDay: value.defaultRentDueDay,
     utilityBalanceVisibleDays: value.utilityBalanceVisibleDays,
     rentGraceDays: value.rentGraceDays,
     lateRentPenaltyEnabled: value.lateRentPenaltyEnabled,
@@ -280,6 +288,14 @@ export class BuildingConfigurationService {
       input.defaultCombinedUtilityChargeKsh == null
         ? input.defaultCombinedUtilityChargeKsh
         : Math.max(0, Math.round(Number(input.defaultCombinedUtilityChargeKsh) || 0));
+    const normalizedDefaultMonthlyRentKsh =
+      input.defaultMonthlyRentKsh == null
+        ? input.defaultMonthlyRentKsh
+        : Math.max(0, Math.round(Number(input.defaultMonthlyRentKsh) || 0));
+    const normalizedDefaultRentDueDay =
+      input.defaultRentDueDay == null
+        ? input.defaultRentDueDay
+        : Math.min(31, Math.max(1, Math.round(Number(input.defaultRentDueDay) || 1)));
     const normalizedLateRentPenaltyAmountKsh =
       input.lateRentPenaltyAmountKsh == null
         ? input.lateRentPenaltyAmountKsh
@@ -294,6 +310,8 @@ export class BuildingConfigurationService {
         defaultWaterFixedChargeKsh: normalizedDefaultWaterFixedChargeKsh,
         defaultElectricityFixedChargeKsh: normalizedDefaultElectricityFixedChargeKsh,
         defaultCombinedUtilityChargeKsh: normalizedDefaultCombinedUtilityChargeKsh,
+        defaultMonthlyRentKsh: normalizedDefaultMonthlyRentKsh,
+        defaultRentDueDay: normalizedDefaultRentDueDay,
         lateRentPenaltyAmountKsh: normalizedLateRentPenaltyAmountKsh,
         updatedByRole: actor?.role ?? null,
         updatedByUserId: actor?.userId ?? null,
@@ -308,6 +326,8 @@ export class BuildingConfigurationService {
         defaultWaterFixedChargeKsh: normalizedDefaultWaterFixedChargeKsh,
         defaultElectricityFixedChargeKsh: normalizedDefaultElectricityFixedChargeKsh,
         defaultCombinedUtilityChargeKsh: normalizedDefaultCombinedUtilityChargeKsh,
+        defaultMonthlyRentKsh: normalizedDefaultMonthlyRentKsh,
+        defaultRentDueDay: normalizedDefaultRentDueDay,
         lateRentPenaltyAmountKsh: normalizedLateRentPenaltyAmountKsh,
         updatedByRole: actor?.role,
         updatedByUserId: actor?.userId,

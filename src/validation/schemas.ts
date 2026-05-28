@@ -249,7 +249,8 @@ export const mediaUploadCategorySchema = z.enum([
 
 export const mediaUploadSignatureRequestSchema = z.object({
   category: mediaUploadCategorySchema,
-  buildingId: nonEmptyString.optional()
+  buildingId: nonEmptyString.optional(),
+  houseNumber: nonEmptyString.max(24).optional()
 });
 
 export const deleteResidentPushSubscriptionSchema = z.object({
@@ -316,6 +317,36 @@ export const landlordRentBulkSheetSchema = z.object({
     )
     .min(1)
     .max(2_000)
+});
+
+const optionalRentAmountSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(10_000_000)
+  .nullable()
+  .optional();
+const optionalRentDueDaySchema = z.number().int().min(1).max(31).nullable().optional();
+const optionalRentGraceDaysSchema = z.number().int().min(0).max(31).nullable().optional();
+
+export const landlordRentSetupSheetSchema = z.object({
+  buildingDefaultMonthlyRentKsh: optionalRentAmountSchema,
+  buildingDefaultDueDay: optionalRentDueDaySchema,
+  buildingDefaultGraceDays: z.number().int().min(0).max(31).optional(),
+  note: z.string().trim().max(280).optional(),
+  rows: z
+    .array(
+      z.object({
+        houseNumber: nonEmptyString.max(24),
+        monthlyRentKsh: optionalRentAmountSchema,
+        paymentDueDay: optionalRentDueDaySchema,
+        graceDays: optionalRentGraceDaysSchema,
+        active: z.boolean().optional(),
+        note: z.string().trim().max(280).optional()
+      })
+    )
+    .max(2_000)
+    .default([])
 });
 
 const utilityMeterNumberField = z
@@ -449,22 +480,32 @@ const optionalTenantIdentityDocumentUrlsSchema = z
   .max(4)
   .optional();
 
-export const residentPasswordSetupSchema = z.object({
-  buildingId: nonEmptyString,
-  houseNumber: nonEmptyString.max(24),
-  phoneNumber: kenyaPhoneSchema,
-  password: z.string().min(8).max(128),
-  identityType: optionalTenantIdentityTypeSchema,
-  identityNumber: z.preprocess(
-    emptyStringToUndefined,
-    z.string().trim().min(4).max(80).optional()
-  ),
-  occupationStatus: optionalTenantOccupationStatusSchema,
-  occupationLabel: z.preprocess(
-    emptyStringToUndefined,
-    z.string().trim().min(2).max(120).optional()
-  )
-});
+export const residentPasswordSetupSchema = z
+  .object({
+    buildingId: nonEmptyString,
+    houseNumber: nonEmptyString.max(24),
+    phoneNumber: kenyaPhoneSchema,
+    password: z.string().min(8).max(128),
+    identityType: optionalTenantIdentityTypeSchema,
+    identityNumber: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(4).max(80).optional()
+    ),
+    occupationStatus: optionalTenantOccupationStatusSchema,
+    occupationLabel: z.preprocess(
+      emptyStringToUndefined,
+      z.string().trim().min(2).max(120).optional()
+    )
+  })
+  .superRefine((value, context) => {
+    if (value.identityNumber && !value.identityType) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["identityType"],
+        message: "Select the ID type for the provided ID number."
+      });
+    }
+  });
 
 export const residentPhoneLoginSchema = z.object({
   buildingId: z.preprocess(emptyStringToUndefined, nonEmptyString.optional()),
@@ -833,6 +874,8 @@ export const landlordBuildingConfigurationUpdateSchema = z
     defaultWaterFixedChargeKsh: z.number().min(0).max(200_000).nullable().optional(),
     defaultElectricityFixedChargeKsh: z.number().min(0).max(200_000).nullable().optional(),
     defaultCombinedUtilityChargeKsh: z.number().int().min(0).max(200_000).nullable().optional(),
+    defaultMonthlyRentKsh: z.number().int().min(0).max(10_000_000).nullable().optional(),
+    defaultRentDueDay: z.number().int().min(1).max(31).nullable().optional(),
     utilityBalanceVisibleDays: z.number().int().min(0).max(60).optional(),
     rentGraceDays: z.number().int().min(0).max(31).optional(),
     lateRentPenaltyEnabled: z.boolean().optional(),
@@ -861,6 +904,8 @@ export const landlordBuildingConfigurationUpdateSchema = z
       value.defaultElectricityFixedChargeKsh !== undefined ||
       typeof value.utilityBalanceVisibleDays === "number" ||
       value.defaultCombinedUtilityChargeKsh !== undefined ||
+      value.defaultMonthlyRentKsh !== undefined ||
+      value.defaultRentDueDay !== undefined ||
       typeof value.rentGraceDays === "number" ||
       typeof value.lateRentPenaltyEnabled === "boolean" ||
       typeof value.lateRentPenaltyAmountKsh === "number" ||

@@ -55,6 +55,175 @@
         </div>
       </section>
 
+      <section class="panel wide-panel room-management-panel">
+        <div class="panel-head">
+          <h2>Room Management</h2>
+        </div>
+        <p id="room-management-status" class="status-text">
+          Tenant and rent setup will load here.
+        </p>
+        <div class="room-management-grid">
+          <form id="room-agreement-form" class="room-management-form">
+            <div class="room-management-form-head">
+              <h3>Tenant Details</h3>
+              <span id="room-agreement-state" class="status-pill">Loading</span>
+            </div>
+            <div class="room-management-fields">
+              <label>
+                ID Type
+                <select name="identityType">
+                  <option value="">Select</option>
+                  <option value="national_id">National ID</option>
+                  <option value="passport">Passport</option>
+                  <option value="alien_id">Alien ID</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                ID Number
+                <input name="identityNumber" type="text" maxlength="80" placeholder="ID / passport number" />
+              </label>
+              <label>
+                ID Photo
+                <input
+                  id="room-identity-document"
+                  name="identityDocument"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                />
+              </label>
+              <label>
+                Occupation
+                <select name="occupationStatus">
+                  <option value="">Select</option>
+                  <option value="employed">Employed</option>
+                  <option value="self_employed">Self-employed</option>
+                  <option value="student">Student</option>
+                  <option value="sponsored">Sponsored</option>
+                  <option value="unemployed">Unemployed</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label>
+                Role / Course / Trade
+                <input name="occupationLabel" type="text" maxlength="120" />
+              </label>
+              <label>
+                Employer / Business / School
+                <input name="organizationName" type="text" maxlength="160" />
+              </label>
+              <label>
+                Work / School Location
+                <input name="organizationLocation" type="text" maxlength="160" />
+              </label>
+              <label>
+                Student / Admission No.
+                <input name="studentRegistrationNumber" type="text" maxlength="80" />
+              </label>
+              <label>
+                Sponsor / Guardian
+                <input name="sponsorName" type="text" maxlength="120" />
+              </label>
+              <label>
+                Sponsor Phone
+                <input name="sponsorPhone" type="tel" maxlength="20" />
+              </label>
+              <label>
+                Emergency Contact
+                <input name="emergencyContactName" type="text" maxlength="120" />
+              </label>
+              <label>
+                Emergency Phone
+                <input name="emergencyContactPhone" type="tel" maxlength="20" />
+              </label>
+              <label>
+                Lease Start
+                <input name="leaseStartDate" type="date" />
+              </label>
+              <label>
+                Lease End
+                <input name="leaseEndDate" type="date" />
+              </label>
+              <label class="room-management-span">
+                Special Terms
+                <textarea
+                  name="specialTerms"
+                  rows="3"
+                  maxlength="1200"
+                  placeholder="Move-out notice, visitor rules, utility arrangements."
+                ></textarea>
+              </label>
+            </div>
+            <div id="room-identity-document-preview" class="room-management-preview"></div>
+            <div class="action-row">
+              <button id="room-agreement-submit" type="submit">Save Tenant Details</button>
+            </div>
+          </form>
+
+          <form id="room-rent-setup-form" class="room-management-form">
+            <div class="room-management-form-head">
+              <h3>Rent Setup</h3>
+              <span id="room-rent-setup-state" class="status-pill">Loading</span>
+            </div>
+            <div class="room-management-fields">
+              <label>
+                Room Default Rent (KSh)
+                <input
+                  name="monthlyRentKsh"
+                  type="number"
+                  min="0"
+                  max="500000"
+                  step="1"
+                  placeholder="Building Default"
+                />
+              </label>
+              <label>
+                Current Balance (KSh)
+                <input name="balanceKsh" type="number" min="0" max="5000000" step="1" />
+              </label>
+              <label>
+                Due Date
+                <input name="dueDate" type="date" required />
+              </label>
+              <label>
+                Due Day
+                <input
+                  name="paymentDueDay"
+                  type="number"
+                  min="1"
+                  max="31"
+                  step="1"
+                  placeholder="Building Default"
+                />
+              </label>
+              <label>
+                Grace Days
+                <input
+                  name="rentGraceDays"
+                  type="number"
+                  min="0"
+                  max="31"
+                  step="1"
+                  placeholder="Building Default"
+                />
+              </label>
+              <label>
+                Deposit (KSh)
+                <input name="depositKsh" type="number" min="0" max="10000000" step="1" />
+              </label>
+              <label class="room-management-span">
+                Note
+                <input name="note" type="text" maxlength="280" placeholder="Optional rent setup note" />
+              </label>
+            </div>
+            <div class="action-row">
+              <button id="room-rent-setup-submit" type="submit">Save Rent Setup</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
       <section class="panel wide-panel room-account-grid-panel">
         <div class="room-account-grid">
           <article class="package-card">
@@ -64,8 +233,8 @@
             <div class="resident-agreement-overview">
               <div><span>Resolved Rule</span><strong id="room-charge-source">-</strong></div>
               <div><span>Visible Through</span><strong id="room-visible-through">-</strong></div>
-              <div><span>Room Custom</span><strong id="room-charge-custom">-</strong></div>
-              <div><span>Month Override</span><strong id="room-charge-month">-</strong></div>
+              <div><span>Room Default</span><strong id="room-charge-custom">-</strong></div>
+              <div><span>Monthly Adjustment</span><strong id="room-charge-month">-</strong></div>
               <div><span>Building Default</span><strong id="room-charge-building-default">-</strong></div>
               <div><span>Fixed Fallback</span><strong id="room-charge-fixed">-</strong></div>
             </div>

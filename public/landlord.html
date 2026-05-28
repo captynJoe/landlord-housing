@@ -695,7 +695,7 @@
           <div class="panel-head">
             <h2>Rent Collection + Manual Payments</h2>
             <div class="action-row">
-              <button id="open-rent-sheet-btn" type="button">Bulk Rent Update</button>
+              <button id="open-rent-sheet-btn" type="button">Rent Setup Sheet</button>
               <button id="refresh-rent-status" type="button">Refresh</button>
             </div>
           </div>
@@ -853,7 +853,7 @@
               <h3>Room Register</h3>
             </div>
             <div class="table-wrap">
-              <table>
+              <table class="resident-source-table">
                 <thead>
                   <tr>
                     <th>Building</th>
@@ -1233,7 +1233,7 @@
               <button id="registry-save-btn" type="button">Save All</button>
             </div>
             <div id="registry-charge-summary" class="landlord-generator registry-charge-summary">
-              Select a building to review default and custom room charge rules.
+              Select a building to review building defaults and room defaults.
             </div>
             <div class="table-wrap utility-registry-table-wrap">
               <table>
@@ -1379,7 +1379,7 @@
 
           <div class="inline-fields compact-fields">
             <label>
-              Monthly Combined Charge Override (KSh)
+              Monthly Adjustment (KSh)
               <input
                 id="utility-sheet-combined-charge"
                 type="number"
@@ -1427,16 +1427,15 @@
       </aside>
 
       <div id="rent-sheet-backdrop" class="landlord-drawer-backdrop hidden"></div>
-      <aside id="rent-sheet-modal" class="landlord-sheet-modal hidden" aria-label="Bulk rent update">
+      <aside id="rent-sheet-modal" class="landlord-sheet-modal hidden" aria-label="Rent setup sheet">
         <header class="landlord-drawer-head">
-          <h2>Bulk Rent Update</h2>
+          <h2>Rent Setup Sheet</h2>
           <button id="close-rent-sheet-btn" type="button" class="ghost-btn">Close</button>
         </header>
 
         <form id="rent-sheet-form" class="package-card landlord-sheet-form">
           <p class="status-text">
-            Set monthly rent for every room in the selected building. Balance override is optional;
-            leave it blank to keep current arrears and payments untouched.
+            Set the Building Default once, then only fill Room Default values for rooms that charge differently.
           </p>
 
           <div class="inline-fields compact-fields">
@@ -1445,12 +1444,16 @@
               <select id="rent-sheet-building-select"></select>
             </label>
             <label>
-              Billing Month
-              <input id="rent-sheet-billing-month" type="month" required />
+              Building Default Rent
+              <input id="rent-sheet-default-monthly-rent" type="number" min="0" step="1" />
             </label>
             <label>
-              Due Date
-              <input id="rent-sheet-due-date" type="datetime-local" required />
+              Due Day
+              <input id="rent-sheet-default-due-day" type="number" min="1" max="31" step="1" />
+            </label>
+            <label>
+              Grace Days
+              <input id="rent-sheet-default-grace-days" type="number" min="0" max="31" step="1" />
             </label>
           </div>
 
@@ -1460,7 +1463,7 @@
               id="rent-sheet-note"
               type="text"
               maxlength="280"
-              placeholder="Monthly rent setup by landlord."
+              placeholder="Room rent setup by landlord."
             />
           </label>
 
@@ -1470,13 +1473,13 @@
                 <tr>
                   <th>House</th>
                   <th>Resident</th>
-                  <th>Status</th>
-                  <th>Current Rent</th>
-                  <th>New Monthly Rent</th>
-                  <th>Current Deposit</th>
-                  <th>New Deposit</th>
+                  <th>Source</th>
+                  <th>Resolved Rent</th>
+                  <th>Room Default Rent</th>
+                  <th>Due Day</th>
+                  <th>Grace</th>
+                  <th>Charge</th>
                   <th>Current Balance</th>
-                  <th>Balance Override</th>
                   <th>Paid This Month</th>
                   <th>Arrears</th>
                 </tr>
@@ -1486,7 +1489,7 @@
           </div>
 
           <div class="action-row">
-            <button id="rent-sheet-submit-btn" type="submit">Save Rent Updates</button>
+            <button id="rent-sheet-submit-btn" type="submit">Save Rent Setup</button>
             <button id="rent-sheet-reload-btn" type="button" class="ghost-btn">Reload Rooms</button>
           </div>
         </form>

@@ -165,6 +165,7 @@ import {
   ownerStaffCreateSchema,
   ownerStaffDisableSchema,
   landlordRentBulkSheetSchema,
+  landlordRentSetupSheetSchema,
   upsertRentDueSchema,
   wifiPackageIdSchema,
   landlordDecisionSchema,
@@ -478,6 +479,20 @@ interface RuntimeQueuesPersistedState {
   monthlyCombinedUtilityCharges: MonthlyCombinedUtilityChargeRecord[];
 }
 
+interface RoomRentDefaultRecord {
+  buildingId: string;
+  houseNumber: string;
+  monthlyRentKsh: number | null;
+  paymentDueDay: number | null;
+  graceDays: number | null;
+  active: boolean;
+  note?: string;
+  updatedByRole?: string;
+  updatedByUserId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface LandlordUtilityRegistryRow {
   houseNumber: string;
   residentName?: string;
@@ -496,6 +511,17 @@ interface LandlordUtilityRegistryRow {
   hasActiveResident: boolean;
   rentEnabled: boolean;
   monthlyRentKsh: number;
+  configuredMonthlyRentKsh: number;
+  configuredPaymentDueDay?: number;
+  configuredRentGraceDays: number;
+  buildingDefaultMonthlyRentKsh?: number;
+  buildingDefaultRentDueDay?: number;
+  buildingDefaultRentGraceDays: number;
+  roomDefaultMonthlyRentKsh?: number;
+  roomDefaultRentDueDay?: number;
+  roomDefaultGraceDays?: number;
+  roomDefaultActive: boolean;
+  rentSetupSource: "room_default" | "building_default" | "agreement_legacy" | "room_disabled" | "unset";
   depositKsh: number;
   rentPaymentStatus?: string;
   rentBalanceKsh: number;
@@ -795,6 +821,45 @@ function normalizeHouseNumber(value: string): string {
 function normalizeBuildingId(value: string | undefined): string {
   const normalized = String(value ?? "").trim();
   return normalized || "__unknown_building__";
+}
+
+function normalizeOptionalNonNegativeInteger(value: number | null | undefined): number | null {
+  if (value == null) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+
+  return Math.max(0, Math.round(numeric));
+}
+
+function normalizeOptionalRentDueDay(value: number | null | undefined): number | undefined {
+  if (value == null) {
+    return undefined;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return undefined;
+  }
+
+  return Math.min(31, Math.max(1, Math.round(numeric)));
+}
+
+function normalizeOptionalGraceDays(value: number | null | undefined): number | undefined {
+  if (value == null) {
+    return undefined;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return undefined;
+  }
+
+  return Math.min(31, Math.max(0, Math.round(numeric)));
 }
 
 function buildAgreementFallbackRentDueDate(
@@ -4233,6 +4298,27 @@ async function bootstrap() {
     return notifications.filter((item) => !isResidentBillingNotification(item));
   };
 
+  const listResidentIdentityDocumentUrls = (value: unknown): string[] =>
+    Array.isArray(value)
+      ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
+      : [];
+
+  const validateTenantIdentityCompletion = (input: {
+    identityType?: string | null;
+    identityNumber?: string | null;
+    identityDocumentUrls?: unknown;
+  }): string | null => {
+    const hasIdentityType = Boolean(String(input.identityType ?? "").trim());
+    const hasIdentityNumber = Boolean(String(input.identityNumber ?? "").trim());
+    const hasIdentityPhotos = listResidentIdentityDocumentUrls(input.identityDocumentUrls).length > 0;
+
+    if ((hasIdentityType || hasIdentityNumber || hasIdentityPhotos) && (!hasIdentityType || !hasIdentityNumber)) {
+      return "Add both the ID type and ID number before saving tenant ID details.";
+    }
+
+    return null;
+  };
+
   const hasCompleteResidentIdentity = (agreement: {
     identityType?: string | null;
     identityNumber?: string | null;
@@ -4240,9 +4326,7 @@ async function bootstrap() {
   } | null | undefined) =>
     Boolean(
       String(agreement?.identityType ?? "").trim() &&
-        String(agreement?.identityNumber ?? "").trim() &&
-        Array.isArray(agreement?.identityDocumentUrls) &&
-        agreement.identityDocumentUrls.some((item) => String(item ?? "").trim())
+        String(agreement?.identityNumber ?? "").trim()
     );
 
   const buildResidentIdentityRequirement = (
@@ -4481,6 +4565,52 @@ async function bootstrap() {
     resolveRecipient: resolveResidentNotificationRecipient
   });
 
+  const mapRoomRentDefault = (row: {
+    buildingId: string;
+    houseNumber: string;
+    monthlyRentKsh: number | null;
+    paymentDueDay: number | null;
+    graceDays: number | null;
+    active: boolean;
+    note: string | null;
+    updatedByRole: string | null;
+    updatedByUserId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): RoomRentDefaultRecord => ({
+    buildingId: normalizeBuildingId(row.buildingId),
+    houseNumber: normalizeHouseNumber(row.houseNumber),
+    monthlyRentKsh: normalizeOptionalNonNegativeInteger(row.monthlyRentKsh),
+    paymentDueDay:
+      row.paymentDueDay == null ? null : normalizeOptionalRentDueDay(row.paymentDueDay) ?? null,
+    graceDays: row.graceDays == null ? null : normalizeOptionalGraceDays(row.graceDays) ?? null,
+    active: row.active,
+    note: row.note ?? undefined,
+    updatedByRole: row.updatedByRole ?? undefined,
+    updatedByUserId: row.updatedByUserId ?? undefined,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString()
+  });
+
+  const listRoomRentDefaultsForBuilding = async (buildingId: string) => {
+    const rowsByHouse = new Map<string, RoomRentDefaultRecord>();
+    if (!repositoryContext.prisma) {
+      return rowsByHouse;
+    }
+
+    const rows = await repositoryContext.prisma.roomRentDefault.findMany({
+      where: { buildingId },
+      orderBy: { updatedAt: "desc" }
+    });
+
+    for (const row of rows) {
+      const mapped = mapRoomRentDefault(row);
+      rowsByHouse.set(mapped.houseNumber, mapped);
+    }
+
+    return rowsByHouse;
+  };
+
   const buildLandlordUtilityRegistryRows = async (
     buildingId: string,
     houseNumbers: string[]
@@ -4676,6 +4806,10 @@ async function bootstrap() {
       }
     }
 
+    const buildingConfiguration = buildingConfigurationService
+      ? await buildingConfigurationService.getForBuilding(buildingId)
+      : null;
+    const roomRentDefaultsByHouse = await listRoomRentDefaultsForBuilding(buildingId);
     const memberRegistryByHouse = await listHouseholdMembersForBuilding(buildingId);
     const utilityDefaultsByHouse = listUtilityChargeDefaultsForBuilding(buildingId);
     const paymentAccess = paymentAccessService.getForBuilding(buildingId);
@@ -4743,18 +4877,72 @@ async function bootstrap() {
       const registryRecord = memberRegistryByHouse.get(houseNumber);
       const utilityDefaults = utilityDefaultsByHouse.get(houseNumber);
       const rent = rentStatusByHouse.get(houseNumber);
-      const fallbackMonthlyRentKsh = Math.max(0, Number(agreement?.monthlyRentKsh ?? 0));
+      const roomRentDefault = roomRentDefaultsByHouse.get(houseNumber);
+      const roomDefaultActive = roomRentDefault?.active ?? true;
+      const roomDefaultMonthlyRentKsh = roomDefaultActive
+        ? normalizeOptionalNonNegativeInteger(roomRentDefault?.monthlyRentKsh)
+        : null;
+      const roomDefaultRentDueDay = roomDefaultActive
+        ? normalizeOptionalRentDueDay(roomRentDefault?.paymentDueDay)
+        : undefined;
+      const roomDefaultGraceDays = roomDefaultActive
+        ? normalizeOptionalGraceDays(roomRentDefault?.graceDays)
+        : undefined;
+      const buildingDefaultMonthlyRentKsh =
+        normalizeOptionalNonNegativeInteger(buildingConfiguration?.defaultMonthlyRentKsh) ??
+        undefined;
+      const buildingDefaultRentDueDay = normalizeOptionalRentDueDay(
+        buildingConfiguration?.defaultRentDueDay
+      );
+      const buildingDefaultRentGraceDays = Math.max(
+        0,
+        Number(buildingConfiguration?.rentGraceDays ?? rentLatePenaltyPolicy.graceDays ?? 0)
+      );
+      const legacyAgreementMonthlyRentKsh = normalizeOptionalNonNegativeInteger(
+        agreement?.monthlyRentKsh
+      );
+      const legacyAgreementPaymentDueDay = normalizeOptionalRentDueDay(
+        agreement?.paymentDueDay
+      );
+      const configuredMonthlyRentKsh = roomDefaultActive
+        ? (roomDefaultMonthlyRentKsh ??
+          buildingDefaultMonthlyRentKsh ??
+          legacyAgreementMonthlyRentKsh ??
+          0)
+        : 0;
+      const configuredPaymentDueDay = roomDefaultActive
+        ? roomDefaultRentDueDay ?? buildingDefaultRentDueDay ?? legacyAgreementPaymentDueDay
+        : undefined;
+      const configuredRentGraceDays = roomDefaultActive
+        ? roomDefaultGraceDays ?? buildingDefaultRentGraceDays
+        : 0;
+      const hasRoomRentDefaultValues =
+        Boolean(roomRentDefault) &&
+        (roomDefaultMonthlyRentKsh != null ||
+          roomDefaultRentDueDay != null ||
+          roomDefaultGraceDays != null ||
+          roomDefaultActive === false);
+      const rentSetupSource =
+        roomDefaultActive === false
+          ? "room_disabled"
+          : hasRoomRentDefaultValues
+            ? "room_default"
+            : buildingDefaultMonthlyRentKsh != null || buildingDefaultRentDueDay != null
+              ? "building_default"
+              : legacyAgreementMonthlyRentKsh != null
+                ? "agreement_legacy"
+                : "unset";
       const depositKsh = Math.max(0, Number(agreement?.depositKsh ?? 0));
-      const fallbackRentBalanceKsh = fallbackMonthlyRentKsh > 0 ? fallbackMonthlyRentKsh : 0;
+      const fallbackRentBalanceKsh = configuredMonthlyRentKsh > 0 ? configuredMonthlyRentKsh : 0;
       const fallbackRentDueDate =
-        fallbackMonthlyRentKsh > 0
+        configuredMonthlyRentKsh > 0
           ? buildAgreementFallbackRentDueDate(
-              agreement?.paymentDueDay,
+              configuredPaymentDueDay,
               agreement?.leaseStartDate
             )
           : undefined;
       const monthlyRentKsh = paymentAccess.rentEnabled
-        ? Math.max(0, Number(rent?.monthlyRentKsh ?? fallbackMonthlyRentKsh))
+        ? Math.max(0, Number(rent?.monthlyRentKsh ?? configuredMonthlyRentKsh))
         : 0;
       const rentBalanceKsh = paymentAccess.rentEnabled
         ? Math.max(0, Number(rent?.balanceKsh ?? fallbackRentBalanceKsh))
@@ -4804,7 +4992,7 @@ async function bootstrap() {
       const visibleRentArrearsKsh = billingVisible ? rentArrearsKsh : 0;
       const visibleCurrentMonthLatePenaltyKsh = billingVisible ? currentMonthLatePenaltyKsh : 0;
       const visibleTotalLatePenaltyKsh = billingVisible ? totalLatePenaltyKsh : 0;
-      const visibleRentGraceDays = billingVisible ? rentLatePenaltyPolicy.graceDays : 0;
+      const visibleRentGraceDays = billingVisible ? configuredRentGraceDays : 0;
       const visibleLateRentPenaltyAmountKsh = billingVisible
         ? rentLatePenaltyPolicy.amountKsh
         : 0;
@@ -4848,6 +5036,17 @@ async function bootstrap() {
         hasActiveResident: Boolean(resident),
         rentEnabled: paymentAccess.rentEnabled,
         monthlyRentKsh,
+        configuredMonthlyRentKsh,
+        configuredPaymentDueDay,
+        configuredRentGraceDays,
+        buildingDefaultMonthlyRentKsh,
+        buildingDefaultRentDueDay,
+        buildingDefaultRentGraceDays,
+        roomDefaultMonthlyRentKsh: roomDefaultMonthlyRentKsh ?? undefined,
+        roomDefaultRentDueDay,
+        roomDefaultGraceDays,
+        roomDefaultActive,
+        rentSetupSource,
         depositKsh,
         rentPaymentStatus: visibleRentPaymentStatus,
         rentBalanceKsh: visibleRentBalanceKsh,
@@ -5337,14 +5536,27 @@ async function bootstrap() {
     }
 
     const normalizedHouseNumber = normalizeHouseNumber(houseNumber);
-    const [roomRows, visibleHouseNumbers, buildingConfiguration, auditEvents, billingHolds] = await Promise.all([
+    const [
+      roomRows,
+      visibleHouseNumbers,
+      buildingConfiguration,
+      auditEvents,
+      billingHolds,
+      agreementState
+    ] = await Promise.all([
       buildLandlordUtilityRegistryRows(building.id, [normalizedHouseNumber]),
       listVisibleHouseNumbersForBuildings([building]),
       buildingConfigurationService
         ? buildingConfigurationService.getForBuilding(building.id)
         : Promise.resolve(null),
       listRoomAccountAuditEvents(building.id, normalizedHouseNumber),
-      listRoomBillingHolds(building.id, normalizedHouseNumber)
+      listRoomBillingHolds(building.id, normalizedHouseNumber),
+      userAccountService
+        ? userAccountService.getActiveTenantAgreement({
+            buildingId: building.id,
+            houseNumber: normalizedHouseNumber
+          })
+        : Promise.resolve(null)
     ]);
 
     const room =
@@ -5576,6 +5788,7 @@ async function bootstrap() {
       tickets,
       auditEvents,
       billingHolds,
+      agreementState,
       monthlyCombinedCharge,
       buildingConfiguration
     };
@@ -5697,6 +5910,158 @@ async function bootstrap() {
     }
 
     return [...collectionRowsByKey.values()].slice(0, limit);
+  };
+
+  const buildResidentRentStatusDetails = (
+    balanceKsh: number,
+    dueDateValue: string,
+    graceDaysValue: number
+  ) => {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const dueDate = new Date(dueDateValue);
+    const safeDueDate = Number.isNaN(dueDate.getTime()) ? new Date() : dueDate;
+    const graceDays = Math.min(31, Math.max(0, Math.round(Number(graceDaysValue) || 0)));
+    const overdueStartsAtDate = new Date(safeDueDate);
+    overdueStartsAtDate.setUTCDate(overdueStartsAtDate.getUTCDate() + graceDays);
+    const daysToDue = Math.ceil((safeDueDate.getTime() - Date.now()) / msPerDay);
+    const daysToOverdue = Math.ceil((overdueStartsAtDate.getTime() - Date.now()) / msPerDay);
+    const normalizedBalance = Math.max(0, Math.round(Number(balanceKsh) || 0));
+
+    return {
+      status: normalizedBalance <= 0 ? "clear" : daysToDue < 0 ? "overdue" : "due_soon",
+      graceDays,
+      overdueStartsAt: overdueStartsAtDate.toISOString(),
+      daysToDue,
+      daysToOverdue
+    };
+  };
+
+  const buildResidentRentProfile = async (session: {
+    buildingId: string;
+    houseNumber: string;
+  }) => {
+    const normalizedHouseNumber = normalizeHouseNumber(session.houseNumber);
+    const [registryRows, ledgerRentDue] = await Promise.all([
+      buildLandlordUtilityRegistryRows(session.buildingId, [normalizedHouseNumber]),
+      Promise.resolve(rentLedgerService.getRentDue(session.buildingId, normalizedHouseNumber))
+    ]);
+    const registryRow =
+      registryRows.find(
+        (item) => normalizeHouseNumber(item.houseNumber) === normalizedHouseNumber
+      ) ?? null;
+    const configuredMonthlyRentKsh = Math.max(
+      0,
+      Math.round(
+        Number(
+          registryRow?.configuredMonthlyRentKsh ??
+            registryRow?.monthlyRentKsh ??
+            ledgerRentDue?.monthlyRentKsh ??
+            0
+        )
+      )
+    );
+    const configuredPaymentDueDay =
+      registryRow?.configuredPaymentDueDay ?? normalizeOptionalRentDueDay(undefined);
+    const configuredGraceDays = Math.max(
+      0,
+      Math.round(Number(registryRow?.configuredRentGraceDays ?? ledgerRentDue?.graceDays ?? 0))
+    );
+    const rentSetup = {
+      source: registryRow?.rentSetupSource ?? (ledgerRentDue ? "ledger" : "unset"),
+      monthlyRentKsh: configuredMonthlyRentKsh,
+      paymentDueDay: configuredPaymentDueDay ?? null,
+      graceDays: configuredGraceDays,
+      dueDate: registryRow?.rentDueDate ?? ledgerRentDue?.dueDate,
+      buildingDefaultMonthlyRentKsh: registryRow?.buildingDefaultMonthlyRentKsh ?? null,
+      buildingDefaultRentDueDay: registryRow?.buildingDefaultRentDueDay ?? null,
+      buildingDefaultRentGraceDays: registryRow?.buildingDefaultRentGraceDays ?? 0,
+      roomDefaultMonthlyRentKsh: registryRow?.roomDefaultMonthlyRentKsh ?? null,
+      roomDefaultRentDueDay: registryRow?.roomDefaultRentDueDay ?? null,
+      roomDefaultGraceDays: registryRow?.roomDefaultGraceDays ?? null,
+      roomDefaultActive: registryRow?.roomDefaultActive ?? true
+    };
+    const rentConfigured =
+      Boolean(ledgerRentDue) ||
+      (rentSetup.source !== "room_disabled" &&
+        rentSetup.source !== "unset" &&
+        configuredMonthlyRentKsh > 0);
+
+    if (!rentConfigured) {
+      return {
+        rentConfigured: false,
+        rentSetup,
+        rentDue: null as Record<string, unknown> | null,
+        message:
+          rentSetup.source === "room_disabled"
+            ? "Rent is not charged for this room."
+            : "Rent setup is not configured yet for this room."
+      };
+    }
+
+    const dueDate =
+      ledgerRentDue?.dueDate ??
+      registryRow?.rentDueDate ??
+      buildAgreementFallbackRentDueDate(configuredPaymentDueDay);
+    const balanceKsh = Math.max(
+      0,
+      Math.round(Number(ledgerRentDue?.balanceKsh ?? configuredMonthlyRentKsh))
+    );
+    const currentMonthLatePenaltyKsh = Math.max(
+      0,
+      Math.round(Number(ledgerRentDue?.currentMonthLatePenaltyKsh ?? 0))
+    );
+    const totalLatePenaltyKsh = Math.max(
+      0,
+      Math.round(Number(ledgerRentDue?.totalLatePenaltyKsh ?? currentMonthLatePenaltyKsh))
+    );
+    const currentCycleChargeKsh = configuredMonthlyRentKsh + currentMonthLatePenaltyKsh;
+    const currentMonthOutstandingKsh =
+      ledgerRentDue?.currentMonthOutstandingKsh ??
+      (currentCycleChargeKsh > 0 ? Math.min(balanceKsh, currentCycleChargeKsh) : balanceKsh);
+    const currentMonthPaidKsh =
+      ledgerRentDue?.currentMonthPaidKsh ??
+      (currentCycleChargeKsh > 0
+        ? Math.max(0, currentCycleChargeKsh - currentMonthOutstandingKsh)
+        : 0);
+    const statusDetails = buildResidentRentStatusDetails(
+      balanceKsh,
+      dueDate,
+      configuredGraceDays
+    );
+    const safeDueDate = new Date(dueDate);
+    const currentBillingMonth = Number.isNaN(safeDueDate.getTime())
+      ? billingMonthFromDate(new Date())
+      : billingMonthFromDate(safeDueDate);
+
+    return {
+      rentConfigured: true,
+      rentSetup,
+      rentDue: {
+        ...(ledgerRentDue ?? {}),
+        buildingId: session.buildingId,
+        houseNumber: normalizedHouseNumber,
+        monthlyRentKsh: configuredMonthlyRentKsh,
+        balanceKsh,
+        dueDate,
+        updatedAt: ledgerRentDue?.updatedAt ?? new Date().toISOString(),
+        payments: ledgerRentDue?.payments ?? [],
+        latePenaltyCharges: ledgerRentDue?.latePenaltyCharges ?? [],
+        paymentStatus:
+          ledgerRentDue?.paymentStatus ?? (balanceKsh <= 0 ? "paid" : "not_paid"),
+        currentBillingMonth: ledgerRentDue?.currentBillingMonth ?? currentBillingMonth,
+        paidAmountKsh: currentMonthPaidKsh,
+        currentMonthPaidKsh,
+        currentMonthOutstandingKsh,
+        arrearsKsh: Math.max(0, balanceKsh - currentMonthOutstandingKsh),
+        totalPaidKsh: ledgerRentDue?.totalPaidKsh ?? 0,
+        currentMonthLatePenaltyKsh,
+        totalLatePenaltyKsh,
+        ...statusDetails,
+        rentSetup,
+        rentSetupSource: rentSetup.source,
+        paymentDueDay: configuredPaymentDueDay ?? null
+      }
+    };
   };
 
   const STARTUP_RECURRING_UTILITY_BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
@@ -8446,16 +8811,26 @@ async function bootstrap() {
       }
 
       const currentAgreement = current.agreement;
+      const nextIdentityType = parsed.identityType ?? currentAgreement?.identityType;
+      const nextIdentityNumber = parsed.identityNumber ?? currentAgreement?.identityNumber;
+      const nextIdentityDocumentUrls =
+        parsed.identityDocumentUrls ?? currentAgreement?.identityDocumentUrls ?? undefined;
+      const identityError = validateTenantIdentityCompletion({
+        identityType: nextIdentityType,
+        identityNumber: nextIdentityNumber,
+        identityDocumentUrls: nextIdentityDocumentUrls
+      });
+      if (identityError) {
+        return res.status(400).json({ error: identityError });
+      }
+
       await userAccountService.upsertActiveTenantAgreement({
         buildingId: session.buildingId,
         houseNumber: session.houseNumber,
         payload: {
-          identityType: parsed.identityType,
-          identityNumber: parsed.identityNumber,
-          identityDocumentUrls:
-            parsed.identityDocumentUrls ??
-            currentAgreement?.identityDocumentUrls ??
-            undefined,
+          identityType: nextIdentityType,
+          identityNumber: nextIdentityNumber,
+          identityDocumentUrls: nextIdentityDocumentUrls,
           occupationStatus: parsed.occupationStatus,
           occupationLabel: parsed.occupationLabel,
           organizationName: parsed.organizationName,
@@ -9799,6 +10174,8 @@ async function bootstrap() {
             defaultWaterFixedChargeKsh: parsed.defaultWaterFixedChargeKsh,
             defaultElectricityFixedChargeKsh: parsed.defaultElectricityFixedChargeKsh,
             defaultCombinedUtilityChargeKsh: parsed.defaultCombinedUtilityChargeKsh,
+            defaultMonthlyRentKsh: parsed.defaultMonthlyRentKsh,
+            defaultRentDueDay: parsed.defaultRentDueDay,
             utilityBalanceVisibleDays: parsed.utilityBalanceVisibleDays,
             rentGraceDays: parsed.rentGraceDays,
             lateRentPenaltyEnabled: parsed.lateRentPenaltyEnabled,
@@ -10052,10 +10429,10 @@ async function bootstrap() {
         const canApproveCaretaker =
           context.role === "admin" ||
           context.role === "root_admin" ||
-          (context.role === "landlord" && context.userId === building.landlordUserId);
+          context.role === "landlord";
         if (!canApproveCaretaker) {
           return res.status(403).json({
-            error: "Only building owner/management admin can review house manager requests."
+            error: "Only owner/staff accounts can review house manager requests."
           });
         }
 
@@ -10218,10 +10595,10 @@ async function bootstrap() {
         const canApproveCaretaker =
           context.role === "admin" ||
           context.role === "root_admin" ||
-          (context.role === "landlord" && context.userId === building.landlordUserId);
+          context.role === "landlord";
         if (!canApproveCaretaker) {
           return res.status(403).json({
-            error: "Only building owner/management admin can approve caretakers."
+            error: "Only owner/staff accounts can approve house managers."
           });
         }
 
@@ -10413,10 +10790,10 @@ async function bootstrap() {
         const canRevokeCaretaker =
           context.role === "admin" ||
           context.role === "root_admin" ||
-          (context.role === "landlord" && context.userId === building.landlordUserId);
+          context.role === "landlord";
         if (!canRevokeCaretaker) {
           return res.status(403).json({
-            error: "Only building owner/management admin can revoke caretakers."
+            error: "Only owner/staff accounts can revoke house managers."
           });
         }
 
@@ -11357,37 +11734,88 @@ async function bootstrap() {
 
       let targetDirectorySegments = ["misc"];
 
-      if (
-        parsed.category === "support_evidence" ||
-        parsed.category === "resident_identity"
-      ) {
+      if (parsed.category === "support_evidence") {
         const session = await getResidentSession(req, res);
         if (!session) {
           return;
         }
 
-        if (
-          parsed.category === "support_evidence" &&
-          session.verificationStatus !== "verified"
-        ) {
+        if (session.verificationStatus !== "verified") {
           return res.status(403).json({
             error: "Support requests unlock after landlord verification."
           });
         }
 
-        targetDirectorySegments =
-          parsed.category === "resident_identity"
-            ? [
-                "identity",
-                normalizeUploadFolderSegment(session.buildingId, "building"),
-                normalizeUploadFolderSegment(session.houseNumber, "house"),
-                normalizeUploadFolderSegment(session.userId, "resident")
-              ]
-            : [
-                "support",
-                normalizeUploadFolderSegment(session.buildingId, "building"),
-                normalizeUploadFolderSegment(session.houseNumber, "house")
-              ];
+        targetDirectorySegments = [
+          "support",
+          normalizeUploadFolderSegment(session.buildingId, "building"),
+          normalizeUploadFolderSegment(session.houseNumber, "house")
+        ];
+      } else if (parsed.category === "resident_identity") {
+        const userSession = await resolveOptionalUserSession(req);
+        if (userSession?.role === "tenant") {
+          const session = await getResidentSession(req, res);
+          if (!session) {
+            return;
+          }
+
+          targetDirectorySegments = [
+            "identity",
+            normalizeUploadFolderSegment(session.buildingId, "building"),
+            normalizeUploadFolderSegment(session.houseNumber, "house"),
+            normalizeUploadFolderSegment(session.userId, "resident")
+          ];
+        } else {
+          const context = await resolveLandlordAccessContext(req, res);
+          if (!context) {
+            return;
+          }
+
+          if (context.role === "caretaker") {
+            return res.status(403).json({
+              error: "House manager accounts cannot upload resident ID photos."
+            });
+          }
+
+          const buildingId = parsed.buildingId?.trim();
+          const houseNumber = normalizeHouseNumber(parsed.houseNumber ?? "");
+          if (!buildingId || !houseNumber) {
+            return res.status(400).json({
+              error: "Building and house number are required for resident ID photos."
+            });
+          }
+
+          const building = await store.getBuilding(buildingId);
+          if (!building) {
+            return res.status(404).json({ error: "Building not found" });
+          }
+
+          const hasAccess = await canManageBuildingFromLandlordContext(
+            context,
+            building.id
+          );
+          if (!hasAccess) {
+            return res.status(403).json({ error: "Building access denied" });
+          }
+
+          const registeredHouseNumbers = new Set(
+            (building.houseNumbers ?? []).map((item) => normalizeHouseNumber(item))
+          );
+          const visibleHouseNumbers = await listVisibleHouseNumbersForBuildings([building]);
+          if (
+            !registeredHouseNumbers.has(houseNumber) &&
+            !visibleHouseNumbers.has(houseNumber)
+          ) {
+            return res.status(404).json({ error: "Room not found" });
+          }
+
+          targetDirectorySegments = [
+            "identity",
+            normalizeUploadFolderSegment(building.id, "building"),
+            normalizeUploadFolderSegment(houseNumber, "house"),
+            normalizeUploadFolderSegment(context.userId ?? context.role, "manager")
+          ];
+        }
       } else {
         const context = await resolveLandlordAccessContext(req, res);
         if (!context) {
@@ -11633,10 +12061,7 @@ async function bootstrap() {
         ? userSupportService.listReports(session.houseNumber, session.buildingId)
         : [];
 
-      const configuredRent = rentLedgerService.getRentDue(
-        session.buildingId,
-        session.houseNumber
-      );
+      const residentRentProfile = await buildResidentRentProfile(session);
       const basePaymentAccess = paymentAccessService.getForBuilding(session.buildingId);
       const sessionBuilding = await store.getBuilding(session.buildingId);
       const paymentInstructions = buildBuildingPaymentInstructionPayload({
@@ -11647,8 +12072,8 @@ async function bootstrap() {
       const paymentAccess = billingVisible
         ? {
             ...basePaymentAccess,
-            rentConfigured: Boolean(configuredRent),
-            rentEnabled: basePaymentAccess.rentEnabled && Boolean(configuredRent),
+            rentConfigured: residentRentProfile.rentConfigured,
+            rentEnabled: basePaymentAccess.rentEnabled && residentRentProfile.rentConfigured,
             locked: false
           }
         : {
@@ -11698,7 +12123,7 @@ async function bootstrap() {
 
             return sum + Math.max(0, Number(item.amountKsh ?? 0));
           }, 0);
-          const due = configuredRent;
+          const due = residentRentProfile.rentDue;
           rentDue = due
             ? {
                 ...due,
@@ -11710,7 +12135,7 @@ async function bootstrap() {
             : null;
           rentDueMessage = rentDue
             ? undefined
-            : "Rent profile is not configured yet for this house number.";
+            : residentRentProfile.message;
           rentPayments = rentLedgerService.listPayments({
             buildingId: session.buildingId,
             houseNumber: session.houseNumber
@@ -11802,10 +12227,7 @@ async function bootstrap() {
 
     enqueueResidentBillingNotifications(session.buildingId, session.houseNumber);
 
-    const rentDue = rentLedgerService.getRentDue(
-      session.buildingId,
-      session.houseNumber
-    );
+    const residentRentProfile = await buildResidentRentProfile(session);
     const expenseBalanceKsh = [...buildingExpenditures.values()].reduce((sum, item) => {
       const itemHouseNumber = item.houseNumber
         ? normalizeHouseNumber(item.houseNumber)
@@ -11820,19 +12242,21 @@ async function bootstrap() {
 
       return sum + Math.max(0, Number(item.amountKsh ?? 0));
     }, 0);
-    const data = rentDue
+    const data = residentRentProfile.rentDue
       ? {
-          ...rentDue,
+          ...residentRentProfile.rentDue,
           expenseBalanceKsh,
           expenseArrearsKsh: expenseBalanceKsh,
-          totalRoomBalanceKsh: Math.max(0, Number(rentDue.balanceKsh ?? 0)) + expenseBalanceKsh
+          totalRoomBalanceKsh:
+            Math.max(0, Number(residentRentProfile.rentDue.balanceKsh ?? 0)) +
+            expenseBalanceKsh
         }
       : null;
     return res.json({
       data,
       message: data
         ? undefined
-        : "Rent profile is not configured yet for this house number."
+        : residentRentProfile.message
     });
   });
 
@@ -11949,15 +12373,12 @@ async function bootstrap() {
       });
     }
 
-    const configuredRent = rentLedgerService.getRentDue(
-      session.buildingId,
-      session.houseNumber
-    );
+    const residentRentProfile = await buildResidentRentProfile(session);
     const baseAccess = paymentAccessService.getForBuilding(session.buildingId);
     const data = {
       ...baseAccess,
-      rentConfigured: Boolean(configuredRent),
-      rentEnabled: baseAccess.rentEnabled && Boolean(configuredRent)
+      rentConfigured: residentRentProfile.rentConfigured,
+      rentEnabled: baseAccess.rentEnabled && residentRentProfile.rentConfigured
     };
     return res.json({ data });
   });
@@ -13711,6 +14132,63 @@ async function bootstrap() {
     }
   );
 
+  const buildLandlordRentSetupSheet = async (building: {
+    id: string;
+    name: string;
+    houseNumbers?: string[];
+  }) => {
+    if (buildingConfigurationService) {
+      await buildingConfigurationService.ensureDefaultsForBuildings([{ id: building.id }]);
+    }
+
+    const configuration = buildingConfigurationService
+      ? await buildingConfigurationService.getForBuilding(building.id)
+      : null;
+    const registryRows = await buildLandlordUtilityRegistryRows(
+      building.id,
+      building.houseNumbers ?? []
+    );
+
+    return {
+      buildingId: building.id,
+      buildingName: building.name,
+      rentEnabled: paymentAccessService.isEnabled(building.id, "rent"),
+      buildingDefaultMonthlyRentKsh: normalizeOptionalNonNegativeInteger(
+        configuration?.defaultMonthlyRentKsh
+      ),
+      buildingDefaultDueDay: normalizeOptionalRentDueDay(
+        configuration?.defaultRentDueDay
+      ) ?? null,
+      buildingDefaultGraceDays: Math.max(0, Number(configuration?.rentGraceDays ?? 0)),
+      rows: registryRows.map((row) => ({
+        houseNumber: row.houseNumber,
+        residentName: row.residentName,
+        residentPhone: row.residentPhone,
+        residentUserId: row.residentUserId,
+        hasActiveResident: row.hasActiveResident,
+        verificationStatus: row.verificationStatus,
+        rentSetupSource: row.rentSetupSource,
+        resolvedMonthlyRentKsh: row.configuredMonthlyRentKsh,
+        resolvedDueDay: row.configuredPaymentDueDay ?? null,
+        resolvedGraceDays: row.configuredRentGraceDays,
+        roomDefaultMonthlyRentKsh: row.roomDefaultMonthlyRentKsh ?? null,
+        roomDefaultDueDay: row.roomDefaultRentDueDay ?? null,
+        roomDefaultGraceDays: row.roomDefaultGraceDays ?? null,
+        roomDefaultActive: row.roomDefaultActive,
+        monthlyRentKsh: row.monthlyRentKsh,
+        depositKsh: row.depositKsh,
+        balanceKsh: row.rentBalanceKsh,
+        currentMonthOutstandingKsh: row.currentMonthRentOutstandingKsh,
+        currentMonthLatePenaltyKsh: row.currentMonthLatePenaltyKsh,
+        totalLatePenaltyKsh: row.totalLatePenaltyKsh,
+        currentMonthPaidKsh: row.currentMonthRentPaidKsh,
+        arrearsKsh: row.rentArrearsKsh,
+        dueDate: row.rentDueDate,
+        paymentStatus: row.rentPaymentStatus
+      }))
+    };
+  };
+
   app.get("/api/landlord/rent-collection-status", async (req, res, next) => {
     try {
       const context = await resolveLandlordAccessContext(req, res);
@@ -13737,6 +14215,255 @@ async function bootstrap() {
       return next(error);
     }
   });
+
+  app.get(
+    "/api/landlord/buildings/:buildingId/rent-setup-sheet",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const data = await buildLandlordRentSetupSheet(building);
+        return res.json({ data, role: context.role });
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
+  app.put(
+    "/api/landlord/buildings/:buildingId/rent-setup-sheet",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "House manager accounts cannot change room rent setup."
+          });
+        }
+
+        if (!buildingConfigurationService || !repositoryContext.prisma) {
+          return res.status(503).json({
+            error: "Room rent setup requires database-backed building configuration."
+          });
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const parsed = landlordRentSetupSheetSchema.parse(req.body ?? {});
+        const registryRows = await buildLandlordUtilityRegistryRows(
+          building.id,
+          building.houseNumbers ?? []
+        );
+        const roomRowsByHouse = new Map(
+          registryRows.map((row) => [normalizeHouseNumber(row.houseNumber), row])
+        );
+
+        await buildingConfigurationService.updateForBuilding(
+          building.id,
+          {
+            defaultMonthlyRentKsh: parsed.buildingDefaultMonthlyRentKsh,
+            defaultRentDueDay: parsed.buildingDefaultDueDay,
+            rentGraceDays: parsed.buildingDefaultGraceDays,
+            note: parsed.note
+          },
+          {
+            role: context.role,
+            userId: context.userId
+          }
+        );
+
+        const actor = actorFromLandlordContext(context);
+        const changedHouses = new Set<string>();
+        for (const row of parsed.rows) {
+          const houseNumber = normalizeHouseNumber(row.houseNumber);
+          if (!roomRowsByHouse.has(houseNumber)) {
+            return res.status(400).json({
+              error: `House ${houseNumber || row.houseNumber} is not registered in ${building.name}.`
+            });
+          }
+
+          const active = row.active !== false;
+          const monthlyRentKsh = normalizeOptionalNonNegativeInteger(row.monthlyRentKsh);
+          const paymentDueDay = normalizeOptionalRentDueDay(row.paymentDueDay) ?? null;
+          const graceDays = normalizeOptionalGraceDays(row.graceDays) ?? null;
+          const note = row.note?.trim() || null;
+          const hasRoomDefault =
+            !active ||
+            monthlyRentKsh != null ||
+            paymentDueDay != null ||
+            graceDays != null ||
+            Boolean(note);
+
+          if (!hasRoomDefault) {
+            await repositoryContext.prisma.roomRentDefault.deleteMany({
+              where: {
+                buildingId: building.id,
+                houseNumber
+              }
+            });
+          } else {
+            await repositoryContext.prisma.roomRentDefault.upsert({
+              where: {
+                buildingId_houseNumber: {
+                  buildingId: building.id,
+                  houseNumber
+                }
+              },
+              update: {
+                monthlyRentKsh,
+                paymentDueDay,
+                graceDays,
+                active,
+                note,
+                updatedByRole: context.role,
+                updatedByUserId: context.userId ?? null
+              },
+              create: {
+                buildingId: building.id,
+                houseNumber,
+                monthlyRentKsh,
+                paymentDueDay,
+                graceDays,
+                active,
+                note,
+                updatedByRole: context.role,
+                updatedByUserId: context.userId ?? null
+              }
+            });
+          }
+
+          changedHouses.add(houseNumber);
+        }
+
+        await syncDerivedBuildingConfigurationState();
+
+        const refreshedRows = await buildLandlordUtilityRegistryRows(
+          building.id,
+          building.houseNumbers ?? []
+        );
+        const refreshedByHouse = new Map(
+          refreshedRows.map((row) => [normalizeHouseNumber(row.houseNumber), row])
+        );
+
+        for (const houseNumber of changedHouses) {
+          const refreshed = refreshedByHouse.get(houseNumber);
+          if (!refreshed) {
+            continue;
+          }
+
+          const monthlyRentKsh = Math.max(
+            0,
+            Math.round(Number(refreshed.configuredMonthlyRentKsh ?? 0))
+          );
+          const dueDate = buildAgreementFallbackRentDueDate(
+            refreshed.configuredPaymentDueDay
+          );
+          const existing = rentLedgerService.getRentDue(building.id, houseNumber);
+          if (paymentAccessService.isEnabled(building.id, "rent") && (existing || monthlyRentKsh > 0)) {
+            rentLedgerService.upsertRentDue(building.id, houseNumber, {
+              monthlyRentKsh,
+              balanceKsh: Math.max(0, Number(existing?.balanceKsh ?? monthlyRentKsh)),
+              dueDate: existing && monthlyRentKsh <= 0 ? existing.dueDate : dueDate,
+              note:
+                parsed.note?.trim() ||
+                `Room Default saved for ${building.name} ${houseNumber}.`
+            });
+          }
+
+          if (userAccountService && refreshed.hasActiveResident) {
+            const activeAgreement = await userAccountService.getActiveTenantAgreement({
+              buildingId: building.id,
+              houseNumber
+            });
+            const currentAgreement = activeAgreement.agreement;
+            await userAccountService.upsertActiveTenantAgreement({
+              buildingId: building.id,
+              houseNumber,
+              payload: {
+                identityType: currentAgreement?.identityType,
+                identityNumber: currentAgreement?.identityNumber,
+                identityDocumentUrls: currentAgreement?.identityDocumentUrls,
+                occupationStatus: currentAgreement?.occupationStatus,
+                occupationLabel: currentAgreement?.occupationLabel,
+                organizationName: currentAgreement?.organizationName,
+                organizationLocation: currentAgreement?.organizationLocation,
+                studentRegistrationNumber: currentAgreement?.studentRegistrationNumber,
+                sponsorName: currentAgreement?.sponsorName,
+                sponsorPhone: currentAgreement?.sponsorPhone,
+                emergencyContactName: currentAgreement?.emergencyContactName,
+                emergencyContactPhone: currentAgreement?.emergencyContactPhone,
+                leaseStartDate: currentAgreement?.leaseStartDate,
+                leaseEndDate: currentAgreement?.leaseEndDate,
+                monthlyRentKsh,
+                depositKsh: currentAgreement?.depositKsh,
+                paymentDueDay: refreshed.configuredPaymentDueDay,
+                specialTerms: currentAgreement?.specialTerms
+              }
+            });
+          }
+
+          await recordRoomAccountAuditEvent({
+            buildingId: building.id,
+            houseNumber,
+            action: "rent.room_default.updated",
+            summary:
+              refreshed.rentSetupSource === "room_disabled"
+                ? "Room rent charging disabled."
+                : `Room Default saved at KSh ${monthlyRentKsh.toLocaleString("en-US")}.`,
+            actor,
+            metadata: {
+              rentSetupSource: refreshed.rentSetupSource,
+              monthlyRentKsh,
+              paymentDueDay: refreshed.configuredPaymentDueDay,
+              graceDays: refreshed.configuredRentGraceDays
+            }
+          });
+        }
+
+        if (changedHouses.size > 0) {
+          await persistRentLedgerStateNow();
+        }
+
+        const data = await buildLandlordRentSetupSheet(building);
+        return res.json({
+          data: {
+            ...data,
+            updatedCount: changedHouses.size
+          },
+          role: context.role
+        });
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
 
   app.get(
     "/api/landlord/buildings/:buildingId/rent-bulk-sheet",
@@ -14412,6 +15139,10 @@ async function bootstrap() {
         );
 
         const parsed = tenantAgreementUpsertSchema.parse(req.body ?? {});
+        const identityError = validateTenantIdentityCompletion(parsed);
+        if (identityError) {
+          return res.status(400).json({ error: identityError });
+        }
 
         try {
           const data = await userAccountService.upsertActiveTenantAgreement({
@@ -16055,7 +16786,7 @@ async function bootstrap() {
       }
 
       if (userSession && !hasUserRoleAtLeast(userSession.role, "landlord")) {
-        return res.status(403).json({ error: "landlord role required" });
+        return res.status(403).json({ error: "Owner/staff access required" });
       }
 
       const parsed = createBuildingSchema.parse(req.body);
@@ -16065,7 +16796,7 @@ async function bootstrap() {
         (!parsed.houseNumbers || parsed.houseNumbers.length === 0)
       ) {
         return res.status(400).json({
-          error: "Landlord building creation requires houseNumbers."
+          error: "Building creation requires room numbers."
         });
       }
 
@@ -16867,7 +17598,7 @@ async function bootstrap() {
 
         if (userSession) {
           if (!hasUserRoleAtLeast(userSession.role, "landlord")) {
-            return res.status(403).json({ error: "landlord role required" });
+            return res.status(403).json({ error: "Owner/staff access required" });
           }
           if (userAccountService) {
             const hasAccess = await userAccountService.canAccessBuilding(
@@ -16916,7 +17647,7 @@ async function bootstrap() {
 
         if (userSession) {
           if (!hasUserRoleAtLeast(userSession.role, "landlord")) {
-            return res.status(403).json({ error: "landlord role required" });
+            return res.status(403).json({ error: "Owner/staff access required" });
           }
           if (userAccountService) {
             const hasAccess = await userAccountService.canAccessBuilding(

@@ -74,8 +74,8 @@ npm run repair:missing-combined-utility-charges -- --all-buildings --month=2026-
 Rules enforced by the repair command:
 
 - only active tenant rooms are considered
-- room-level combined charge overrides win first
-- monthly building override wins next
+- room default combined charges win first
+- monthly building adjustments win next
 - building default combined charge is the fallback
 - rooms that already have any positive utility bill for the target month are skipped
 - zero-value water bills for the month are upgraded in place instead of creating duplicates
@@ -83,5 +83,5 @@ Rules enforced by the repair command:
 ## Operational Notes
 
 - The repair command updates `AppState.utility_billing_v1`.
-- Room-level combined overrides and monthly overrides are read from `AppState.runtime_queues_v1`.
+- Room default combined charges and monthly adjustments are read from `AppState.runtime_queues_v1`.
 - If a housing change is meant to affect live posting behavior and live balances, make sure both the code deploy and any one-time backfill are done. Redeploy alone does not recreate a skipped month.
