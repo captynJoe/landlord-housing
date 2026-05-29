@@ -37,6 +37,37 @@ const landlordNotificationsReadBtnEl = document.getElementById(
 const landlordNotificationsRefreshBtnEl = document.getElementById(
   "landlord-notifications-refresh-btn"
 );
+const messageCenterSummaryEl = document.getElementById("message-center-summary");
+const messageRulesFormEl = document.getElementById("message-rules-form");
+const messageRulesStatusEl = document.getElementById("message-rules-status");
+const messageRulesUpdatedEl = document.getElementById("message-rules-updated");
+const messageRulePaymentReceiptsEl = document.getElementById(
+  "message-rule-payment-receipts"
+);
+const messageRuleRentRemindersEl = document.getElementById(
+  "message-rule-rent-reminders"
+);
+const messageRuleUtilityRemindersEl = document.getElementById(
+  "message-rule-utility-reminders"
+);
+const messageRuleOverdueNoticesEl = document.getElementById(
+  "message-rule-overdue-notices"
+);
+const messageRulesSaveBtnEl = document.getElementById("message-rules-save-btn");
+const messageCenterFormEl = document.getElementById("message-center-form");
+const messageRecipientScopeEl = document.getElementById("message-recipient-scope");
+const messageBuildingFieldEl = document.getElementById("message-building-field");
+const messageBuildingSelectEl = document.getElementById("message-building-select");
+const messageHouseFieldEl = document.getElementById("message-house-field");
+const messageHouseNumberEl = document.getElementById("message-house-number");
+const messagePhoneFieldEl = document.getElementById("message-phone-field");
+const messagePhoneNumberEl = document.getElementById("message-phone-number");
+const messageTitleEl = document.getElementById("message-title");
+const messageBodyEl = document.getElementById("message-body");
+const messageCharacterCountEl = document.getElementById("message-character-count");
+const messageSendBtnEl = document.getElementById("message-send-btn");
+const messagesBodyEl = document.getElementById("messages-body");
+const refreshMessagesBtnEl = document.getElementById("refresh-messages");
 const refreshAllBtnEl = document.getElementById("refresh-all-btn");
 const landlordLogoutBtnEl = document.getElementById("landlord-logout-btn");
 const landlordGlobalSearchFormEl = document.getElementById("landlord-global-search-form");
@@ -408,6 +439,11 @@ const state = {
   rentStatus: [],
   selectedRentPaymentBuildingId: "",
   selectedRentSheetBuildingId: "",
+  rentSheetDefaults: {
+    monthlyRentKsh: null,
+    dueDay: null,
+    graceDays: 0
+  },
   rentSheetRows: [],
   paymentAccess: [],
   paymentAccessByBuildingId: new Map(),
@@ -435,6 +471,22 @@ const state = {
   ownerNotifications: [],
   ownerNotificationsUnreadCount: 0,
   ownerNotificationsOpen: false,
+  messages: [],
+  messageCenterSms: {
+    enabled: false,
+    provider: "",
+    senderId: ""
+  },
+  automaticMessageRules: {
+    buildingId: "",
+    buildingName: "",
+    paymentReceiptsEnabled: true,
+    rentRemindersEnabled: true,
+    utilityRemindersEnabled: true,
+    overdueNoticesEnabled: true,
+    updatedAt: ""
+  },
+  selectedMessageBuildingId: "",
   landlordPushConfig: null,
   landlordPushSubscriptionEndpoint: "",
   caretakerRequests: [],
@@ -919,6 +971,237 @@ function renderOwnerNotifications() {
   });
 }
 
+function setMessageCenterData(data = {}) {
+  state.messageCenterSms = {
+    enabled: Boolean(data.sms?.enabled),
+    provider: String(data.sms?.provider ?? ""),
+    senderId: String(data.sms?.senderId ?? "")
+  };
+  state.messages = Array.isArray(data.messages) ? data.messages : [];
+  if (data.automaticRules) {
+    setAutomaticMessageRules(data.automaticRules);
+  }
+}
+
+function setAutomaticMessageRules(rules = {}) {
+  state.automaticMessageRules = {
+    buildingId: String(rules.buildingId ?? state.selectedMessageBuildingId ?? ""),
+    buildingName: String(rules.buildingName ?? ""),
+    paymentReceiptsEnabled:
+      typeof rules.paymentReceiptsEnabled === "boolean"
+        ? rules.paymentReceiptsEnabled
+        : true,
+    rentRemindersEnabled:
+      typeof rules.rentRemindersEnabled === "boolean"
+        ? rules.rentRemindersEnabled
+        : true,
+    utilityRemindersEnabled:
+      typeof rules.utilityRemindersEnabled === "boolean"
+        ? rules.utilityRemindersEnabled
+        : true,
+    overdueNoticesEnabled:
+      typeof rules.overdueNoticesEnabled === "boolean"
+        ? rules.overdueNoticesEnabled
+        : true,
+    updatedAt: String(rules.updatedAt ?? "")
+  };
+}
+
+function renderMessageCenterBuildingOptions() {
+  if (!(messageBuildingSelectEl instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  const current =
+    state.selectedMessageBuildingId ||
+    messageBuildingSelectEl.value ||
+    getFocusedBuildingId();
+  messageBuildingSelectEl.replaceChildren();
+
+  if (state.buildings.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No buildings";
+    messageBuildingSelectEl.append(option);
+    state.selectedMessageBuildingId = "";
+    return;
+  }
+
+  state.buildings.forEach((building) => {
+    const option = document.createElement("option");
+    option.value = building.id;
+    option.textContent = getBuildingDisplayName(building, building.id);
+    messageBuildingSelectEl.append(option);
+  });
+
+  const nextValue = state.buildings.some((building) => building.id === current)
+    ? current
+    : state.buildings[0]?.id ?? "";
+  messageBuildingSelectEl.value = nextValue;
+  state.selectedMessageBuildingId = nextValue;
+}
+
+function renderAutomaticMessageRules() {
+  const rules = state.automaticMessageRules ?? {};
+  const selectedBuildingId = String(state.selectedMessageBuildingId || "").trim();
+  const buildingName =
+    rules.buildingName ||
+    getBuildingDisplayNameById(selectedBuildingId, selectedBuildingId || "building");
+
+  if (messageRulesStatusEl instanceof HTMLElement) {
+    messageRulesStatusEl.textContent = selectedBuildingId
+      ? `Rules for ${buildingName}`
+      : "Select a building";
+  }
+
+  if (messageRulesUpdatedEl instanceof HTMLElement) {
+    messageRulesUpdatedEl.textContent = rules.updatedAt
+      ? `Updated ${formatDateTime(rules.updatedAt)}`
+      : "";
+  }
+
+  const disabled = !selectedBuildingId;
+  const pairs = [
+    [messageRulePaymentReceiptsEl, rules.paymentReceiptsEnabled],
+    [messageRuleRentRemindersEl, rules.rentRemindersEnabled],
+    [messageRuleUtilityRemindersEl, rules.utilityRemindersEnabled],
+    [messageRuleOverdueNoticesEl, rules.overdueNoticesEnabled]
+  ];
+
+  pairs.forEach(([element, checked]) => {
+    if (element instanceof HTMLInputElement) {
+      element.checked = checked !== false;
+      element.disabled = disabled;
+    }
+  });
+
+  if (messageRulesSaveBtnEl instanceof HTMLButtonElement) {
+    messageRulesSaveBtnEl.disabled = disabled;
+  }
+}
+
+function updateMessageCenterRecipientFields() {
+  const scope = String(messageRecipientScopeEl?.value || "room");
+  const caretaker = isCaretakerRole();
+
+  if (messageRecipientScopeEl instanceof HTMLSelectElement) {
+    const phoneOption = [...messageRecipientScopeEl.options].find(
+      (option) => option.value === "phone"
+    );
+    if (phoneOption) {
+      phoneOption.disabled = caretaker;
+    }
+    if (caretaker && scope === "phone") {
+      messageRecipientScopeEl.value = "room";
+    }
+  }
+
+  const nextScope = String(messageRecipientScopeEl?.value || "room");
+  messageBuildingFieldEl?.classList.toggle("hidden", nextScope === "phone");
+  messageHouseFieldEl?.classList.toggle("hidden", nextScope !== "room");
+  messagePhoneFieldEl?.classList.toggle("hidden", nextScope !== "phone");
+
+  if (messageHouseNumberEl instanceof HTMLInputElement) {
+    messageHouseNumberEl.required = nextScope === "room";
+  }
+  if (messagePhoneNumberEl instanceof HTMLInputElement) {
+    messagePhoneNumberEl.required = nextScope === "phone";
+  }
+}
+
+function updateMessageCharacterCount() {
+  if (!(messageCharacterCountEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const title = String(messageTitleEl?.value ?? "").trim();
+  const body = String(messageBodyEl?.value ?? "").trim();
+  const length = title ? `${title}: ${body}`.length : body.length;
+  messageCharacterCountEl.textContent = `${length}/160`;
+}
+
+function renderMessageCenter() {
+  renderMessageCenterBuildingOptions();
+  updateMessageCenterRecipientFields();
+  updateMessageCharacterCount();
+  renderAutomaticMessageRules();
+
+  const sms = state.messageCenterSms ?? {};
+  const messages = Array.isArray(state.messages) ? state.messages : [];
+  if (messageCenterSummaryEl instanceof HTMLElement) {
+    const provider = sms.provider ? sms.provider : "SMS";
+    const sender = sms.senderId ? ` from ${sms.senderId}` : "";
+    messageCenterSummaryEl.textContent = sms.enabled
+      ? `${provider} is ready${sender}. Showing ${messages.length} recent message${
+          messages.length === 1 ? "" : "s"
+        }.`
+      : "SMS is not configured on this server.";
+  }
+
+  if (messageSendBtnEl instanceof HTMLButtonElement) {
+    messageSendBtnEl.disabled = !sms.enabled || state.buildings.length === 0;
+  }
+
+  if (!(messagesBodyEl instanceof HTMLElement)) {
+    return;
+  }
+
+  if (messages.length === 0) {
+    messagesBodyEl.innerHTML = '<tr><td colspan="7">No messages sent yet.</td></tr>';
+    return;
+  }
+
+  messagesBodyEl.innerHTML = messages
+    .map((message) => {
+      const status = String(message.status || "sent");
+      const recipientName = message.recipientName || "Tenant";
+      const phone = message.recipientPhoneMask || "";
+      const building =
+        message.buildingName ||
+        getBuildingNameById(message.buildingId) ||
+        message.buildingId ||
+        "";
+      const scopeParts = [
+        message.recipientKind === "building"
+          ? "Building"
+          : message.recipientKind === "phone"
+            ? "Phone"
+            : "Room",
+        building,
+        message.houseNumber ? `House ${message.houseNumber}` : ""
+      ].filter(Boolean);
+      const sender = message.actor?.name || message.actor?.role || message.source || "-";
+      const title = String(message.title || "").trim();
+      const error = message.error
+        ? `<small>${escapeHtml(message.error)}</small>`
+        : `<small>${escapeHtml(message.source || "")}</small>`;
+
+      return `
+        <tr>
+          <td>${escapeHtml(formatDateTime(message.createdAt))}</td>
+          <td><span class="message-status-pill is-${escapeHtml(status)}">${escapeHtml(status)}</span></td>
+          <td>
+            <span class="message-recipient-cell">
+              <strong>${escapeHtml(recipientName)}</strong>
+              <small>${escapeHtml(phone || "-")}</small>
+            </span>
+          </td>
+          <td>${escapeHtml(scopeParts.join(" • ") || "-")}</td>
+          <td>
+            <span class="message-body-cell">
+              ${title ? `<strong>${escapeHtml(title)}</strong>` : ""}
+              <span>${escapeHtml(message.body || "")}</span>
+              ${error}
+            </span>
+          </td>
+          <td>${escapeHtml(sender)}</td>
+          <td>${escapeHtml(message.provider || "-")}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
 function applyRoleCapabilities() {
   const caretaker = isCaretakerRole();
 
@@ -942,6 +1225,7 @@ function applyRoleCapabilities() {
   }
 
   updateOwnerNotificationControls();
+  renderMessageCenter();
 }
 
 function redirectToLogin() {
@@ -1036,6 +1320,7 @@ function setActiveLandlordView(nextView) {
     normalizedView === "overview" ||
     normalizedView === "buildings" ||
     normalizedView === "applications" ||
+    normalizedView === "messages" ||
     normalizedView === "tenants" ||
     normalizedView === "expenses"
       ? normalizedView
@@ -2340,6 +2625,46 @@ function getRoomsDeepLinkBuildingId() {
   }
 
   return decodeURIComponent(segments[2] ?? "").trim();
+}
+
+function getRentSetupDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const intent = String(params.get("rentSetup") ?? params.get("panel") ?? "").trim();
+  const shouldOpen = intent === "1" || intent === "true" || intent === "rent-setup";
+
+  return {
+    shouldOpen,
+    buildingId: String(params.get("buildingId") ?? "").trim()
+  };
+}
+
+function clearRentSetupDeepLink() {
+  if (!window.history?.replaceState) {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("rentSetup");
+  url.searchParams.delete("buildingId");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+async function openRentSetupDeepLinkIfRequested() {
+  const deepLink = getRentSetupDeepLink();
+  if (!deepLink.shouldOpen) {
+    return;
+  }
+
+  if (deepLink.buildingId && state.buildings.some((item) => item.id === deepLink.buildingId)) {
+    state.selectedRentSheetBuildingId = deepLink.buildingId;
+    state.selectedRentPaymentBuildingId = deepLink.buildingId;
+    state.selectedRegistryBuildingId = deepLink.buildingId;
+  }
+
+  setActiveLandlordView("tenants");
+  scrollToLandlordSection("overview-rent-status-section");
+  await openRentSheetModal();
+  clearRentSetupDeepLink();
 }
 
 function buildRoomAccountPath(buildingId, houseNumber) {
@@ -5086,6 +5411,154 @@ async function markOwnerNotificationsRead() {
   renderOwnerNotifications();
 }
 
+async function loadMessageCenter() {
+  const params = new URLSearchParams({ limit: "100" });
+  if (state.selectedMessageBuildingId) {
+    params.set("rulesBuildingId", state.selectedMessageBuildingId);
+  }
+  const payload = await requestJson(`/api/landlord/messages?${params.toString()}`, {
+    cache: "no-store"
+  });
+  setMessageCenterData(payload.data ?? {});
+  renderMessageCenter();
+}
+
+async function loadAutomaticMessageRules(buildingId = state.selectedMessageBuildingId) {
+  const normalizedBuildingId = String(buildingId || "").trim();
+  if (!normalizedBuildingId) {
+    renderAutomaticMessageRules();
+    return;
+  }
+
+  const payload = await requestJson(
+    `/api/landlord/messages/rules?buildingId=${encodeURIComponent(normalizedBuildingId)}`,
+    { cache: "no-store" }
+  );
+  if (payload.data?.automaticRules) {
+    setAutomaticMessageRules(payload.data.automaticRules);
+  }
+  renderAutomaticMessageRules();
+}
+
+async function saveAutomaticMessageRules(event) {
+  event.preventDefault();
+  clearError();
+
+  const buildingId = String(state.selectedMessageBuildingId || "").trim();
+  if (!buildingId) {
+    showError("Choose a building before saving automatic message rules.");
+    return;
+  }
+
+  if (messageRulesSaveBtnEl instanceof HTMLButtonElement) {
+    messageRulesSaveBtnEl.disabled = true;
+  }
+
+  try {
+    const payload = await requestJson("/api/landlord/messages/rules", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        buildingId,
+        paymentReceiptsEnabled: Boolean(messageRulePaymentReceiptsEl?.checked),
+        rentRemindersEnabled: Boolean(messageRuleRentRemindersEl?.checked),
+        utilityRemindersEnabled: Boolean(messageRuleUtilityRemindersEl?.checked),
+        overdueNoticesEnabled: Boolean(messageRuleOverdueNoticesEl?.checked)
+      })
+    });
+
+    if (payload.data?.automaticRules) {
+      setAutomaticMessageRules(payload.data.automaticRules);
+    }
+    renderAutomaticMessageRules();
+    setStatus("Automatic message rules saved.");
+  } catch (error) {
+    handleLandlordError(error, "Unable to save automatic message rules.");
+  } finally {
+    if (messageRulesSaveBtnEl instanceof HTMLButtonElement) {
+      messageRulesSaveBtnEl.disabled = !state.selectedMessageBuildingId;
+    }
+  }
+}
+
+async function submitMessageCenter(event) {
+  event.preventDefault();
+  clearError();
+
+  const scope = String(messageRecipientScopeEl?.value || "room");
+  const buildingId = String(messageBuildingSelectEl?.value || "").trim();
+  const houseNumber = String(messageHouseNumberEl?.value || "").trim();
+  const phoneNumber = String(messagePhoneNumberEl?.value || "").trim();
+  const title = String(messageTitleEl?.value || "").trim();
+  const message = String(messageBodyEl?.value || "").trim();
+
+  if (!message) {
+    showError("Message is required.");
+    return;
+  }
+
+  if (scope === "building") {
+    const buildingName = getBuildingDisplayNameById(buildingId, "this building");
+    const ok = window.confirm(`Send this SMS to all active tenants in ${buildingName}?`);
+    if (!ok) {
+      return;
+    }
+  }
+
+  if (messageSendBtnEl instanceof HTMLButtonElement) {
+    messageSendBtnEl.disabled = true;
+  }
+  setStatus("Sending SMS...");
+
+  try {
+    const payload = await requestJson("/api/landlord/messages/send", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        recipientScope: scope,
+        buildingId,
+        houseNumber,
+        phoneNumber,
+        title,
+        message
+      })
+    });
+
+    if (payload.data?.messageCenter) {
+      setMessageCenterData(payload.data.messageCenter);
+    } else {
+      await loadMessageCenter();
+    }
+    renderMessageCenter();
+
+    if (messageBodyEl instanceof HTMLTextAreaElement) {
+      messageBodyEl.value = "";
+    }
+    if (messageTitleEl instanceof HTMLInputElement) {
+      messageTitleEl.value = "";
+    }
+    updateMessageCharacterCount();
+
+    const sent = Number(payload.data?.sentCount ?? 0);
+    const failed = Number(payload.data?.failedCount ?? 0);
+    setStatus(
+      failed > 0
+        ? `SMS attempted: ${sent} sent, ${failed} failed.`
+        : `SMS sent to ${sent} recipient${sent === 1 ? "" : "s"}.`
+    );
+  } catch (error) {
+    handleLandlordError(error, "Unable to send SMS.");
+  } finally {
+    if (messageSendBtnEl instanceof HTMLButtonElement) {
+      messageSendBtnEl.disabled = !state.messageCenterSms.enabled;
+    }
+  }
+}
+
 function replaceUploadPreview(container, gallery, emptyText) {
   if (!(container instanceof HTMLElement)) {
     return;
@@ -5795,7 +6268,34 @@ function optionalInputValue(value) {
   return Number.isFinite(numeric) ? String(Math.round(numeric)) : "";
 }
 
+function rentDefaultPlaceholder(value, formatter) {
+  if (value == null || value === "") {
+    return "Set";
+  }
+
+  return `Default: ${formatter(value)}`;
+}
+
+function formatRentDueDay(value) {
+  const day = toOptionalNumber(value);
+  return day == null ? "" : `Day ${day}`;
+}
+
+function formatRentGraceDays(value) {
+  const days = toOptionalNumber(value);
+  if (days == null) {
+    return "";
+  }
+
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
 function setRentSheetDefaultInputs(data) {
+  state.rentSheetDefaults = {
+    monthlyRentKsh: data?.buildingDefaultMonthlyRentKsh ?? null,
+    dueDay: data?.buildingDefaultDueDay ?? null,
+    graceDays: data?.buildingDefaultGraceDays ?? 0
+  };
   if (rentSheetDefaultMonthlyRentEl instanceof HTMLInputElement) {
     rentSheetDefaultMonthlyRentEl.value = optionalInputValue(
       data?.buildingDefaultMonthlyRentKsh
@@ -5839,6 +6339,18 @@ function renderRentSheetRows(rows) {
     const roomDefaultMonthlyRentKsh = optionalInputValue(item.roomDefaultMonthlyRentKsh);
     const roomDefaultDueDay = optionalInputValue(item.roomDefaultDueDay);
     const roomDefaultGraceDays = optionalInputValue(item.roomDefaultGraceDays);
+    const rentPlaceholder = rentDefaultPlaceholder(
+      state.rentSheetDefaults.monthlyRentKsh,
+      formatCurrency
+    );
+    const dueDayPlaceholder = rentDefaultPlaceholder(
+      state.rentSheetDefaults.dueDay,
+      formatRentDueDay
+    );
+    const graceDaysPlaceholder = rentDefaultPlaceholder(
+      state.rentSheetDefaults.graceDays,
+      formatRentGraceDays
+    );
     const sourceLabel = rentSetupSourceLabel(item.rentSetupSource);
     const resolvedDueLabel =
       item.resolvedDueDay == null ? "No due day" : `Day ${Math.round(Number(item.resolvedDueDay))}`;
@@ -5871,7 +6383,7 @@ function renderRentSheetRows(rows) {
           min="0"
           step="1"
           value="${escapeHtml(roomDefaultMonthlyRentKsh)}"
-          placeholder="Building Default"
+          placeholder="${escapeHtml(rentPlaceholder)}"
         />
       </td>
       <td>
@@ -5883,7 +6395,7 @@ function renderRentSheetRows(rows) {
           max="31"
           step="1"
           value="${escapeHtml(roomDefaultDueDay)}"
-          placeholder="Building"
+          placeholder="${escapeHtml(dueDayPlaceholder)}"
         />
       </td>
       <td>
@@ -5895,7 +6407,7 @@ function renderRentSheetRows(rows) {
           max="31"
           step="1"
           value="${escapeHtml(roomDefaultGraceDays)}"
-          placeholder="Building"
+          placeholder="${escapeHtml(graceDaysPlaceholder)}"
         />
       </td>
       <td>
@@ -9693,6 +10205,7 @@ async function loadBuildings() {
   renderGlobalSearchBuildingOptions();
   renderRegistryBuildingOptions();
   renderResidentsBuildingOptions();
+  renderMessageCenterBuildingOptions();
   renderMetrics();
   updateLandlordBranding();
 }
@@ -10121,6 +10634,9 @@ function applyLandlordStartupData(startup) {
   state.selectedRentPaymentBuildingId = String(
     selection.rentPaymentBuildingId || ""
   ).trim();
+  state.selectedMessageBuildingId = String(
+    selection.messageBuildingId || state.selectedRegistryBuildingId || state.buildings[0]?.id || ""
+  ).trim();
 
   state.residentUsersCount = state.buildings.reduce(
     (sum, item) => sum + Number(item.residentUsers ?? 0),
@@ -10153,6 +10669,7 @@ function applyLandlordStartupData(startup) {
   )
     ? Number(startup.ownerNotifications.unreadCount)
     : state.ownerNotifications.filter((item) => !item.read).length;
+  setMessageCenterData(startup?.messageCenter ?? {});
   state.tickets = Array.isArray(startup?.tickets) ? startup.tickets : [];
   setResidentDirectory(
     dedupeResidentDirectoryRows(
@@ -10179,6 +10696,7 @@ function applyLandlordStartupData(startup) {
   renderGlobalSearchBuildingOptions();
   renderRegistryBuildingOptions();
   renderResidentsBuildingOptions();
+  renderMessageCenterBuildingOptions();
   renderPaymentAccess(state.paymentAccess);
   renderPaymentProfiles();
   renderPaymentInstructions();
@@ -10195,6 +10713,7 @@ function applyLandlordStartupData(startup) {
   renderWifiPackages(state.wifiPackages);
   renderOwnerStaff();
   renderOwnerNotifications();
+  renderMessageCenter();
   renderCaretakerRequests(state.caretakerRequests);
   renderCaretakers(state.caretakers);
   renderLandlordTickets(state.tickets);
@@ -10228,6 +10747,7 @@ async function loadDataLegacy() {
       loadPaymentInstructions(),
       loadLandlordWifiPackages(),
       loadOwnerStaff(),
+      loadMessageCenter(),
       loadCaretakerAccessRequests(),
       loadCaretakers(),
       loadLandlordTickets(),
@@ -10257,6 +10777,7 @@ async function hydrateDeferredLandlordData() {
     loadPaymentInstructions,
     loadLandlordWifiPackages,
     loadOwnerStaff,
+    loadMessageCenter,
     loadCaretakerAccessRequests,
     loadCaretakers,
     loadLandlordTickets,
@@ -13393,6 +13914,39 @@ landlordNotificationsReadBtnEl?.addEventListener("click", () => {
   });
 });
 
+messageRecipientScopeEl?.addEventListener("change", () => {
+  updateMessageCenterRecipientFields();
+});
+
+messageBuildingSelectEl?.addEventListener("change", () => {
+  state.selectedMessageBuildingId = String(messageBuildingSelectEl.value || "").trim();
+  void loadAutomaticMessageRules().catch((error) => {
+    handleLandlordError(error, "Unable to load automatic message rules.");
+  });
+});
+
+messageBodyEl?.addEventListener("input", () => {
+  updateMessageCharacterCount();
+});
+
+messageTitleEl?.addEventListener("input", () => {
+  updateMessageCharacterCount();
+});
+
+messageCenterFormEl?.addEventListener("submit", (event) => {
+  void submitMessageCenter(event);
+});
+
+messageRulesFormEl?.addEventListener("submit", (event) => {
+  void saveAutomaticMessageRules(event);
+});
+
+refreshMessagesBtnEl?.addEventListener("click", () => {
+  void loadMessageCenter().catch((error) => {
+    handleLandlordError(error, "Unable to refresh messages.");
+  });
+});
+
 landlordPushAlertsBtnEl?.addEventListener("click", () => {
   void enableLandlordPushAlerts();
 });
@@ -13429,6 +13983,11 @@ void (async () => {
   }
   syncUtilityBillInputMode();
   await loadData();
+  try {
+    await openRentSetupDeepLinkIfRequested();
+  } catch (error) {
+    handleLandlordError(error, "Unable to open rent setup sheet.");
+  }
   void syncLandlordPushState({ subscribeIfAllowed: true });
   window.setInterval(() => {
     void refreshPendingApplicationsIndicator().catch(() => {

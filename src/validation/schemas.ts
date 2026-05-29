@@ -261,6 +261,80 @@ export const ownerNotificationReadSchema = z.object({
   notificationIds: z.array(nonEmptyString.max(120)).max(100).optional()
 });
 
+export const landlordMessageSendSchema = z
+  .object({
+    recipientScope: z.enum(["phone", "room", "building"]),
+    buildingId: z.preprocess(
+      emptyStringToUndefined,
+      nonEmptyString.max(120).optional()
+    ),
+    houseNumber: z.preprocess(
+      emptyStringToUndefined,
+      nonEmptyString.max(24).optional()
+    ),
+    phoneNumber: z.preprocess(emptyStringToUndefined, kenyaPhoneSchema.optional()),
+    title: z.preprocess(emptyStringToUndefined, nonEmptyString.max(48).optional()),
+    message: nonEmptyString.max(160)
+  })
+  .superRefine((value, ctx) => {
+    if (value.recipientScope === "phone" && !value.phoneNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phoneNumber"],
+        message: "Phone number is required."
+      });
+    }
+
+    if (
+      (value.recipientScope === "room" || value.recipientScope === "building") &&
+      !value.buildingId
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["buildingId"],
+        message: "Building is required."
+      });
+    }
+
+    if (value.recipientScope === "room" && !value.houseNumber) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["houseNumber"],
+        message: "Room or house number is required."
+      });
+    }
+
+    const fullMessage = value.title
+      ? `${value.title}: ${value.message}`
+      : value.message;
+    if (fullMessage.length > 160) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["message"],
+        message: "Title and message together must fit within 160 characters."
+      });
+    }
+  });
+
+export const landlordAutomaticMessageRulesUpdateSchema = z
+  .object({
+    buildingId: nonEmptyString.max(120),
+    paymentReceiptsEnabled: z.boolean().optional(),
+    rentRemindersEnabled: z.boolean().optional(),
+    utilityRemindersEnabled: z.boolean().optional(),
+    overdueNoticesEnabled: z.boolean().optional()
+  })
+  .refine(
+    (value) =>
+      typeof value.paymentReceiptsEnabled === "boolean" ||
+      typeof value.rentRemindersEnabled === "boolean" ||
+      typeof value.utilityRemindersEnabled === "boolean" ||
+      typeof value.overdueNoticesEnabled === "boolean",
+    {
+      message: "Provide at least one automatic message rule to update."
+    }
+  );
+
 export const updateResidentNotificationPreferencesSchema = z
   .object({
     smsEnabled: z.boolean().optional(),
@@ -1225,6 +1299,10 @@ export type AdminAccessCredentialUpdateInput = z.infer<
 export type MediaUploadCategoryInput = z.infer<typeof mediaUploadCategorySchema>;
 export type MediaUploadSignatureRequestInput = z.infer<
   typeof mediaUploadSignatureRequestSchema
+>;
+export type LandlordMessageSendInput = z.infer<typeof landlordMessageSendSchema>;
+export type LandlordAutomaticMessageRulesUpdateInput = z.infer<
+  typeof landlordAutomaticMessageRulesUpdateSchema
 >;
 export type ResidentPasswordSetupInput = z.infer<
   typeof residentPasswordSetupSchema

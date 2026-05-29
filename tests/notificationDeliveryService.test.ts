@@ -6,6 +6,7 @@ import { ResidentNotificationPreferenceService } from "../src/services/residentN
 test("delivers grouped push alerts and billing SMS when resident preferences allow", async () => {
   const pushCalls = [];
   const smsCalls = [];
+  const messageLogCalls = [];
   const preferences = new ResidentNotificationPreferenceService();
   preferences.updateForUser("tenant-1", {
     smsEnabled: true,
@@ -22,8 +23,20 @@ test("delivers grouped push alerts and billing SMS when resident preferences all
     },
     smsNotificationService: {
       isEnabled: () => true,
+      getProvider: () => "talksasa",
       send: async (input) => {
         smsCalls.push(input);
+      }
+    },
+    outboundMessageService: {
+      record: (input) => {
+        messageLogCalls.push(input);
+        return {
+          id: `log-${messageLogCalls.length}`,
+          channel: "sms",
+          createdAt: new Date().toISOString(),
+          ...input
+        };
       }
     },
     residentNotificationPreferenceService: preferences,
@@ -64,6 +77,9 @@ test("delivers grouped push alerts and billing SMS when resident preferences all
   assert.equal(smsCalls.length, 2);
   assert.match(smsCalls[0].message, /Housing Portal$/);
   assert.equal(smsCalls[0].to, "+254712345678");
+  assert.equal(messageLogCalls.length, 2);
+  assert.equal(messageLogCalls[0].status, "sent");
+  assert.equal(messageLogCalls[0].provider, "talksasa");
 });
 
 test("skips billing push and SMS for residents who are not verified", async () => {
@@ -107,5 +123,56 @@ test("skips billing push and SMS for residents who are not verified", async () =
   ]);
 
   assert.equal(pushCalls.length, 0);
+  assert.equal(smsCalls.length, 0);
+});
+
+test("skips SMS when landlord automatic message rules disable the notification kind", async () => {
+  const smsCalls = [];
+  const ruleCalls = [];
+  const preferences = new ResidentNotificationPreferenceService();
+  preferences.updateForUser("tenant-3", {
+    smsEnabled: true,
+    rentEnabled: true
+  });
+
+  const service = new NotificationDeliveryService({
+    pushNotificationService: {
+      isEnabled: () => false,
+      notifyResidentScope: async () => {}
+    },
+    smsNotificationService: {
+      isEnabled: () => true,
+      send: async (input) => {
+        smsCalls.push(input);
+      }
+    },
+    residentNotificationPreferenceService: preferences,
+    allowSystemSms: (input) => {
+      ruleCalls.push(input);
+      return input.kind !== "overdue_notice";
+    },
+    resolveRecipient: async () => ({
+      userId: "tenant-3",
+      phoneNumber: "+254711111111",
+      verificationStatus: "verified"
+    })
+  });
+
+  await service.deliverResidentNotifications([
+    {
+      id: "rent-overdue-1",
+      buildingId: "CAPTYN001",
+      houseNumber: "C-3",
+      title: "Rent Overdue",
+      message: "Rent is overdue.",
+      level: "warning",
+      source: "rent",
+      createdAt: new Date().toISOString(),
+      dedupeKey: "rent-reminder-overdue-CAPTYN001-C-3-2026-05-29"
+    }
+  ]);
+
+  assert.equal(ruleCalls.length, 1);
+  assert.equal(ruleCalls[0].kind, "overdue_notice");
   assert.equal(smsCalls.length, 0);
 });

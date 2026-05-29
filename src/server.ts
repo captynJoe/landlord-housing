@@ -51,6 +51,16 @@ import {
   type OwnerNotificationPersistedState
 } from "./services/ownerNotificationService.js";
 import {
+  OutboundMessageService,
+  type OutboundMessagePersistedState,
+  type OutboundMessageRecord
+} from "./services/outboundMessageService.js";
+import {
+  AutomaticMessageRuleService,
+  type AutomaticMessageRulePersistedState,
+  type AutomaticMessageRuleRecord
+} from "./services/automaticMessageRuleService.js";
+import {
   WifiAccessService,
   type WifiAccessPersistedState,
   type WifiPackage
@@ -128,6 +138,8 @@ import {
   mediaUploadSignatureRequestSchema,
   residentPushSubscriptionSchema,
   ownerNotificationReadSchema,
+  landlordMessageSendSchema,
+  landlordAutomaticMessageRulesUpdateSchema,
   updateResidentNotificationPreferencesSchema,
   upsertUtilityMeterSchema,
   utilityTypeSchema,
@@ -287,9 +299,17 @@ const pushVapidPrivateKey = String(
 const pushVapidSubject = String(
   process.env.PUSH_VAPID_SUBJECT ?? "mailto:support@captyn.shop"
 ).trim();
+const smsProvider = String(process.env.SMS_PROVIDER ?? "").trim();
 const africasTalkingApiKey = String(process.env.AFRICASTALKING_API_KEY ?? "").trim();
 const africasTalkingUsername = String(process.env.AFRICASTALKING_USERNAME ?? "").trim();
 const africasTalkingSenderId = String(process.env.AFRICASTALKING_SENDER_ID ?? "").trim();
+const talksasaApiToken = String(
+  process.env.TALKSASA_API_TOKEN ?? process.env.TALKSASA_PROXY_API_KEY ?? ""
+).trim();
+const talksasaSenderId = String(process.env.TALKSASA_SENDER_ID ?? "").trim();
+const talksasaBaseUrl = String(process.env.TALKSASA_BASE_URL ?? "").trim();
+const talksasaSendPath = String(process.env.TALKSASA_SEND_PATH ?? "").trim();
+const talksasaTimeoutMs = Number(process.env.TALKSASA_HTTP_TIMEOUT_MS ?? 12000);
 const notificationSweepToken = String(process.env.NOTIFICATION_SWEEP_TOKEN ?? "").trim();
 const ADMIN_AUTH_STATE_KEY = "admin_auth_v1";
 const RENT_LEDGER_STATE_KEY = "rent_ledger_v1";
@@ -307,6 +327,8 @@ const PUSH_SUBSCRIPTIONS_STATE_KEY = "push_subscriptions_v1";
 const RESIDENT_NOTIFICATION_PREFERENCES_STATE_KEY =
   "resident_notification_preferences_v1";
 const OWNER_NOTIFICATIONS_STATE_KEY = "owner_notifications_v1";
+const OUTBOUND_MESSAGES_STATE_KEY = "outbound_messages_v1";
+const AUTOMATIC_MESSAGE_RULES_STATE_KEY = "automatic_message_rules_v1";
 const DEFAULT_ALLOWED_CORS_ORIGINS: string[] = [];
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const COOKIE_PROTECTED_PATH_PREFIXES = ["/api/auth/", "/api/user/", "/api/landlord/", "/api/admin/"];
@@ -809,6 +831,29 @@ function normalizeKenyaPhone(phoneNumber: string): string {
 
   if (normalized.startsWith("0")) {
     return `+254${normalized.slice(1)}`;
+  }
+
+  return normalized;
+}
+
+function looksLikeEmailIdentifier(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? "").trim());
+}
+
+function looksLikeKenyaPhoneIdentifier(value: string): boolean {
+  return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(
+    String(value ?? "").trim().replace(/[\s-]/g, "")
+  );
+}
+
+function normalizeManagerUsernameCandidate(value: unknown): string {
+  const normalized = String(value ?? "").trim();
+  if (
+    !normalized ||
+    looksLikeEmailIdentifier(normalized) ||
+    looksLikeKenyaPhoneIdentifier(normalized)
+  ) {
+    return "";
   }
 
   return normalized;
@@ -2827,6 +2872,8 @@ async function bootstrap() {
     : null;
   const userSupportService = new UserSupportService();
   const ownerNotificationService = new OwnerNotificationService();
+  const outboundMessageService = new OutboundMessageService();
+  const automaticMessageRuleService = new AutomaticMessageRuleService();
   const rentLedgerService = new RentLedgerService();
   rentLedgerService.setLatePenaltyPolicyResolver(
     (buildingId) =>
@@ -2942,9 +2989,15 @@ async function bootstrap() {
       : null
   );
   const smsNotificationService = new SmsNotificationService({
+    provider: smsProvider,
     apiKey: africasTalkingApiKey,
     username: africasTalkingUsername,
-    senderId: africasTalkingSenderId
+    senderId: africasTalkingSenderId,
+    talksasaApiToken,
+    talksasaSenderId,
+    talksasaBaseUrl,
+    talksasaSendPath,
+    talksasaTimeoutMs
   });
 
   if (
@@ -2957,11 +3010,15 @@ async function bootstrap() {
   }
 
   if (
-    (africasTalkingApiKey || africasTalkingUsername) &&
+    (smsProvider ||
+      talksasaApiToken ||
+      talksasaSenderId ||
+      africasTalkingApiKey ||
+      africasTalkingUsername) &&
     !smsNotificationService.isEnabled()
   ) {
     console.warn(
-      "Housing SMS is disabled because AFRICASTALKING_API_KEY/AFRICASTALKING_USERNAME are incomplete."
+      `Housing SMS is disabled because ${smsNotificationService.getProvider()} settings are incomplete.`
     );
   }
 
@@ -3577,7 +3634,9 @@ async function bootstrap() {
         runtimeQueuesState,
         pushSubscriptionState,
         residentNotificationPreferenceState,
-        ownerNotificationState
+        ownerNotificationState,
+        outboundMessageState,
+        automaticMessageRuleState
       ] = await Promise.all([
         loadAppStateJsonSafely<AdminAuthPersistedState>(ADMIN_AUTH_STATE_KEY),
         loadAppStateJsonSafely<RentLedgerPersistedState>(RENT_LEDGER_STATE_KEY),
@@ -3610,6 +3669,12 @@ async function bootstrap() {
         ),
         loadAppStateJsonSafely<OwnerNotificationPersistedState>(
           OWNER_NOTIFICATIONS_STATE_KEY
+        ),
+        loadAppStateJsonSafely<OutboundMessagePersistedState>(
+          OUTBOUND_MESSAGES_STATE_KEY
+        ),
+        loadAppStateJsonSafely<AutomaticMessageRulePersistedState>(
+          AUTOMATIC_MESSAGE_RULES_STATE_KEY
         )
       ]);
 
@@ -3626,6 +3691,8 @@ async function bootstrap() {
         residentNotificationPreferenceState
       );
       ownerNotificationService.importState(ownerNotificationState);
+      outboundMessageService.importState(outboundMessageState);
+      automaticMessageRuleService.importState(automaticMessageRuleState);
       importCaretakerAccessState(caretakerAccessState);
       importBuildingExpenditureState(buildingExpenditureState);
       await syncDerivedBuildingConfigurationState();
@@ -3795,6 +3862,12 @@ async function bootstrap() {
       ownerNotificationService.setStateChangeHandler((state) =>
         queuePersist(OWNER_NOTIFICATIONS_STATE_KEY, state)
       );
+      outboundMessageService.setStateChangeHandler((state) =>
+        queuePersist(OUTBOUND_MESSAGES_STATE_KEY, state)
+      );
+      automaticMessageRuleService.setStateChangeHandler((state) =>
+        queuePersist(AUTOMATIC_MESSAGE_RULES_STATE_KEY, state)
+      );
 
       if (utilityStateNormalized) {
         await appStateService.queueSetJson(
@@ -3851,6 +3924,14 @@ async function bootstrap() {
       void queuePersist(
         OWNER_NOTIFICATIONS_STATE_KEY,
         ownerNotificationService.exportState()
+      );
+      void queuePersist(
+        OUTBOUND_MESSAGES_STATE_KEY,
+        outboundMessageService.exportState()
+      );
+      void queuePersist(
+        AUTOMATIC_MESSAGE_RULES_STATE_KEY,
+        automaticMessageRuleService.exportState()
       );
       persistCaretakerAccessState();
       persistBuildingExpenditureState();
@@ -4561,7 +4642,10 @@ async function bootstrap() {
   const notificationDeliveryService = new NotificationDeliveryService({
     pushNotificationService,
     smsNotificationService,
+    outboundMessageService,
     residentNotificationPreferenceService,
+    allowSystemSms: ({ notification, kind }) =>
+      automaticMessageRuleService.allows(notification.buildingId, kind),
     resolveRecipient: resolveResidentNotificationRecipient
   });
 
@@ -5321,6 +5405,268 @@ async function bootstrap() {
     role: String(context.role ?? context.userSession?.role ?? "").trim() || undefined,
     name: String(context.userSession?.fullName ?? "").trim() || undefined
   });
+
+  const mapOutboundMessageForClient = (record: OutboundMessageRecord) => ({
+    id: record.id,
+    channel: record.channel,
+    provider: record.provider,
+    source: record.source,
+    category: record.category,
+    status: record.status,
+    recipientKind: record.recipientKind,
+    recipientUserId: record.recipientUserId,
+    recipientName: record.recipientName,
+    recipientPhoneMask: record.recipientPhone ? maskPhone(record.recipientPhone) : "",
+    buildingId: record.buildingId,
+    buildingName: record.buildingName,
+    houseNumber: record.houseNumber,
+    title: record.title,
+    body: record.body,
+    tag: record.tag,
+    error: record.error,
+    actor: record.actor,
+    createdAt: record.createdAt,
+    sentAt: record.sentAt,
+    failedAt: record.failedAt
+  });
+
+  const mapAutomaticMessageRulesForClient = (
+    record: AutomaticMessageRuleRecord,
+    buildingName?: string
+  ) => ({
+    buildingId: record.buildingId,
+    buildingName,
+    paymentReceiptsEnabled: record.paymentReceiptsEnabled,
+    rentRemindersEnabled: record.rentRemindersEnabled,
+    utilityRemindersEnabled: record.utilityRemindersEnabled,
+    overdueNoticesEnabled: record.overdueNoticesEnabled,
+    updatedAt: record.updatedAt
+  });
+
+  const getAutomaticMessageRulesForContext = async (
+    context: {
+      role: string;
+      userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
+    },
+    buildingId: string
+  ) => {
+    const normalizedBuildingId = String(buildingId ?? "").trim();
+    if (!normalizedBuildingId) {
+      return null;
+    }
+
+    const hasAccess = await canManageBuildingFromLandlordContext(
+      context,
+      normalizedBuildingId
+    );
+    if (!hasAccess) {
+      return null;
+    }
+
+    const building = await store.getBuilding(normalizedBuildingId);
+    return mapAutomaticMessageRulesForClient(
+      automaticMessageRuleService.getForBuilding(normalizedBuildingId),
+      building?.name
+    );
+  };
+
+  const listMessageCenterRecordsForContext = async (
+    context: {
+      role: string;
+      userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
+    },
+    options: { limit?: number; buildingId?: string } = {}
+  ) => {
+    const normalizedBuildingId = String(options.buildingId ?? "").trim();
+    if (normalizedBuildingId) {
+      const hasAccess = await canManageBuildingFromLandlordContext(
+        context,
+        normalizedBuildingId
+      );
+      if (!hasAccess) {
+        return null;
+      }
+
+      return outboundMessageService.list({
+        limit: options.limit,
+        buildingId: normalizedBuildingId,
+        includeUnscoped: false
+      });
+    }
+
+    const visibleBuildingIds = await listVisibleBuildingIdsForLandlordContext(context);
+    return outboundMessageService.list({
+      limit: options.limit,
+      buildingIds: visibleBuildingIds ?? undefined,
+      includeUnscoped: context.role !== "caretaker"
+    });
+  };
+
+  const buildMessageCenterPayload = async (
+    context: {
+      role: string;
+      userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
+    },
+    options: { limit?: number; buildingId?: string; rulesBuildingId?: string } = {}
+  ) => {
+    const records = await listMessageCenterRecordsForContext(context, options);
+    if (!records) {
+      return null;
+    }
+    const rulesBuildingId = String(
+      options.rulesBuildingId ?? options.buildingId ?? ""
+    ).trim();
+    const automaticRules = rulesBuildingId
+      ? await getAutomaticMessageRulesForContext(context, rulesBuildingId)
+      : null;
+
+    return {
+      sms: {
+        enabled: smsNotificationService.isEnabled(),
+        provider: smsNotificationService.getProvider(),
+        senderId: smsNotificationService.getSenderId()
+      },
+      automaticRules,
+      messages: records.map(mapOutboundMessageForClient)
+    };
+  };
+
+  type MessageCenterRecipient = {
+    recipientKind: "phone" | "room" | "building";
+    recipientUserId?: string;
+    recipientName?: string;
+    recipientPhone: string;
+    buildingId?: string;
+    buildingName?: string;
+    houseNumber?: string;
+  };
+
+  const listRoomMessageRecipients = async (
+    buildingId: string,
+    houseNumber: string,
+    recipientKind: "room" | "building" = "room"
+  ): Promise<MessageCenterRecipient[]> => {
+    if (!repositoryContext.prisma) {
+      return [];
+    }
+
+    const building = await store.getBuilding(buildingId);
+    const normalizedHouseNumber = normalizeHouseNumber(houseNumber);
+    const tenancy = await repositoryContext.prisma.tenancy.findFirst({
+      where: {
+        buildingId,
+        active: true,
+        unit: {
+          houseNumber: normalizedHouseNumber
+        }
+      },
+      select: {
+        userId: true,
+        user: {
+          select: {
+            fullName: true,
+            phone: true,
+            status: true
+          }
+        },
+        unit: {
+          select: {
+            houseNumber: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    const phone = normalizeKenyaPhone(tenancy?.user.phone ?? "");
+    if (!tenancy || tenancy.user.status !== "active" || !phone) {
+      return [];
+    }
+
+    return [
+      {
+        recipientKind,
+        recipientUserId: tenancy.userId,
+        recipientName: tenancy.user.fullName,
+        recipientPhone: phone,
+        buildingId,
+        buildingName: building?.name,
+        houseNumber: normalizeHouseNumber(tenancy.unit.houseNumber)
+      }
+    ];
+  };
+
+  const listBuildingMessageRecipients = async (
+    buildingId: string
+  ): Promise<MessageCenterRecipient[]> => {
+    if (!repositoryContext.prisma) {
+      return [];
+    }
+
+    const building = await store.getBuilding(buildingId);
+    if (!building) {
+      return [];
+    }
+
+    const visibleHouseNumbers = await listVisibleHouseNumbersForBuildings([building]);
+    const rows = await repositoryContext.prisma.tenancy.findMany({
+      where: {
+        buildingId,
+        active: true
+      },
+      select: {
+        userId: true,
+        user: {
+          select: {
+            fullName: true,
+            phone: true,
+            status: true
+          }
+        },
+        unit: {
+          select: {
+            houseNumber: true
+          }
+        }
+      }
+    });
+
+    const seen = new Set<string>();
+    const recipients: MessageCenterRecipient[] = [];
+    for (const row of rows) {
+      const houseNumber = normalizeHouseNumber(row.unit.houseNumber);
+      const phone = normalizeKenyaPhone(row.user.phone ?? "");
+      const dedupeKey = `${row.userId}::${phone}`;
+      if (
+        row.user.status !== "active" ||
+        !visibleHouseNumbers.has(houseNumber) ||
+        !phone ||
+        seen.has(dedupeKey)
+      ) {
+        continue;
+      }
+
+      seen.add(dedupeKey);
+      recipients.push({
+        recipientKind: "building",
+        recipientUserId: row.userId,
+        recipientName: row.user.fullName,
+        recipientPhone: phone,
+        buildingId,
+        buildingName: building.name,
+        houseNumber
+      });
+    }
+
+    return recipients.sort((a, b) =>
+      String(a.houseNumber ?? "").localeCompare(String(b.houseNumber ?? ""), undefined, {
+        numeric: true,
+        sensitivity: "base"
+      })
+    );
+  };
 
   const buildLandlordRoomUrl = (buildingId?: string, houseNumber?: string) => {
     const normalizedBuildingId = String(buildingId ?? "").trim();
@@ -6373,6 +6719,10 @@ async function bootstrap() {
             notifications: [],
             unreadCount: 0
           };
+    const messageCenter = await buildMessageCenterPayload(context, {
+      limit: 50,
+      rulesBuildingId: registryBuildingId
+    });
 
     return {
       selection: {
@@ -6383,7 +6733,8 @@ async function bootstrap() {
         overviewRoomBuildingId: "all",
         ticketBuildingId: "",
         wifiPackageBuildingId,
-        rentPaymentBuildingId
+        rentPaymentBuildingId,
+        messageBuildingId: registryBuildingId
       },
       buildings,
       applications,
@@ -6397,6 +6748,7 @@ async function bootstrap() {
       wifiPackagesUnavailableReason,
       ownerStaff,
       ownerNotifications,
+      messageCenter,
       caretakerRequests,
       caretakers,
       tickets,
@@ -8196,6 +8548,38 @@ async function bootstrap() {
 
   app.post("/api/auth/login", async (req, res, next) => {
     try {
+      const managerUsername = normalizeManagerUsernameCandidate(
+        req.body?.identifier ?? req.body?.username ?? req.body?.email
+      );
+      const managerPassword =
+        typeof req.body?.password === "string" ? req.body.password.trim() : "";
+      if (managerUsername && managerPassword) {
+        const managerSession = adminAuthService.login({
+          username: managerUsername,
+          password: managerPassword
+        });
+        if (managerSession && adminAuthService.hasRole(managerSession, "landlord")) {
+          const expiresAtMs = new Date(managerSession.expiresAt).getTime();
+          const maxAgeMs = Math.max(0, expiresAtMs - Date.now());
+          res.cookie(
+            adminSessionCookieName,
+            managerSession.token,
+            buildSessionCookieOptions(req, maxAgeMs)
+          );
+
+          return res.json({
+            data: {
+              role: managerSession.role,
+              expiresAt: managerSession.expiresAt
+            }
+          });
+        }
+
+        return res.status(401).json({
+          error: "Invalid manager username or password."
+        });
+      }
+
       if (!userAccountService) {
         return res.status(503).json({
           error: "User account service unavailable. Database connection is required."
@@ -9662,6 +10046,236 @@ async function bootstrap() {
             limit: 50
           }),
           unreadCount: ownerNotificationService.countUnreadForUser(ownerAlertUserId)
+        },
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.get("/api/landlord/messages", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      const limitRaw = Number(req.query.limit ?? 100);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(Math.trunc(limitRaw), 1), 500)
+        : 100;
+      const buildingId =
+        typeof req.query.buildingId === "string" ? req.query.buildingId : undefined;
+      const rulesBuildingId =
+        typeof req.query.rulesBuildingId === "string"
+          ? req.query.rulesBuildingId
+          : buildingId;
+      const messageCenter = await buildMessageCenterPayload(context, {
+        limit,
+        buildingId,
+        rulesBuildingId
+      });
+      if (!messageCenter) {
+        return res.status(403).json({ error: "Building access denied" });
+      }
+
+      return res.json({ data: messageCenter, role: context.role });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.get("/api/landlord/messages/rules", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      const buildingId = String(req.query.buildingId ?? "").trim();
+      if (!buildingId) {
+        return res.status(400).json({ error: "Building ID is required." });
+      }
+
+      const automaticRules = await getAutomaticMessageRulesForContext(
+        context,
+        buildingId
+      );
+      if (!automaticRules) {
+        return res.status(403).json({ error: "Building access denied" });
+      }
+
+      return res.json({ data: { automaticRules }, role: context.role });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.patch("/api/landlord/messages/rules", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      const parsed = landlordAutomaticMessageRulesUpdateSchema.parse(req.body ?? {});
+      const hasAccess = await canManageBuildingFromLandlordContext(
+        context,
+        parsed.buildingId
+      );
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Building access denied" });
+      }
+
+      const updated = automaticMessageRuleService.updateForBuilding(
+        parsed.buildingId,
+        {
+          paymentReceiptsEnabled: parsed.paymentReceiptsEnabled,
+          rentRemindersEnabled: parsed.rentRemindersEnabled,
+          utilityRemindersEnabled: parsed.utilityRemindersEnabled,
+          overdueNoticesEnabled: parsed.overdueNoticesEnabled
+        }
+      );
+      const building = await store.getBuilding(parsed.buildingId);
+
+      return res.json({
+        data: {
+          automaticRules: mapAutomaticMessageRulesForClient(updated, building?.name)
+        },
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.post("/api/landlord/messages/send", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (!smsNotificationService.isEnabled()) {
+        return res.status(503).json({
+          error: "SMS is not configured on this server."
+        });
+      }
+
+      const parsed = landlordMessageSendSchema.parse(req.body ?? {});
+      if (context.role === "caretaker" && parsed.recipientScope === "phone") {
+        return res.status(403).json({
+          error: "House manager accounts can send messages only to assigned rooms or buildings."
+        });
+      }
+
+      const buildingId = String(parsed.buildingId ?? "").trim();
+      if (buildingId) {
+        const hasAccess = await canManageBuildingFromLandlordContext(context, buildingId);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+      }
+
+      let recipients: MessageCenterRecipient[] = [];
+      if (parsed.recipientScope === "phone") {
+        recipients = [
+          {
+            recipientKind: "phone",
+            recipientPhone: normalizeKenyaPhone(parsed.phoneNumber ?? "")
+          }
+        ];
+      } else if (parsed.recipientScope === "room") {
+        recipients = await listRoomMessageRecipients(
+          buildingId,
+          parsed.houseNumber ?? ""
+        );
+      } else {
+        recipients = await listBuildingMessageRecipients(buildingId);
+      }
+
+      if (recipients.length === 0) {
+        return res.status(404).json({
+          error:
+            parsed.recipientScope === "building"
+              ? "No active resident phone numbers were found for this building."
+              : "No active resident phone number was found for this room."
+        });
+      }
+
+      const actor = actorFromLandlordContext(context);
+      const provider = smsNotificationService.getProvider();
+      const messageTitle = String(parsed.title ?? "").trim();
+      const messageBody = messageTitle
+        ? `${messageTitle}: ${parsed.message}`
+        : parsed.message;
+      const sentRecords: OutboundMessageRecord[] = [];
+      const failedRecords: OutboundMessageRecord[] = [];
+      const tagBase = `manual-${Date.now()}`;
+
+      for (const [index, recipient] of recipients.entries()) {
+        const tag = `${tagBase}-${index + 1}`;
+        try {
+          await smsNotificationService.send({
+            to: recipient.recipientPhone,
+            message: messageBody,
+            tag
+          });
+          sentRecords.push(
+            outboundMessageService.record({
+              provider,
+              source: "manual",
+              category: "general",
+              status: "sent",
+              recipientKind: recipient.recipientKind,
+              recipientUserId: recipient.recipientUserId,
+              recipientName: recipient.recipientName,
+              recipientPhone: recipient.recipientPhone,
+              buildingId: recipient.buildingId,
+              buildingName: recipient.buildingName,
+              houseNumber: recipient.houseNumber,
+              title: messageTitle || undefined,
+              body: messageBody,
+              tag,
+              actor
+            })
+          );
+        } catch (error) {
+          failedRecords.push(
+            outboundMessageService.record({
+              provider,
+              source: "manual",
+              category: "general",
+              status: "failed",
+              recipientKind: recipient.recipientKind,
+              recipientUserId: recipient.recipientUserId,
+              recipientName: recipient.recipientName,
+              recipientPhone: recipient.recipientPhone,
+              buildingId: recipient.buildingId,
+              buildingName: recipient.buildingName,
+              houseNumber: recipient.houseNumber,
+              title: messageTitle || undefined,
+              body: messageBody,
+              tag,
+              actor,
+              error: error instanceof Error ? error.message : "SMS delivery failed."
+            })
+          );
+        }
+      }
+
+      const messageCenter = await buildMessageCenterPayload(context, {
+        limit: 100,
+        rulesBuildingId: buildingId
+      });
+      return res.json({
+        data: {
+          sentCount: sentRecords.length,
+          failedCount: failedRecords.length,
+          attemptedCount: recipients.length,
+          messages: [...sentRecords, ...failedRecords].map(mapOutboundMessageForClient),
+          messageCenter
         },
         role: context.role
       });
@@ -14746,21 +15360,36 @@ async function bootstrap() {
         });
       }
 
+      const previousRentDue = rentLedgerService.getRentDue(
+        building.id,
+        normalizedHouseNumber
+      );
+      const previousBalanceKsh =
+        previousRentDue == null
+          ? null
+          : Math.max(0, Math.round(Number(previousRentDue.balanceKsh ?? 0)));
       const data = rentLedgerService.upsertRentDue(
         building.id,
         normalizedHouseNumber,
         parsed
       );
+      const balanceChanged =
+        previousBalanceKsh != null &&
+        previousBalanceKsh !== Math.max(0, Math.round(Number(data.balanceKsh ?? 0)));
       await persistRentLedgerStateNow();
       await recordRoomAccountAuditEvent({
         buildingId: building.id,
         houseNumber: normalizedHouseNumber,
         action: "rent.profile.updated",
-        summary: `Rent settings updated. Monthly rent KSh ${data.monthlyRentKsh.toLocaleString("en-US")}.`,
+        summary: balanceChanged
+          ? `Rent settings updated. Current balance changed from KSh ${previousBalanceKsh.toLocaleString("en-US")} to KSh ${data.balanceKsh.toLocaleString("en-US")}.`
+          : `Rent settings updated. Monthly rent KSh ${data.monthlyRentKsh.toLocaleString("en-US")}.`,
         actor: actorFromLandlordContext(context),
         metadata: {
           monthlyRentKsh: data.monthlyRentKsh,
+          previousBalanceKsh,
           balanceKsh: data.balanceKsh,
+          balanceChanged,
           dueDate: data.dueDate
         }
       });

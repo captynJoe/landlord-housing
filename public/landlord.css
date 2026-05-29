@@ -113,6 +113,27 @@
   min-height: 38px;
 }
 
+.room-default-helper {
+  width: fit-content;
+  min-height: 28px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(28, 126, 124, 0.22);
+  background: rgba(240, 250, 247, 0.94);
+  color: #0f5d4e;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.room-default-helper:hover,
+.room-default-helper:focus-visible {
+  border-color: rgba(184, 121, 47, 0.42);
+  background: #fff8eb;
+  color: #6f430d;
+}
+
 .room-management-fields textarea {
   resize: vertical;
 }
@@ -172,6 +193,65 @@
 
 .room-account-audit-card h4 {
   margin: 4px 0;
+}
+
+.room-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 31;
+  background: rgba(16, 35, 49, 0.42);
+}
+
+.room-confirm-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 32;
+  display: grid;
+  width: min(440px, calc(100vw - 32px));
+  gap: 14px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(16, 35, 49, 0.16);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 20px 42px rgba(16, 35, 49, 0.26);
+  padding: 18px;
+}
+
+.room-confirm-modal h2 {
+  margin: 0;
+  color: #102331;
+  font-size: 1rem;
+}
+
+.room-confirm-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.room-confirm-values div {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(16, 35, 49, 0.12);
+  border-radius: 8px;
+  background: rgba(247, 251, 251, 0.94);
+  padding: 10px;
+}
+
+.room-confirm-values span {
+  color: rgba(16, 35, 49, 0.68);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.room-confirm-values strong {
+  color: #102331;
+}
+
+.room-confirm-actions {
+  justify-content: flex-end;
 }
 
 .room-billing-hold-form {
@@ -434,7 +514,7 @@
 .landlord-nav {
   margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   align-items: stretch;
   gap: 4px;
   overflow: visible;
@@ -584,6 +664,88 @@
 .landlord-notification-chip.chip-success {
   background: rgba(24, 110, 110, 0.14);
   color: #174f4b;
+}
+
+.message-center-compose {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.message-center-rules {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.message-center-rules-head {
+  margin: 0;
+}
+
+.message-center-rules-head h4 {
+  margin: 0;
+  color: #102331;
+  font-size: 0.98rem;
+}
+
+.message-center-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+}
+
+.message-center-rule-grid .checkbox-row {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid rgba(15, 62, 87, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #102331;
+  font-weight: 800;
+}
+
+.message-center-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.message-center-table-wrap td {
+  vertical-align: top;
+}
+
+.message-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(24, 110, 110, 0.14);
+  color: #174f4b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.message-status-pill.is-failed {
+  background: rgba(186, 43, 43, 0.12);
+  color: #8c1f1f;
+}
+
+.message-recipient-cell,
+.message-body-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.message-body-cell small,
+.message-recipient-cell small {
+  color: rgba(16, 35, 49, 0.58);
+  font-size: 0.74rem;
 }
 
 .metric-card-btn {
@@ -2199,7 +2361,7 @@ button.resident-overview-card.is-active {
   }
 
   .landlord-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 3px;
     padding: 3px;
   }

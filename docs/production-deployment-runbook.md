@@ -98,6 +98,32 @@ Expected shape:
 {"status":"ok","service":"landlord-housing-api","storage":"prisma"}
 ```
 
+Run the VPS2 production audit after deploys or when checking hardening:
+
+```bash
+deploy/vps2/audit.sh
+```
+
+The audit validates the env shape without printing secrets, checks container
+health, confirms the API is not bound to `0.0.0.0`, confirms the landlord
+PostgreSQL container has no host-published port, checks Prisma migration status,
+checks the uploads mount, and reports whether recent backups exist.
+
+Back up the dedicated production database and uploads volume from VPS2:
+
+```bash
+deploy/vps2/backup.sh
+```
+
+Recommended cron entry on VPS2:
+
+```cron
+17 2 * * * cd /home/captyn/landlord-housing && deploy/vps2/backup.sh >> /home/captyn/backups/landlord-housing/backup.log 2>&1
+```
+
+Keep a copy of `/home/captyn/backups/landlord-housing` off VPS2. Local backups
+protect against bad deploys; off-host backups protect against disk or VPS loss.
+
 ## VPS1 Frontend And Public Proxy Deploy
 
 Run these on the frontend VPS that already hosts the public Nginx entrypoint.

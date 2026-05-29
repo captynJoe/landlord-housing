@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260523c" />
+    <link rel="stylesheet" href="/landlord.css?v=20260529b" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260523c" />
   </head>
   <body>
@@ -115,6 +115,14 @@
               class="landlord-nav-badge hidden"
               aria-live="polite"
             ></span>
+          </button>
+          <button
+            type="button"
+            class="landlord-nav-btn"
+            data-landlord-view="messages"
+            data-landlord-section-target="message-center-section"
+          >
+            Messages
           </button>
           <button
             type="button"
@@ -1100,6 +1108,126 @@
 
         <section
           class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="messages"
+          id="message-center-section"
+        >
+          <div class="panel-head">
+            <div>
+              <h2>Message Center</h2>
+              <p id="message-center-summary" class="status-text">
+                Recent tenant SMS activity will appear here.
+              </p>
+            </div>
+            <button id="refresh-messages" type="button">Refresh</button>
+          </div>
+
+          <form id="message-rules-form" class="package-card message-center-rules">
+            <div class="section-head message-center-rules-head">
+              <h4>Automatic Messages</h4>
+              <span id="message-rules-status" class="status-text"></span>
+            </div>
+            <div class="message-center-rule-grid">
+              <label class="checkbox-row">
+                <input id="message-rule-payment-receipts" type="checkbox" />
+                Payment receipts
+              </label>
+              <label class="checkbox-row">
+                <input id="message-rule-rent-reminders" type="checkbox" />
+                Rent reminders
+              </label>
+              <label class="checkbox-row">
+                <input id="message-rule-utility-reminders" type="checkbox" />
+                Utility reminders
+              </label>
+              <label class="checkbox-row">
+                <input id="message-rule-overdue-notices" type="checkbox" />
+                Overdue notices
+              </label>
+            </div>
+            <div class="message-center-compose-actions">
+              <span id="message-rules-updated" class="status-text"></span>
+              <button id="message-rules-save-btn" type="submit">Save Rules</button>
+            </div>
+          </form>
+
+          <form id="message-center-form" class="package-card message-center-compose">
+            <div class="inline-fields compact-fields">
+              <label>
+                Send To
+                <select id="message-recipient-scope">
+                  <option value="room">Room</option>
+                  <option value="building">Building</option>
+                  <option value="phone">Phone Number</option>
+                </select>
+              </label>
+              <label id="message-building-field">
+                Building
+                <select id="message-building-select"></select>
+              </label>
+              <label id="message-house-field">
+                Room / House
+                <input
+                  id="message-house-number"
+                  type="text"
+                  maxlength="24"
+                  placeholder="A-12"
+                />
+              </label>
+              <label id="message-phone-field" class="hidden">
+                Phone
+                <input
+                  id="message-phone-number"
+                  type="tel"
+                  maxlength="20"
+                  placeholder="07..."
+                />
+              </label>
+            </div>
+            <label>
+              Title / Purpose
+              <input
+                id="message-title"
+                type="text"
+                maxlength="48"
+                placeholder="Maintenance Notice"
+              />
+            </label>
+            <label>
+              Message
+              <textarea
+                id="message-body"
+                rows="3"
+                maxlength="160"
+                placeholder="Type tenant SMS"
+                required
+              ></textarea>
+            </label>
+            <div class="message-center-compose-actions">
+              <span id="message-character-count" class="status-text">0/160</span>
+              <button id="message-send-btn" type="submit">Send SMS</button>
+            </div>
+          </form>
+
+          <div class="table-wrap message-center-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Status</th>
+                  <th>Recipient</th>
+                  <th>Scope</th>
+                  <th>Message</th>
+                  <th>Sender</th>
+                  <th>Provider</th>
+                </tr>
+              </thead>
+              <tbody id="messages-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
           data-landlord-view-panel="expenses"
           id="utilities-expenditures-section"
         >
@@ -1445,15 +1573,15 @@
             </label>
             <label>
               Building Default Rent
-              <input id="rent-sheet-default-monthly-rent" type="number" min="0" step="1" />
+              <input id="rent-sheet-default-monthly-rent" type="number" min="0" step="1" placeholder="Set" />
             </label>
             <label>
               Due Day
-              <input id="rent-sheet-default-due-day" type="number" min="1" max="31" step="1" />
+              <input id="rent-sheet-default-due-day" type="number" min="1" max="31" step="1" placeholder="Set" />
             </label>
             <label>
               Grace Days
-              <input id="rent-sheet-default-grace-days" type="number" min="0" max="31" step="1" />
+              <input id="rent-sheet-default-grace-days" type="number" min="0" max="31" step="1" placeholder="Set" />
             </label>
           </div>
 
@@ -1816,6 +1944,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260525b"></script>
+    <script type="module" src="/landlord.js?v=20260529b"></script>
   </body>
 </html>

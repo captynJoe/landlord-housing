@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260517c" />
+    <link rel="stylesheet" href="/landlord.css?v=20260529a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
@@ -175,7 +175,7 @@
                   min="0"
                   max="500000"
                   step="1"
-                  placeholder="Building Default"
+                  placeholder="Set"
                 />
               </label>
               <label>
@@ -194,8 +194,15 @@
                   min="1"
                   max="31"
                   step="1"
-                  placeholder="Building Default"
+                  placeholder="Set"
                 />
+                <button
+                  id="room-rent-due-day-default-action"
+                  type="button"
+                  class="room-default-helper hidden"
+                >
+                  Set building default
+                </button>
               </label>
               <label>
                 Grace Days
@@ -205,7 +212,7 @@
                   min="0"
                   max="31"
                   step="1"
-                  placeholder="Building Default"
+                  placeholder="Set"
                 />
               </label>
               <label>
@@ -221,6 +228,28 @@
               <button id="room-rent-setup-submit" type="submit">Save Rent Setup</button>
             </div>
           </form>
+        </div>
+      </section>
+
+      <div id="room-balance-confirm-backdrop" class="room-confirm-backdrop hidden"></div>
+      <section
+        id="room-balance-confirm-modal"
+        class="room-confirm-modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="room-balance-confirm-title"
+        aria-describedby="room-balance-confirm-message"
+      >
+        <h2 id="room-balance-confirm-title">Confirm Balance Adjustment</h2>
+        <p id="room-balance-confirm-message" class="status-text"></p>
+        <div id="room-balance-confirm-values" class="room-confirm-values"></div>
+        <div class="action-row room-confirm-actions">
+          <button id="room-balance-confirm-cancel" type="button" class="ghost-btn">
+            Cancel
+          </button>
+          <button id="room-balance-confirm-apply" type="button">
+            Update Balance
+          </button>
         </div>
       </section>
 
@@ -406,6 +435,6 @@
       </section>
     </main>
 
-    <script type="module" src="/room-account.js?v=20260525a"></script>
+    <script type="module" src="/room-account.js?v=20260529a"></script>
   </body>
 </html>

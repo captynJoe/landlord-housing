@@ -4,9 +4,12 @@ import type {
   PushNotificationService
 } from "../pushNotificationService.js";
 import type { UserNotification } from "../userSupportService.js";
+import type { OutboundMessageService } from "../outboundMessageService.js";
+import type { AutomaticMessageKind } from "../automaticMessageRuleService.js";
 import type { SmsNotificationService } from "./sms.js";
 
 type NotificationCategory = "rent" | "utility" | "support" | "general";
+export type ResidentSmsNotificationKind = AutomaticMessageKind;
 type ResidentVerificationStatus = "verified" | "pending_review" | "rejected";
 
 interface ResidentNotificationRecipient {
@@ -20,11 +23,19 @@ interface NotificationDeliveryServiceOptions {
     PushNotificationService,
     "isEnabled" | "notifyResidentScope"
   >;
-  smsNotificationService: Pick<SmsNotificationService, "isEnabled" | "send">;
+  smsNotificationService: Pick<SmsNotificationService, "isEnabled" | "send"> & {
+    getProvider?: SmsNotificationService["getProvider"];
+  };
+  outboundMessageService?: Pick<OutboundMessageService, "record">;
   residentNotificationPreferenceService: Pick<
     ResidentNotificationPreferenceService,
     "getForUser"
   >;
+  allowSystemSms?: (input: {
+    notification: UserNotification;
+    category: NotificationCategory;
+    kind: ResidentSmsNotificationKind;
+  }) => boolean;
   resolveRecipient: (scope: {
     buildingId: string;
     houseNumber: string;
@@ -45,6 +56,36 @@ function classifyNotification(item: Pick<UserNotification, "source" | "dedupeKey
   if (item.source === "ticket") {
     return "support";
   }
+  return "general";
+}
+
+function classifySmsNotificationKind(
+  item: Pick<UserNotification, "source" | "dedupeKey">
+): ResidentSmsNotificationKind {
+  const dedupeKey = String(item.dedupeKey ?? "").trim();
+
+  if (
+    dedupeKey.startsWith("rent-reminder-overdue-") ||
+    dedupeKey.startsWith("utility-reminder-overdue-")
+  ) {
+    return "overdue_notice";
+  }
+
+  if (
+    dedupeKey.startsWith("rent-payment-") ||
+    dedupeKey.startsWith("utility-payment-")
+  ) {
+    return "payment_receipt";
+  }
+
+  if (dedupeKey.startsWith("rent-reminder-")) {
+    return "rent_reminder";
+  }
+
+  if (dedupeKey.startsWith("utility-reminder-")) {
+    return "utility_reminder";
+  }
+
   return "general";
 }
 
@@ -227,14 +268,49 @@ export class NotificationDeliveryService {
       if (!allowSmsForCategory(category, preferences)) {
         continue;
       }
+      const kind = classifySmsNotificationKind(notification);
+      if (
+        this.options.allowSystemSms &&
+        !this.options.allowSystemSms({ notification, category, kind })
+      ) {
+        continue;
+      }
 
       try {
+        const message = buildSmsBody(notification);
         await this.options.smsNotificationService.send({
           to: recipient.phoneNumber,
-          message: buildSmsBody(notification),
+          message,
+          tag: notification.dedupeKey
+        });
+        this.options.outboundMessageService?.record({
+          provider: this.options.smsNotificationService.getProvider?.() ?? "sms",
+          source: "system",
+          category,
+          status: "sent",
+          recipientKind: "room",
+          recipientUserId: recipient.userId,
+          recipientPhone: recipient.phoneNumber,
+          buildingId: notification.buildingId,
+          houseNumber: notification.houseNumber,
+          body: message,
           tag: notification.dedupeKey
         });
       } catch (error) {
+        this.options.outboundMessageService?.record({
+          provider: this.options.smsNotificationService.getProvider?.() ?? "sms",
+          source: "system",
+          category,
+          status: "failed",
+          recipientKind: "room",
+          recipientUserId: recipient.userId,
+          recipientPhone: recipient.phoneNumber,
+          buildingId: notification.buildingId,
+          houseNumber: notification.houseNumber,
+          body: buildSmsBody(notification),
+          tag: notification.dedupeKey,
+          error: error instanceof Error ? error.message : "SMS delivery failed."
+        });
         console.error("Failed to deliver resident SMS notification", {
           userId: recipient.userId,
           buildingId: notification.buildingId,
