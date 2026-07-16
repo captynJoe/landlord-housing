@@ -97,6 +97,14 @@ export interface UnrecordUtilityPaymentResult {
   totalAmountKsh: number;
 }
 
+export interface ReplaceManualUtilityPaymentResult {
+  previousEvents: UtilityPaymentEvent[];
+  event: UtilityPaymentEvent;
+  bill: UtilityBillSnapshot;
+  allocations: UtilityPaymentAllocation[];
+  totalAppliedAmountKsh: number;
+}
+
 export interface UtilityWriteOffBillResult {
   id: string;
   utilityType: UtilityType;
@@ -721,6 +729,55 @@ export class UtilityBillingService {
       )
     ) {
       changed = true;
+    }
+
+    if (!changed) {
+      return false;
+    }
+
+    this.rebuildPaymentReferenceIndex();
+    this.emitStateChange();
+    return true;
+  }
+
+  purgeBuilding(buildingId: string): boolean {
+    const normalizedBuildingId = normalizeBuildingId(buildingId);
+    let changed = false;
+
+    for (const [key, meter] of this.meters.entries()) {
+      if (meter.buildingId === normalizedBuildingId) {
+        this.meters.delete(key);
+        changed = true;
+      }
+    }
+
+    for (const [key, records] of this.billsByLedger.entries()) {
+      const sample = records[0];
+      if (sample?.buildingId === normalizedBuildingId) {
+        this.billsByLedger.delete(key);
+        changed = true;
+      }
+    }
+
+    if (this.combinedChargeBuildingIds.delete(normalizedBuildingId)) {
+      changed = true;
+    }
+    if (this.combinedChargeAmountsByBuilding.delete(normalizedBuildingId)) {
+      changed = true;
+    }
+
+    for (const key of this.combinedChargeAmountsByMonth.keys()) {
+      if (key.startsWith(`${normalizedBuildingId}::`)) {
+        this.combinedChargeAmountsByMonth.delete(key);
+        changed = true;
+      }
+    }
+
+    for (const key of this.combinedChargeAmountsByRoom.keys()) {
+      if (key.startsWith(`${normalizedBuildingId}::`)) {
+        this.combinedChargeAmountsByRoom.delete(key);
+        changed = true;
+      }
     }
 
     if (!changed) {
@@ -1421,6 +1478,83 @@ export class UtilityBillingService {
     };
   }
 
+  replaceManualPayment(
+    utilityType: UtilityType,
+    buildingId: string,
+    houseNumber: string,
+    paymentId: string,
+    input: InternalRecordUtilityPaymentInput
+  ): ReplaceManualUtilityPaymentResult | null {
+    const targetEvent = this.findPaymentById(utilityType, buildingId, houseNumber, paymentId);
+    if (!targetEvent) {
+      return null;
+    }
+
+    if (targetEvent.provider === "mpesa" || targetEvent.source !== "manual") {
+      throw new Error("Only manually recorded non-M-PESA utility payments can be edited.");
+    }
+
+    const originalReference = targetEvent.providerReference
+      ? normalizeProviderReference(targetEvent.providerReference)
+      : undefined;
+    const nextReference = input.providerReference?.trim()
+      ? normalizeProviderReference(input.providerReference)
+      : undefined;
+    if (
+      nextReference &&
+      nextReference !== originalReference &&
+      this.paymentReferenceIndex.has(nextReference)
+    ) {
+      throw new Error("PAYMENT_REFERENCE_ALREADY_EXISTS");
+    }
+
+    const removed = this.unrecordCashPayment(
+      utilityType,
+      buildingId,
+      houseNumber,
+      paymentId
+    );
+    if (!removed) {
+      return null;
+    }
+
+    const previousEvents = removed.events.map((event) => ({ ...event }));
+    const rollbackEvent = previousEvents[0];
+
+    try {
+      const outcome = this.recordPayment(utilityType, buildingId, houseNumber, {
+        billingMonth: input.billingMonth ?? rollbackEvent?.billingMonth,
+        amountKsh: input.amountKsh,
+        provider: input.provider,
+        providerReference: input.providerReference,
+        paidAt: input.paidAt ?? rollbackEvent?.paidAt,
+        note: input.note ?? rollbackEvent?.note,
+        source: "manual"
+      });
+
+      return {
+        previousEvents,
+        event: outcome.event,
+        bill: outcome.bill,
+        allocations: outcome.allocations,
+        totalAppliedAmountKsh: outcome.totalAppliedAmountKsh
+      };
+    } catch (error) {
+      if (rollbackEvent) {
+        this.recordPayment(utilityType, buildingId, houseNumber, {
+          billingMonth: rollbackEvent.billingMonth,
+          amountKsh: removed.totalAmountKsh,
+          provider: rollbackEvent.provider,
+          providerReference: rollbackEvent.providerReference,
+          paidAt: rollbackEvent.paidAt,
+          note: rollbackEvent.note,
+          source: rollbackEvent.source
+        });
+      }
+      throw error;
+    }
+  }
+
   private resolvePaymentContext(
     utilityType: UtilityType,
     buildingId: string,
@@ -1677,6 +1811,39 @@ export class UtilityBillingService {
         0
       )
     };
+  }
+
+  private findPaymentById(
+    utilityType: UtilityType,
+    buildingId: string,
+    houseNumber: string,
+    paymentId: string
+  ): UtilityPaymentEvent | null {
+    const normalizedBuildingId = normalizeBuildingId(buildingId);
+    const normalizedHouse = normalizeHouseNumber(houseNumber);
+    const normalizedPaymentId = String(paymentId ?? "").trim();
+    if (!normalizedPaymentId) {
+      return null;
+    }
+
+    for (const bills of this.billsByLedger.values()) {
+      for (const bill of bills) {
+        if (
+          bill.utilityType !== utilityType ||
+          !buildingMatchesScope(bill.buildingId, normalizedBuildingId) ||
+          bill.houseNumber !== normalizedHouse
+        ) {
+          continue;
+        }
+
+        const event = bill.payments.find((payment) => payment.id === normalizedPaymentId);
+        if (event) {
+          return { ...event };
+        }
+      }
+    }
+
+    return null;
   }
 
   private normalizeCombinedChargeState(): void {

@@ -48,7 +48,20 @@ esac
   docker compose "${compose_env_args[@]}" \
     -f "$base_compose" \
     -f "$app_root/deploy/vps1/docker-compose.estatedesk.yml" \
-    up -d estatedesk_web nginx
+    up -d --force-recreate landlord_housing_web nginx
+
+  compose_project_name="$(
+    awk -F= '$1 == "COMPOSE_PROJECT_NAME" { print $2; exit }' "$stack_root/.env" 2>/dev/null || true
+  )"
+  compose_project_name="${compose_project_name:-captyn_vps1}"
+  old_estatedesk_web_containers="$(
+    docker ps -aq \
+      --filter "label=com.docker.compose.project=$compose_project_name" \
+      --filter "label=com.docker.compose.service=estatedesk_web"
+  )"
+  if [ -n "$old_estatedesk_web_containers" ]; then
+    docker rm -f $old_estatedesk_web_containers >/dev/null
+  fi
 
   docker compose "${compose_env_args[@]}" \
     -f "$base_compose" \

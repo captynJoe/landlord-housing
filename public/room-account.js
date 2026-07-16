@@ -86,7 +86,8 @@ const state = {
   loading: false,
   formSaving: false,
   data: null,
-  balanceConfirmResolve: null
+  balanceConfirmResolve: null,
+  balanceConfirmPreviousFocus: null
 };
 
 function escapeHtml(value) {
@@ -231,11 +232,33 @@ function setFormFieldPlaceholder(form, name, value) {
 function closeBalanceConfirmModal(result) {
   roomBalanceConfirmBackdropEl?.classList.add("hidden");
   roomBalanceConfirmModalEl?.classList.add("hidden");
+  document.body.classList.remove("room-confirm-open");
 
   const resolver = state.balanceConfirmResolve;
   state.balanceConfirmResolve = null;
   if (typeof resolver === "function") {
     resolver(Boolean(result));
+  }
+
+  const previousFocus = state.balanceConfirmPreviousFocus;
+  state.balanceConfirmPreviousFocus = null;
+  if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+    previousFocus.focus({ preventScroll: true });
+  }
+}
+
+function mountBalanceConfirmModal() {
+  if (!document.body) {
+    return;
+  }
+
+  if (roomBalanceConfirmBackdropEl instanceof HTMLElement) {
+    document.body.append(roomBalanceConfirmBackdropEl);
+  }
+
+  if (roomBalanceConfirmModalEl instanceof HTMLElement) {
+    roomBalanceConfirmModalEl.setAttribute("tabindex", "-1");
+    document.body.append(roomBalanceConfirmModalEl);
   }
 }
 
@@ -252,8 +275,15 @@ function confirmBalanceAdjustment({ currentBalanceKsh, nextBalanceKsh, targetLab
     return Promise.resolve(window.confirm(fallbackMessage));
   }
 
+  if (state.balanceConfirmResolve) {
+    closeBalanceConfirmModal(false);
+  }
+
   return new Promise((resolve) => {
+    mountBalanceConfirmModal();
     state.balanceConfirmResolve = resolve;
+    state.balanceConfirmPreviousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (roomBalanceConfirmMessageEl instanceof HTMLElement) {
       roomBalanceConfirmMessageEl.textContent =
         `You are about to modify the current tenant balance for ${targetLabel}. ` +
@@ -276,9 +306,12 @@ function confirmBalanceAdjustment({ currentBalanceKsh, nextBalanceKsh, targetLab
       });
     }
 
+    document.body.classList.add("room-confirm-open");
     roomBalanceConfirmBackdropEl.classList.remove("hidden");
     roomBalanceConfirmModalEl.classList.remove("hidden");
-    roomBalanceConfirmApplyEl.focus();
+    requestAnimationFrame(() => {
+      roomBalanceConfirmApplyEl.focus({ preventScroll: true });
+    });
   });
 }
 
@@ -456,10 +489,14 @@ function formatAuditActionLabel(value) {
   switch (String(value ?? "").trim()) {
     case "rent.payment.recorded":
       return "Rent payment recorded";
+    case "rent.payment.edited":
+      return "Rent payment edited";
     case "rent.payment.unrecorded":
       return "Rent payment unrecorded";
     case "utility.payment.recorded":
       return "Utility payment recorded";
+    case "utility.payment.edited":
+      return "Utility payment edited";
     case "utility.payment.unrecorded":
       return "Utility payment unrecorded";
     case "resident.removed":
@@ -470,6 +507,8 @@ function formatAuditActionLabel(value) {
       return "Deposit settlement recorded";
     case "deposit.refund.recorded":
       return "Deposit refund recorded";
+    case "rent.current_month_paid.updated":
+      return "Paid this month updated";
     case "resident.debt.transferred":
       return "Debt transferred";
     case "room.removed":
@@ -568,11 +607,25 @@ function canUnrecordPayments() {
   return String(state.role ?? "").trim() !== "caretaker";
 }
 
-function renderUnrecordPaymentButton(action, payment, extraAttributes = {}) {
+function canEditPayment(payment) {
+  if (!canUnrecordPayments()) {
+    return false;
+  }
+
   const paymentId = String(payment?.id ?? "").trim();
   const provider = String(payment?.provider ?? "").trim().toLowerCase();
   const source = String(payment?.source ?? "").trim().toLowerCase();
-  if (!canUnrecordPayments() || !paymentId || (provider !== "cash" && source !== "manual")) {
+  return Boolean(paymentId && source === "manual" && provider && provider !== "mpesa");
+}
+
+function renderPaymentActionButtons(actionPrefix, payment, extraAttributes = {}) {
+  const paymentId = String(payment?.id ?? "").trim();
+  const provider = String(payment?.provider ?? "").trim().toLowerCase();
+  const source = String(payment?.source ?? "").trim().toLowerCase();
+  const editable = canEditPayment(payment);
+  const deletable =
+    canUnrecordPayments() && paymentId && (provider === "cash" || source === "manual");
+  if (!editable && !deletable) {
     return "-";
   }
 
@@ -580,18 +633,159 @@ function renderUnrecordPaymentButton(action, payment, extraAttributes = {}) {
     .map(([key, value]) => `data-${key}="${escapeHtml(value)}"`)
     .join(" ");
 
-  return `
-    <button
-      type="button"
-      class="btn-danger payment-unrecord-btn"
-      data-action="${escapeHtml(action)}"
-      data-payment-id="${escapeHtml(paymentId)}"
-      data-amount="${escapeHtml(formatCurrency(payment?.amountKsh ?? 0))}"
-      ${extra}
-    >
-      Unrecord
-    </button>
-  `;
+  const buttons = [];
+  if (editable) {
+    buttons.push(`
+      <button
+        type="button"
+        class="payment-edit-btn"
+        data-action="edit-${escapeHtml(actionPrefix)}-payment"
+        data-payment-id="${escapeHtml(paymentId)}"
+        data-amount-ksh="${escapeHtml(String(Number(payment?.amountKsh ?? 0)))}"
+        data-provider="${escapeHtml(String(payment?.provider ?? ""))}"
+        data-provider-reference="${escapeHtml(String(payment?.providerReference ?? ""))}"
+        data-billing-month="${escapeHtml(String(payment?.billingMonth ?? ""))}"
+        data-paid-at="${escapeHtml(String(payment?.paidAt ?? payment?.createdAt ?? ""))}"
+        data-note="${escapeHtml(String(payment?.note ?? ""))}"
+        ${extra}
+      >
+        Edit
+      </button>
+    `);
+  }
+  if (deletable) {
+    buttons.push(`
+      <button
+        type="button"
+        class="btn-danger payment-unrecord-btn"
+        data-action="unrecord-${escapeHtml(actionPrefix)}-payment"
+        data-payment-id="${escapeHtml(paymentId)}"
+        data-amount="${escapeHtml(formatCurrency(payment?.amountKsh ?? 0))}"
+        ${extra}
+      >
+        Delete
+      </button>
+    `);
+  }
+
+  return `<div class="resident-row-actions payment-row-actions">${buttons.join("")}</div>`;
+}
+
+function formatPromptDateTime(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw;
+  }
+
+  return new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function parsePromptDateTime(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const normalized = raw.includes(" ") && !raw.includes("T") ? raw.replace(" ", "T") : raw;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
+function promptForPaymentEdit(button) {
+  const action = String(button?.dataset?.action ?? "").trim();
+  const currentAmount = Number(button?.dataset?.amountKsh ?? 0);
+  const currentProvider = String(button?.dataset?.provider ?? "cash").trim().toLowerCase();
+  const currentReference = String(button?.dataset?.providerReference ?? "").trim();
+  const currentBillingMonth = String(button?.dataset?.billingMonth ?? "").trim();
+  const currentPaidAt = String(button?.dataset?.paidAt ?? "").trim();
+  const currentNote = String(button?.dataset?.note ?? "").trim();
+
+  const amountRaw = window.prompt("Amount in KSh", String(currentAmount || ""));
+  if (amountRaw === null) {
+    return null;
+  }
+  const amountKsh = Math.round(Number(amountRaw.trim()));
+  if (!Number.isFinite(amountKsh) || amountKsh <= 0) {
+    throw new Error("Provide a valid payment amount greater than zero.");
+  }
+
+  const providerRaw = window.prompt(
+    "Provider (cash, bank, or card)",
+    currentProvider || "cash"
+  );
+  if (providerRaw === null) {
+    return null;
+  }
+  const provider = providerRaw.trim().toLowerCase();
+  if (!["cash", "bank", "card"].includes(provider)) {
+    throw new Error("Provider must be cash, bank, or card.");
+  }
+
+  const referenceRaw = window.prompt(
+    "Reference (optional for cash, required for bank/card)",
+    currentReference
+  );
+  if (referenceRaw === null) {
+    return null;
+  }
+  const providerReference = referenceRaw.trim();
+  if ((provider === "bank" || provider === "card") && !providerReference) {
+    throw new Error("Reference is required for bank or card payments.");
+  }
+
+  const paidAtRaw = window.prompt(
+    "Paid at (YYYY-MM-DDTHH:MM or full ISO time)",
+    formatPromptDateTime(currentPaidAt)
+  );
+  if (paidAtRaw === null) {
+    return null;
+  }
+  const paidAt = parsePromptDateTime(paidAtRaw);
+  if (paidAtRaw.trim() && !paidAt) {
+    throw new Error("Paid at must be a valid date and time.");
+  }
+
+  const billingMonthRaw = window.prompt(
+    "Billing month (YYYY-MM). Leave blank to keep current coverage month.",
+    currentBillingMonth
+  );
+  if (billingMonthRaw === null) {
+    return null;
+  }
+  const billingMonth = billingMonthRaw.trim();
+  if (billingMonth && !/^\d{4}-\d{2}$/.test(billingMonth)) {
+    throw new Error("Billing month must use YYYY-MM format.");
+  }
+
+  const payload = {
+    buildingId: state.buildingId,
+    amountKsh,
+    provider,
+    providerReference: providerReference || undefined,
+    billingMonth: billingMonth || undefined,
+    paidAt: paidAt || undefined
+  };
+
+  if (action === "edit-utility-payment") {
+    const noteRaw = window.prompt("Note (optional)", currentNote);
+    if (noteRaw === null) {
+      return null;
+    }
+    payload.note = noteRaw.trim() || undefined;
+  }
+
+  return payload;
 }
 
 function setStatus(message) {
@@ -1123,6 +1317,11 @@ function renderManagementForms(payload) {
       "depositKsh",
       numberToInputString(agreement.depositKsh ?? room.depositKsh)
     );
+    setFormFieldValue(
+      roomRentSetupFormEl,
+      "depositPaidKsh",
+      numberToInputString(agreement.depositPaidKsh)
+    );
     setFormFieldValue(roomRentSetupFormEl, "note", "");
     setFormControlsEnabled(roomRentSetupFormEl, canEditRent);
     if (roomRentSetupSubmitEl instanceof HTMLButtonElement) {
@@ -1276,7 +1475,7 @@ function renderRentPayments(payload) {
       <td>${escapeHtml(item?.providerReference || "-")}</td>
       <td>${escapeHtml(formatCurrency(item?.amountKsh ?? 0))}</td>
       <td>${escapeHtml(formatDateTime(item?.paidAt || item?.createdAt))}</td>
-      <td>${renderUnrecordPaymentButton("unrecord-rent-payment", item)}</td>
+      <td>${renderPaymentActionButtons("rent", item)}</td>
     `;
     roomRentPaymentsBodyEl.append(row);
   });
@@ -1306,7 +1505,7 @@ function renderUtilityPayments(payload) {
       <td>${escapeHtml(item?.providerReference || item?.note || "-")}</td>
       <td>${escapeHtml(formatCurrency(item?.amountKsh ?? 0))}</td>
       <td>${escapeHtml(formatDateTime(item?.paidAt || item?.createdAt))}</td>
-      <td>${renderUnrecordPaymentButton("unrecord-utility-payment", item, {
+      <td>${renderPaymentActionButtons("utility", item, {
         "utility-type": String(item?.utilityType ?? "")
       })}</td>
     `;
@@ -1611,6 +1810,7 @@ function buildAgreementPayloadFromRecord(overrides = {}) {
     leaseEndDate: toDateInputValue(agreement.leaseEndDate) || undefined,
     monthlyRentKsh: toOptionalNumber(agreement.monthlyRentKsh),
     depositKsh: toOptionalNumber(agreement.depositKsh),
+    depositPaidKsh: toOptionalNumber(agreement.depositPaidKsh),
     paymentDueDay: toOptionalNumber(agreement.paymentDueDay),
     specialTerms: agreement.specialTerms || undefined,
     ...overrides
@@ -1770,10 +1970,21 @@ async function saveRoomRentSetup(event) {
     toOptionalNumber(room.configuredPaymentDueDay ?? room.paymentDueDay);
   const roomDefaultGraceDays = toOptionalNumber(getFormFieldValue(form, "rentGraceDays"));
   const depositKsh = toOptionalNumber(getFormFieldValue(form, "depositKsh"));
+  const depositPaidKsh = toOptionalNumber(getFormFieldValue(form, "depositPaidKsh"));
   const note = normalizeOptionalString(getFormFieldValue(form, "note"));
 
   if (!dueDate) {
     showError("Choose the rent due date.");
+    return;
+  }
+
+  if (depositPaidKsh != null && depositKsh == null) {
+    showError("Set the agreed deposit before recording how much has been paid.");
+    return;
+  }
+
+  if (depositPaidKsh != null && depositKsh != null && depositPaidKsh > depositKsh) {
+    showError("Deposit paid cannot be more than the agreed deposit amount.");
     return;
   }
 
@@ -1863,6 +2074,7 @@ async function saveRoomRentSetup(event) {
             buildAgreementPayloadFromRecord({
               monthlyRentKsh,
               depositKsh,
+              depositPaidKsh,
               paymentDueDay: resolvedPaymentDueDay
             })
           )
@@ -2001,6 +2213,70 @@ async function unrecordPayment(button) {
   }
 }
 
+async function editPayment(button) {
+  const action = String(button?.dataset?.action ?? "").trim();
+  const paymentId = String(button?.dataset?.paymentId ?? "").trim();
+  if (!paymentId || (action !== "edit-rent-payment" && action !== "edit-utility-payment")) {
+    return;
+  }
+
+  let payload;
+  try {
+    payload = promptForPaymentEdit(button);
+  } catch (error) {
+    showError(error instanceof Error ? error.message : "Unable to open payment editor.");
+    return;
+  }
+  if (!payload) {
+    return;
+  }
+
+  const utilityType = String(button?.dataset?.utilityType ?? "").trim();
+  if (action === "edit-utility-payment" && !utilityType) {
+    showError("Utility type is missing for this payment.");
+    return;
+  }
+
+  const roomPath = encodeURIComponent(state.houseNumber);
+  const paymentPath = encodeURIComponent(paymentId);
+  const url =
+    action === "edit-rent-payment"
+      ? `/api/landlord/rent/${roomPath}/payments/${paymentPath}`
+      : `/api/landlord/utilities/${encodeURIComponent(
+          utilityType
+        )}/${roomPath}/payments/${paymentPath}`;
+
+  setLoading(true);
+  showError("");
+  button.disabled = true;
+  setStatus("Saving payment changes...");
+
+  try {
+    await requestJson(url, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    await loadRoomAccount();
+    setStatus("Payment changes saved.");
+  } catch (error) {
+    if (error?.status === 401) {
+      redirectToLogin();
+      return;
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Unable to edit this payment.";
+    showError(message);
+    setStatus("Payment edit failed.");
+  } finally {
+    button.disabled = false;
+    setLoading(false);
+  }
+}
+
 function handlePaymentActionClick(event) {
   if (state.loading || !(event.target instanceof Element)) {
     return;
@@ -2011,7 +2287,14 @@ function handlePaymentActionClick(event) {
     return;
   }
 
-  void unrecordPayment(button);
+  if (button.dataset.action?.startsWith("edit-")) {
+    void editPayment(button);
+    return;
+  }
+
+  if (button.dataset.action?.startsWith("unrecord-")) {
+    void unrecordPayment(button);
+  }
 }
 
 function handleBillingHoldClick(event) {
@@ -2096,12 +2379,48 @@ roomBalanceConfirmBackdropEl?.addEventListener("click", () => {
 roomBalanceConfirmApplyEl?.addEventListener("click", () => {
   closeBalanceConfirmModal(true);
 });
+document.addEventListener(
+  "click",
+  (event) => {
+    if (
+      !(roomBalanceConfirmModalEl instanceof HTMLElement) ||
+      roomBalanceConfirmModalEl.classList.contains("hidden")
+    ) {
+      return;
+    }
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) {
+      return;
+    }
+
+    if (
+      target.closest("#room-balance-confirm-apply") instanceof HTMLElement
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeBalanceConfirmModal(true);
+      return;
+    }
+
+    if (
+      target.closest("#room-balance-confirm-cancel") instanceof HTMLElement ||
+      target.id === "room-balance-confirm-backdrop"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      closeBalanceConfirmModal(false);
+    }
+  },
+  true
+);
 document.addEventListener("keydown", (event) => {
   if (
     event.key === "Escape" &&
     roomBalanceConfirmModalEl instanceof HTMLElement &&
     !roomBalanceConfirmModalEl.classList.contains("hidden")
   ) {
+    event.preventDefault();
     closeBalanceConfirmModal(false);
   }
 });

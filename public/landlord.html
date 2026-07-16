@@ -11,8 +11,8 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260529b" />
-    <link rel="stylesheet" href="/dedicated-theme.css?v=20260523c" />
+    <link rel="stylesheet" href="/landlord.css?v=20260716c" />
+    <link rel="stylesheet" href="/dedicated-theme.css?v=20260716b" />
   </head>
   <body>
     <div class="backdrop"></div>
@@ -21,8 +21,7 @@
         <div class="landlord-navbar-head">
           <div class="landlord-navbar-copy">
             <p id="landlord-brand-tag" class="tag landlord-navbar-tag">JK Flats</p>
-            <h1 id="landlord-brand-title" class="landlord-navbar-title">Manager Workspace</h1>
-            <p class="sidebar-label">Workspace</p>
+            <h1 id="landlord-brand-title" class="landlord-navbar-title">Manager</h1>
             <p id="auth-status" class="status-text landlord-navbar-status">
               Checking landlord session...
             </p>
@@ -78,61 +77,6 @@
           </label>
           <button id="landlord-global-search-btn" type="submit">Open Room</button>
         </form>
-        <nav class="landlord-nav" aria-label="Landlord sections">
-          <button
-            type="button"
-            class="landlord-nav-btn"
-            data-landlord-view="tenants"
-            data-landlord-section-target="residents-section"
-          >
-            Ledger
-          </button>
-          <button
-            type="button"
-            class="landlord-nav-btn"
-            data-landlord-view="overview"
-            data-landlord-section-target="overview-collections-panel"
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            class="landlord-nav-btn"
-            data-landlord-view="buildings"
-            data-landlord-section-target="buildings-section"
-          >
-            Manage
-          </button>
-          <button
-            type="button"
-            class="landlord-nav-btn"
-            data-landlord-view="applications"
-            data-landlord-section-target="applications-section"
-          >
-            <span class="landlord-nav-label">Requests</span>
-            <span
-              id="applications-nav-badge"
-              class="landlord-nav-badge hidden"
-              aria-live="polite"
-            ></span>
-          </button>
-          <button
-            type="button"
-            class="landlord-nav-btn"
-            data-landlord-view="messages"
-            data-landlord-section-target="message-center-section"
-          >
-            Messages
-          </button>
-          <button
-            type="button"
-            class="landlord-nav-btn"
-            data-landlord-view="expenses"
-            data-landlord-section-target="utilities-expenditures-section"
-          >
-            Expenses
-          </button>
-        </nav>
       </section>
 
       <section
@@ -153,87 +97,158 @@
         <div id="landlord-notifications-list" class="landlord-notification-list"></div>
       </section>
 
-      <section class="panel metrics-panel">
-        <div class="panel-head">
-          <h2>Overview</h2>
-        </div>
-        <div class="metrics-grid">
-          <button type="button" class="metric-card metric-card-btn" data-metric-target="meters"><p>Meters</p><strong id="metric-meters">-</strong></button>
-          <button type="button" class="metric-card metric-card-btn" data-metric-target="users"><p>Tenants</p><strong id="metric-users">-</strong></button>
-          <button type="button" class="metric-card metric-card-btn" data-metric-target="posted-bills"><p>Posted Bills</p><strong id="metric-bills">-</strong></button>
-          <button type="button" class="metric-card metric-card-btn" data-metric-target="unpaid-bills"><p>Unpaid Bills</p><strong id="metric-unpaid">-</strong></button>
-          <button type="button" class="metric-card metric-card-btn" data-metric-target="overdue-bills"><p>Overdue Bills</p><strong id="metric-overdue">-</strong></button>
-          <button type="button" class="metric-card metric-card-btn" data-metric-target="payments"><p>Collected This Month</p><strong id="metric-payments">-</strong></button>
-          <button type="button" class="metric-card metric-card-btn" data-metric-target="outstanding"><p>Resident Outstanding</p><strong id="metric-balance">-</strong></button>
-        </div>
-      </section>
-
-      <section class="panel landlord-focus-panel">
-        <div class="panel-head">
-          <h2>Current Building Focus</h2>
-          <div class="action-row landlord-focus-actions">
-            <button
-              type="button"
-              data-landlord-focus-target-view="buildings"
-              data-landlord-focus-target-section="buildings-section"
-            >
-              Manage
-            </button>
-            <button
-              type="button"
-              data-landlord-focus-target-view="tenants"
-              data-landlord-focus-target-section="residents-section"
-            >
-              Ledger
-            </button>
-            <button
-              type="button"
-              data-landlord-focus-target-view="applications"
-              data-landlord-focus-target-section="overview-issues-section"
-            >
-              Requests
-            </button>
-          </div>
-        </div>
-        <div class="landlord-focus-grid">
-          <label class="landlord-focus-field">
-            Working Building
-            <select id="landlord-focus-building-select"></select>
-          </label>
-          <div class="landlord-focus-summary" aria-live="polite">
-            <div class="landlord-focus-stat">
-              <span>Units</span>
-              <strong id="landlord-focus-units">-</strong>
-            </div>
-            <div class="landlord-focus-stat">
-              <span>Resident users</span>
-              <strong id="landlord-focus-residents">-</strong>
-            </div>
-            <div class="landlord-focus-stat">
-              <span>Open utility bills</span>
-              <strong id="landlord-focus-open-bills">-</strong>
-            </div>
-            <div class="landlord-focus-stat">
-              <span>Outstanding</span>
-              <strong id="landlord-focus-outstanding">-</strong>
-            </div>
-          </div>
-        </div>
-        <p id="landlord-focus-note" class="status-text landlord-focus-note">
-          Choose a building to keep the workspace aligned.
-        </p>
-      </section>
-
       <div class="landlord-workspace">
+        <aside class="panel landlord-side-panel" aria-label="Manager workspace">
+          <nav class="landlord-nav" aria-label="Landlord sections">
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="overview"
+              data-landlord-section-target="overview-collections-panel"
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="tenants"
+              data-landlord-section-target="residents-section"
+            >
+              Rooms
+            </button>
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="applications"
+              data-landlord-section-target="applications-section"
+            >
+              <span class="landlord-nav-label">Requests</span>
+              <span
+                id="applications-nav-badge"
+                class="landlord-nav-badge hidden"
+                aria-live="polite"
+              ></span>
+            </button>
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="messages"
+              data-landlord-section-target="message-center-section"
+            >
+              Messages
+            </button>
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="expenses"
+              data-landlord-section-target="utilities-expenditures-section"
+            >
+              Costs
+            </button>
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="buildings"
+              data-landlord-section-target="buildings-section"
+            >
+              Buildings
+            </button>
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="settings"
+              data-landlord-section-target="settings-section"
+            >
+              Setup
+            </button>
+          </nav>
+
+          <section class="landlord-focus-panel">
+            <div class="panel-head">
+              <h2>Building Focus</h2>
+              <div class="action-row landlord-focus-actions">
+                <button
+                  type="button"
+                  data-landlord-focus-target-view="buildings"
+                  data-landlord-focus-target-section="buildings-section"
+                >
+                  Buildings
+                </button>
+                <button
+                  type="button"
+                  data-landlord-focus-target-view="tenants"
+                  data-landlord-focus-target-section="residents-section"
+                >
+                  Rooms
+                </button>
+                <button
+                  type="button"
+                  data-landlord-focus-target-view="applications"
+                  data-landlord-focus-target-section="overview-issues-section"
+                >
+                  Requests
+                </button>
+              </div>
+            </div>
+            <div class="landlord-focus-grid">
+              <label class="landlord-focus-field">
+                Working Building
+                <select id="landlord-focus-building-select"></select>
+              </label>
+              <div class="landlord-focus-summary" aria-live="polite">
+                <div class="landlord-focus-stat">
+                  <span>Units</span>
+                  <strong id="landlord-focus-units">-</strong>
+                </div>
+                <div class="landlord-focus-stat">
+                  <span>Residents</span>
+                  <strong id="landlord-focus-residents">-</strong>
+                </div>
+                <div class="landlord-focus-stat">
+                  <span>Open Bills</span>
+                  <strong id="landlord-focus-open-bills">-</strong>
+                </div>
+                <div class="landlord-focus-stat">
+                  <span>Outstanding</span>
+                  <strong id="landlord-focus-outstanding">-</strong>
+                </div>
+              </div>
+            </div>
+            <p id="landlord-focus-note" class="status-text landlord-focus-note">
+              Choose a building to keep the workspace aligned.
+            </p>
+          </section>
+
+          <section class="metrics-panel">
+            <div class="panel-head">
+              <h2>Numbers</h2>
+            </div>
+            <div class="metrics-grid">
+              <button type="button" class="metric-card metric-card-btn" data-metric-target="meters"><p>Meters</p><strong id="metric-meters">-</strong></button>
+              <button type="button" class="metric-card metric-card-btn" data-metric-target="users"><p>Tenants</p><strong id="metric-users">-</strong></button>
+              <button type="button" class="metric-card metric-card-btn" data-metric-target="posted-bills"><p>Posted Bills</p><strong id="metric-bills">-</strong></button>
+              <button type="button" class="metric-card metric-card-btn" data-metric-target="unpaid-bills"><p>Unpaid Bills</p><strong id="metric-unpaid">-</strong></button>
+              <button type="button" class="metric-card metric-card-btn" data-metric-target="overdue-bills"><p>Overdue</p><strong id="metric-overdue">-</strong></button>
+              <button type="button" class="metric-card metric-card-btn" data-metric-target="payments"><p>Collected</p><strong id="metric-payments">-</strong></button>
+              <button type="button" class="metric-card metric-card-btn" data-metric-target="outstanding"><p>Outstanding</p><strong id="metric-balance">-</strong></button>
+            </div>
+          </section>
+        </aside>
         <section class="layout landlord-content">
         <section
           class="panel wide-panel landlord-view hidden"
           data-landlord-view-panel="overview"
           id="overview-collections-panel"
         >
-          <div class="panel-head">
-            <h2>Collections Dashboard</h2>
-            <div class="action-row">
+          <div class="panel-head landlord-dashboard-head">
+            <div>
+              <p class="tag dashboard-kicker">Daily View</p>
+              <h2 id="overview-daily-heading">Dashboard</h2>
+              <p id="overview-daily-subtitle" class="status-text">
+                Current building activity, collections, rooms, and requests.
+              </p>
+            </div>
+            <div class="action-row dashboard-lookup-row">
               <label class="dashboard-lookup-field">
                 Room Lookup
                 <input
@@ -251,7 +266,54 @@
               <button id="refresh-overview-dashboard" type="button">Refresh</button>
             </div>
           </div>
-          <div class="table-wrap" id="overview-collections-section">
+
+          <section class="daily-dashboard" aria-live="polite">
+            <div class="daily-dashboard-cards">
+              <article class="daily-card daily-card-primary">
+                <span>Collected This Month</span>
+                <strong id="overview-daily-collected">-</strong>
+                <small>Rent and utility payments</small>
+              </article>
+              <article class="daily-card">
+                <span>Total Outstanding</span>
+                <strong id="overview-daily-outstanding">-</strong>
+                <small>Rooms needing follow-up</small>
+              </article>
+              <article class="daily-card">
+                <span>Unpaid Rooms</span>
+                <strong id="overview-daily-unpaid">-</strong>
+                <small>Rent or utilities open</small>
+              </article>
+              <article class="daily-card">
+                <span>Open Issues</span>
+                <strong id="overview-daily-issues">-</strong>
+                <small>Resident reports not resolved</small>
+              </article>
+              <article class="daily-card">
+                <span>Tenant Requests</span>
+                <strong id="overview-daily-requests">-</strong>
+                <small>Applications waiting</small>
+              </article>
+              <article class="daily-card">
+                <span>Vacant Rooms</span>
+                <strong id="overview-daily-vacant">-</strong>
+                <small>Rooms ready for assignment</small>
+              </article>
+            </div>
+            <div class="daily-action-grid">
+              <button type="button" data-dashboard-action="rooms">Room Ledger</button>
+              <button type="button" data-dashboard-action="record-rent">Record Payment</button>
+              <button type="button" data-dashboard-action="requests">Tenant Requests</button>
+              <button type="button" data-dashboard-action="issues">Resident Issues</button>
+              <button type="button" data-dashboard-action="add-tenant">Add Tenant</button>
+            </div>
+          </section>
+
+          <div class="dashboard-section-title">
+            <h3>Rooms To Watch</h3>
+            <p class="status-text">Outstanding balances and recent payments for the focused building.</p>
+          </div>
+          <div class="table-wrap dashboard-watch-table" id="overview-collections-section">
             <table>
               <thead>
                 <tr>
@@ -274,12 +336,12 @@
 
         <section
           class="panel wide-panel landlord-view hidden"
-          data-landlord-view-panel="tenants"
+          data-landlord-view-panel="settings"
           id="overview-payment-routing-section"
         >
           <div class="panel-head">
             <div>
-              <h2>Building Payment Routing</h2>
+              <h2>Payment Routing Setup</h2>
               <p id="payment-profiles-summary" class="status-text"></p>
             </div>
             <button id="refresh-payment-profiles" type="button">Refresh</button>
@@ -304,12 +366,12 @@
 
         <section
           class="panel wide-panel landlord-view hidden"
-          data-landlord-view-panel="tenants"
+          data-landlord-view-panel="settings"
           id="overview-payment-instructions-section"
         >
           <div class="panel-head">
             <div>
-              <h2>Building Payment Instructions</h2>
+              <h2>Resident Payment Instructions</h2>
               <p id="payment-instructions-summary" class="status-text"></p>
             </div>
             <button id="refresh-payment-instructions" type="button">Refresh</button>
@@ -334,11 +396,11 @@
 
         <section
           class="panel wide-panel landlord-view hidden"
-          data-landlord-view-panel="tenants"
+          data-landlord-view-panel="settings"
           id="overview-payment-access-section"
         >
           <div class="panel-head">
-            <h2>Resident Payment Access</h2>
+            <h2>Payment Access Rules</h2>
             <button id="refresh-payment-access" type="button">Refresh</button>
           </div>
           <div class="table-wrap">
@@ -363,11 +425,11 @@
 
         <section
           class="panel wide-panel landlord-view hidden"
-          data-landlord-view-panel="tenants"
+          data-landlord-view-panel="settings"
           id="overview-wifi-packages-section"
         >
           <div class="panel-head">
-            <h2>Wi-Fi Package Controls</h2>
+            <h2>Wi-Fi Package Setup</h2>
             <button id="refresh-wifi-packages" type="button">Refresh</button>
           </div>
           <div class="inline-fields compact-fields">
@@ -441,11 +503,11 @@
 
           <div id="owner-staff-management-panel" class="package-card">
             <div class="panel-head">
-              <h3>Owner / Staff Access</h3>
+              <h3>Staff Access</h3>
               <button id="refresh-owner-staff" type="button">Refresh</button>
             </div>
             <p id="owner-staff-summary" class="status-text">
-              Owner/staff access is loading.
+              Staff access is loading.
             </p>
             <form id="owner-staff-form" class="inline-fields compact-fields">
               <label>
@@ -454,7 +516,7 @@
                   id="owner-staff-name"
                   type="text"
                   maxlength="120"
-                  placeholder="Owner Staff"
+                  placeholder="Staff Member"
                   required
                 />
               </label>
@@ -492,7 +554,7 @@
                 Note (optional)
                 <input id="owner-staff-note" type="text" maxlength="280" />
               </label>
-              <button id="owner-staff-submit-btn" type="submit">Add Owner/Staff</button>
+              <button id="owner-staff-submit-btn" type="submit">Add Staff</button>
             </form>
             <div class="table-wrap">
               <table>
@@ -603,11 +665,90 @@
 
         <section
           class="panel wide-panel landlord-view hidden"
-          data-landlord-view-panel="applications"
+          data-landlord-view-panel="settings"
+          id="settings-section"
+        >
+          <div class="panel-head">
+            <div>
+              <h2>Setup & Controls</h2>
+              <p id="settings-summary" class="status-text">
+                Payment setup, resident payment rules, cache refresh, and data controls.
+              </p>
+            </div>
+            <button id="refresh-settings-view" type="button">Refresh</button>
+          </div>
+
+          <div class="package-card settings-scope-card">
+            <div class="inline-fields compact-fields">
+              <label>
+                Building
+                <select id="settings-building-select"></select>
+              </label>
+            </div>
+            <p class="status-text settings-scope-note">
+              The selected building here stays aligned with the rest of the landlord workspace.
+            </p>
+          </div>
+
+          <div class="settings-danger-grid">
+            <article class="package-card settings-danger-card">
+              <div class="panel-head">
+                <div>
+                  <h3>Clear Building Cache</h3>
+                  <p>
+                    Refresh the selected building's derived workspace cache and billing-hold cache
+                    without deleting rent, utility, resident, or room data.
+                  </p>
+                </div>
+                <button
+                  id="settings-clear-cache-btn"
+                  type="button"
+                  class="btn-danger"
+                >
+                  Clear Cache
+                </button>
+              </div>
+              <p class="status-text settings-danger-note">
+                This is safe for live records and only refreshes cached landlord workspace state.
+              </p>
+            </article>
+
+            <article class="package-card settings-danger-card is-danger">
+              <div class="panel-head">
+                <div>
+                  <h3>Delete Building &amp; Data</h3>
+                  <p>
+                    Permanently remove the selected building, its rooms, tenancy links, ledger
+                    records, and linked building configuration.
+                  </p>
+                </div>
+                <button
+                  id="settings-clear-data-btn"
+                  type="button"
+                  class="btn-danger"
+                >
+                  Delete Data
+                </button>
+              </div>
+              <p class="status-text settings-danger-note">
+                This cannot be undone.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="messages"
           id="overview-issues-section"
         >
           <div class="panel-head">
-            <h2>Resident Issues</h2>
+            <div>
+              <h2>Resident Issues</h2>
+              <p class="status-text">
+                Track resident reports, update status, and record the message sent back to the room.
+              </p>
+            </div>
             <div class="action-row">
               <label>
                 Status
@@ -644,7 +785,7 @@
                   <th>Status</th>
                   <th>SLA</th>
                   <th>Created</th>
-                  <th>Reply</th>
+                  <th>Update</th>
                 </tr>
               </thead>
               <tbody id="landlord-tickets-body"></tbody>
@@ -699,9 +840,9 @@
           data-landlord-view-panel="tenants"
           id="overview-rent-status-section"
         >
-          <summary>Rent Collection Source Details</summary>
+          <summary>Rent Setup + Collection</summary>
           <div class="panel-head">
-            <h2>Rent Collection + Manual Payments</h2>
+            <h2>Rent Setup Sheet + Manual Payments</h2>
             <div class="action-row">
               <button id="open-rent-sheet-btn" type="button">Rent Setup Sheet</button>
               <button id="refresh-rent-status" type="button">Refresh</button>
@@ -814,22 +955,25 @@
                   placeholder="Name, phone, house, status"
                 />
               </label>
+              <button id="open-direct-tenant-drawer-btn" type="button">Add Tenant</button>
+              <button id="residents-open-rent-sheet-btn" type="button">Rent Setup Sheet</button>
               <button id="residents-open-match-btn" type="button">Open Account</button>
               <button id="refresh-residents" type="button">Refresh</button>
             </div>
           </div>
           <div id="residents-overview" class="resident-overview-cards"></div>
           <p id="residents-search-summary" class="status-text">
-            Showing all rooms for the selected building filter.
+            Showing rooms for the focused building.
           </p>
 
-          <div id="room-ledger-section" class="utility-summary-card room-ledger-card">
-            <div class="panel-head">
-              <h3>Room Accounts</h3>
-              <p id="room-ledger-summary" class="status-text">
-                Rent, utilities, deposits, charges, and settlement state in one sheet.
-              </p>
-            </div>
+          <details id="room-ledger-section" class="secondary-ledger-panel utility-summary-card room-ledger-card">
+            <summary class="room-ledger-toggle">
+              <span>Room Accounts</span>
+              <small>Open balances, deposits, utilities, and actions</small>
+            </summary>
+            <p id="room-ledger-summary" class="status-text">
+              Rent, utilities, deposits, charges, and settlement state in one sheet.
+            </p>
             <div class="table-wrap room-ledger-table-wrap">
               <table class="room-ledger-table">
                 <thead>
@@ -850,44 +994,12 @@
                 <tbody id="room-ledger-body"></tbody>
               </table>
             </div>
-          </div>
-
-          <details
-            id="residents-directory-section"
-            class="secondary-ledger-panel utility-summary-card"
-          >
-            <summary>Tenant Register Source Details</summary>
-            <div class="panel-head">
-              <h3>Room Register</h3>
-            </div>
-            <div class="table-wrap">
-              <table class="resident-source-table">
-                <thead>
-                  <tr>
-                    <th>Building</th>
-                    <th>House</th>
-                    <th>Occupancy</th>
-                    <th>Resident</th>
-                    <th>Phone</th>
-                    <th>Identity</th>
-                    <th>Occupation</th>
-                    <th>Emergency</th>
-                    <th>Billing</th>
-                    <th>Late Fee</th>
-                    <th>Outstanding</th>
-                    <th>Due</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="residents-body"></tbody>
-              </table>
-            </div>
           </details>
           <details
             id="utility-room-status-section"
             class="secondary-ledger-panel utility-summary-card"
           >
-            <summary>Utility Status Source Details</summary>
+            <summary>Utility Status</summary>
             <div class="panel-head">
               <h3>Utility Room Status</h3>
             </div>
@@ -1113,9 +1225,9 @@
         >
           <div class="panel-head">
             <div>
-              <h2>Message Center</h2>
+              <h2>Messages</h2>
               <p id="message-center-summary" class="status-text">
-                Recent tenant SMS activity will appear here.
+                Resident issues, outbound SMS, and automatic reminders for the focused building.
               </p>
             </div>
             <button id="refresh-messages" type="button">Refresh</button>
@@ -1123,7 +1235,7 @@
 
           <form id="message-rules-form" class="package-card message-center-rules">
             <div class="section-head message-center-rules-head">
-              <h4>Automatic Messages</h4>
+              <h4>Automatic SMS Rules</h4>
               <span id="message-rules-status" class="status-text"></span>
             </div>
             <div class="message-center-rule-grid">
@@ -1151,6 +1263,10 @@
           </form>
 
           <form id="message-center-form" class="package-card message-center-compose">
+            <div class="section-head message-center-rules-head">
+              <h4>Send SMS</h4>
+              <span class="status-text">Use this for notices, follow-ups, and bulk building updates.</span>
+            </div>
             <div class="inline-fields compact-fields">
               <label>
                 Send To
@@ -1232,8 +1348,68 @@
           id="utilities-expenditures-section"
         >
           <div class="panel-head">
-            <h2>Expenditure Log</h2>
+            <div>
+              <h2>Landlord Expense Dashboard</h2>
+              <p id="expense-dashboard-summary" class="status-text">
+                Track landlord-only building costs, shared utilities, recoverable room charges, and recent expense activity.
+              </p>
+            </div>
             <button id="refresh-expenditures" type="button">Refresh</button>
+          </div>
+
+          <div class="action-row expense-dashboard-toolbar">
+            <label>
+              Summary Month
+              <input id="expense-dashboard-month" type="month" />
+            </label>
+          </div>
+
+          <div class="resident-overview-cards expense-dashboard-cards" id="expense-dashboard-cards">
+            <article class="resident-overview-card">
+              <span>This Month Spend</span>
+              <strong id="expense-dashboard-month-total">-</strong>
+              <small id="expense-dashboard-month-count">-</small>
+            </article>
+            <article class="resident-overview-card">
+              <span>Landlord Only</span>
+              <strong id="expense-dashboard-landlord-total">-</strong>
+              <small>Building costs not billed to rooms</small>
+            </article>
+            <article class="resident-overview-card">
+              <span>Recoverable Charges</span>
+              <strong id="expense-dashboard-recoverable-total">-</strong>
+              <small>Room charges passed to residents</small>
+            </article>
+            <article class="resident-overview-card">
+              <span>Common Electricity</span>
+              <strong id="expense-dashboard-common-electricity-total">-</strong>
+              <small>Includes gate and security lights</small>
+            </article>
+            <article class="resident-overview-card">
+              <span>Common Water</span>
+              <strong id="expense-dashboard-common-water-total">-</strong>
+              <small>Plot and shared compound water</small>
+            </article>
+            <article class="resident-overview-card">
+              <span>Shared Services</span>
+              <strong id="expense-dashboard-shared-services-total">-</strong>
+              <small>Cleaning, garbage, grounds, and service vendors</small>
+            </article>
+          </div>
+
+          <div class="table-wrap expense-dashboard-breakdown-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Month Total</th>
+                  <th>All-Time Total</th>
+                  <th>Entries</th>
+                  <th>Coverage</th>
+                </tr>
+              </thead>
+              <tbody id="expense-dashboard-breakdown-body"></tbody>
+            </table>
           </div>
 
           <form id="expenditure-form" class="package-card">
@@ -1247,6 +1423,10 @@
                 <select id="expenditure-category" required>
                   <option value="maintenance">Maintenance</option>
                   <option value="utilities">Utilities</option>
+                  <option value="common_water">Common Water</option>
+                  <option value="common_electricity">Common Electricity</option>
+                  <option value="security_lighting">Security Lighting</option>
+                  <option value="shared_services">Shared Services</option>
                   <option value="cleaning">Cleaning</option>
                   <option value="security">Security</option>
                   <option value="supplies">Supplies</option>
@@ -1267,6 +1447,9 @@
               Note (optional)
               <textarea id="expenditure-note" rows="3" maxlength="500" placeholder="Pipe leak repair for bathroom line"></textarea>
             </label>
+            <p id="expenditure-form-guidance" class="status-text expense-form-guidance">
+              Use common utility and shared service categories for landlord-only costs such as gate lights, plot water, garbage collection, cleaning, and shared compound services.
+            </p>
             <label class="checkbox-row">
               <input id="expenditure-chargeable" type="checkbox" />
               Charge this room's resident
@@ -1561,7 +1744,7 @@
           <button id="close-rent-sheet-btn" type="button" class="ghost-btn">Close</button>
         </header>
 
-        <form id="rent-sheet-form" class="package-card landlord-sheet-form">
+        <form id="rent-sheet-form" class="package-card landlord-sheet-form rent-sheet-form">
           <p class="status-text">
             Set the Building Default once, then only fill Room Default values for rooms that charge differently.
           </p>
@@ -1576,12 +1759,20 @@
               <input id="rent-sheet-default-monthly-rent" type="number" min="0" step="1" placeholder="Set" />
             </label>
             <label>
+              Default Deposit
+              <input id="rent-sheet-default-deposit" type="number" min="0" step="1" placeholder="Set" />
+            </label>
+            <label>
               Due Day
               <input id="rent-sheet-default-due-day" type="number" min="1" max="31" step="1" placeholder="Set" />
             </label>
             <label>
               Grace Days
               <input id="rent-sheet-default-grace-days" type="number" min="0" max="31" step="1" placeholder="Set" />
+            </label>
+            <label>
+              Charge Start Date
+              <input id="rent-sheet-charge-start-date" type="date" />
             </label>
           </div>
 
@@ -1595,7 +1786,7 @@
             />
           </label>
 
-          <div class="table-wrap utility-sheet-table-wrap">
+          <div class="table-wrap utility-sheet-table-wrap rent-sheet-table-wrap">
             <table class="utility-sheet-table">
               <thead>
                 <tr>
@@ -1604,9 +1795,10 @@
                   <th>Source</th>
                   <th>Resolved Rent</th>
                   <th>Room Default Rent</th>
+                  <th>Deposit</th>
                   <th>Due Day</th>
                   <th>Grace</th>
-                  <th>Charge</th>
+                  <th>Charge Rent</th>
                   <th>Current Balance</th>
                   <th>Paid This Month</th>
                   <th>Arrears</th>
@@ -1620,6 +1812,9 @@
             <button id="rent-sheet-submit-btn" type="submit">Save Rent Setup</button>
             <button id="rent-sheet-reload-btn" type="button" class="ghost-btn">Reload Rooms</button>
           </div>
+          <p id="rent-sheet-status" class="status-text">
+            Current month paid cannot exceed the resolved monthly rent. Due day controls the monthly due date.
+          </p>
         </form>
       </aside>
 
@@ -1941,9 +2136,103 @@
         <div id="resident-drawer-body" class="package-card landlord-drawer-form"></div>
       </aside>
 
+      <div id="direct-tenant-drawer-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="direct-tenant-drawer"
+        class="landlord-drawer hidden"
+        aria-label="Add tenant"
+      >
+        <header class="landlord-drawer-head">
+          <h2>Add Tenant</h2>
+          <button id="close-direct-tenant-drawer-btn" type="button" class="ghost-btn">
+            Close
+          </button>
+        </header>
+        <form id="direct-tenant-form" class="package-card landlord-drawer-form">
+          <label>
+            Building
+            <select id="direct-tenant-building" required></select>
+          </label>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Room / House
+              <input
+                id="direct-tenant-house"
+                type="text"
+                maxlength="24"
+                placeholder="A10"
+                required
+              />
+            </label>
+            <label>
+              Tenant Name
+              <input
+                id="direct-tenant-name"
+                type="text"
+                maxlength="120"
+                placeholder="Jane Wanjiku"
+                autocomplete="name"
+                required
+              />
+            </label>
+          </div>
+
+          <div class="inline-fields compact-fields">
+            <label>
+              Phone Number
+              <input
+                id="direct-tenant-phone"
+                type="tel"
+                maxlength="20"
+                placeholder="0712345678"
+                autocomplete="tel"
+                required
+              />
+            </label>
+            <label>
+              ID Type
+              <select id="direct-tenant-id-type" required>
+                <option value="national_id">National ID</option>
+                <option value="passport">Passport</option>
+                <option value="alien_id">Alien ID</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            ID Number
+            <input
+              id="direct-tenant-id-number"
+              type="text"
+              maxlength="80"
+              placeholder="Temporary password"
+              autocomplete="off"
+              required
+            />
+          </label>
+
+          <label>
+            Note
+            <input
+              id="direct-tenant-note"
+              type="text"
+              maxlength="280"
+              placeholder="Optional onboarding note"
+            />
+          </label>
+
+          <p id="direct-tenant-status" class="status-text">
+            Temporary password: ID number. Password change required at first sign-in.
+          </p>
+          <button id="direct-tenant-submit-btn" type="submit">Add Tenant</button>
+        </form>
+      </aside>
+
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260529b"></script>
+    <script type="module" src="/landlord.js?v=20260716d"></script>
   </body>
 </html>

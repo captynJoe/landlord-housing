@@ -217,6 +217,56 @@ test("unrecords manually entered M-PESA rent receipts", () => {
   assert.equal(unrecorded.snapshot?.balanceKsh, 6000);
 });
 
+test("edits manual non-M-PESA rent payments and refreshes current-cycle status", () => {
+  const service = new RentLedgerService();
+  const dueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+
+  service.upsertRentDue(BUILDING_A, "M-6", {
+    monthlyRentKsh: 12000,
+    balanceKsh: 12000,
+    dueDate
+  });
+
+  const payment = service.recordPayment({
+    buildingId: BUILDING_A,
+    houseNumber: "M-6",
+    amountKsh: 12000,
+    provider: "cash",
+    providerReference: "cash-edit-001",
+    paidAt: dueDate,
+    source: "manual"
+  });
+
+  assert.equal(payment.snapshot?.paymentStatus, "paid");
+
+  const edited = service.replaceManualPayment({
+    buildingId: BUILDING_A,
+    houseNumber: "M-6",
+    paymentId: payment.event.id,
+    amountKsh: 6000,
+    provider: "bank",
+    providerReference: "bank-edit-001",
+    paidAt: dueDate
+  });
+
+  assert.ok(edited);
+  assert.equal(edited.event.provider, "bank");
+  assert.equal(edited.event.providerReference, "BANK-EDIT-001");
+  assert.equal(edited.snapshot?.balanceKsh, 6000);
+  assert.equal(edited.snapshot?.paymentStatus, "partial");
+
+  const unrecorded = service.unrecordCashPayment({
+    buildingId: BUILDING_A,
+    houseNumber: "M-6",
+    paymentId: edited.event.id
+  });
+
+  assert.ok(unrecorded);
+  assert.equal(unrecorded.snapshot?.balanceKsh, 12000);
+  assert.equal(unrecorded.snapshot?.paymentStatus, "not_paid");
+  assert.equal(service.listCollectionStatus(10, BUILDING_A)[0]?.paymentStatus, "not_paid");
+});
+
 test("exposes current-month paid, current-month outstanding, and arrears separately", () => {
   const service = new RentLedgerService();
   const dueDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
@@ -283,6 +333,44 @@ test("purges room-scoped rent state when a room is removed", () => {
   assert.equal(service.purgeHouse(BUILDING_A, "z-9"), true);
   assert.equal(service.getRentDue(BUILDING_A, "Z-9"), null);
   assert.equal(service.listPayments({ buildingId: BUILDING_A, houseNumber: "Z-9" }).length, 0);
+});
+
+test("purges building-scoped rent state when a building is removed", () => {
+  const service = new RentLedgerService();
+  const dueDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+
+  service.upsertRentDue(BUILDING_A, "Z-9", {
+    monthlyRentKsh: 9000,
+    balanceKsh: 9000,
+    dueDate
+  });
+  service.upsertRentDue(BUILDING_A, "Z-10", {
+    monthlyRentKsh: 8000,
+    balanceKsh: 4000,
+    dueDate
+  });
+  service.upsertRentDue(BUILDING_B, "Z-9", {
+    monthlyRentKsh: 7000,
+    balanceKsh: 2000,
+    dueDate
+  });
+  service.recordPayment({
+    buildingId: BUILDING_A,
+    houseNumber: "Z-9",
+    amountKsh: 1200,
+    provider: "cash",
+    providerReference: "z9-building-purge-cash"
+  });
+
+  assert.equal(service.purgeBuilding(BUILDING_A), true);
+  assert.equal(service.purgeBuilding(BUILDING_A), false);
+  assert.equal(service.getRentDue(BUILDING_A, "Z-9"), null);
+  assert.equal(service.getRentDue(BUILDING_A, "Z-10"), null);
+  assert.ok(service.getRentDue(BUILDING_B, "Z-9"));
+  assert.deepEqual(
+    service.exportState().records.map((item) => item.buildingId),
+    [BUILDING_B]
+  );
 });
 
 test("does not add next month rent before the rollover window opens", () => {

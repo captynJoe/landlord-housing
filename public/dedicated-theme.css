@@ -344,3 +344,85 @@ button.resident-overview-card.is-active {
     padding-inline: 12px;
   }
 }
+
+/* Landlord side rail contrast override. */
+body .landlord-side-panel.panel {
+  background: #102331 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+  box-shadow: 0 18px 42px rgba(16, 35, 49, 0.18) !important;
+}
+
+body .landlord-side-panel .landlord-nav {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body .landlord-side-panel .landlord-nav-btn {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+body .landlord-side-panel .landlord-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #fff !important;
+}
+
+body .landlord-side-panel .landlord-nav-btn.active,
+body .landlord-side-panel .landlord-nav-btn.has-alert {
+  background: #f3c55b !important;
+  border-color: #f3c55b !important;
+  color: #102331 !important;
+  box-shadow: none !important;
+}
+
+body .landlord-side-panel .landlord-nav-badge {
+  background: #102331 !important;
+  color: #fff !important;
+}
+
+body .landlord-side-panel .panel-head h2,
+body .landlord-side-panel .landlord-focus-field,
+body .landlord-side-panel .landlord-focus-note,
+body .landlord-side-panel label,
+body .landlord-side-panel .status-text {
+  color: rgba(255, 255, 255, 0.84) !important;
+}
+
+body .landlord-side-panel select {
+  background: #fff !important;
+  color: #102331 !important;
+}
+
+body .landlord-side-panel .landlord-focus-stat,
+body .landlord-side-panel .metric-card {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+body .landlord-side-panel .landlord-focus-stat span,
+body .landlord-side-panel .metric-card p {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+body .landlord-side-panel .landlord-focus-stat strong,
+body .landlord-side-panel .metric-card strong {
+  color: #fff !important;
+}
+
+body .landlord-side-panel .landlord-focus-actions button {
+  background: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: #102331 !important;
+  box-shadow: none !important;
+}
+
+body .landlord-side-panel .landlord-focus-actions button:hover {
+  background: #f3c55b !important;
+  color: #102331 !important;
+}

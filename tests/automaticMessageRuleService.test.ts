@@ -44,3 +44,21 @@ test("automatic message rules import and export persisted state", () => {
   assert.equal(service.allows("BLDG-1", "rent_reminder"), false);
   assert.equal(service.exportState().rules.length, 1);
 });
+
+test("automatic message rules can remove deleted building state", () => {
+  const service = new AutomaticMessageRuleService();
+  service.updateForBuilding("BLDG-1", {
+    paymentReceiptsEnabled: false
+  });
+  service.updateForBuilding("BLDG-2", {
+    overdueNoticesEnabled: false
+  });
+
+  assert.equal(service.removeBuilding("BLDG-1"), true);
+  assert.equal(service.removeBuilding("BLDG-1"), false);
+  assert.equal(service.allows("BLDG-1", "payment_receipt"), true);
+  assert.deepEqual(
+    service.exportState().rules.map((item) => item.buildingId),
+    ["BLDG-2"]
+  );
+});

@@ -1,6 +1,6 @@
 # Dedicated Landlord Housing Production Deployment Runbook
 
-Last updated: 2026-05-19
+Last updated: 2026-05-29
 
 ## Target Shape
 
@@ -11,7 +11,7 @@ Recommended production topology:
 
 - VPS2: `landlord_housing_api` plus `landlord_housing_db`.
 - VPS2 private bind: `<vps2-private-ip>:4110 -> container port 4100`.
-- VPS1: `estatedesk_web` static Nginx service for `public/`.
+- VPS1: `landlord_housing_web` static Nginx service for `public/`.
 - VPS1 public Nginx: proxies `/api`, `/uploads`, and `/health` to VPS2.
 - Database: dedicated PostgreSQL database named `landlord_housing`.
 - Uploads: dedicated Docker volume mounted at `/var/lib/landlord-housing/uploads`.
@@ -170,7 +170,7 @@ docker compose --env-file .env \
   --env-file /home/captyn/landlord-housing/.env.vps1 \
   -f docker-compose.vps1.yml \
   -f /home/captyn/landlord-housing/deploy/vps1/docker-compose.estatedesk.yml \
-  up -d estatedesk_web nginx
+  up -d landlord_housing_web nginx
 
 docker compose --env-file .env \
   --env-file .env.common \
@@ -231,7 +231,7 @@ safe to show to residents; keep Daraja API secrets in VPS2 environment values.
 After deployment:
 
 - owner login at `/landlord/login`,
-- owner/staff list via `/api/landlord/staff`,
+- staff list via `/api/landlord/staff`,
 - building creation or existing building load,
 - resident signup,
 - owner approval,

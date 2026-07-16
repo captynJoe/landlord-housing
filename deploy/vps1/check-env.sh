@@ -118,7 +118,7 @@ fi
   docker compose "${compose_env_args[@]}" \
     -f "$base_compose" \
     -f "$app_root/deploy/vps1/docker-compose.estatedesk.yml" \
-    config --services | grep -qx estatedesk_web
+    config --services | grep -qx landlord_housing_web
 )
 
 echo "VPS1 env and compose override look ready: $env_file"

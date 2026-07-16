@@ -436,6 +436,74 @@ test("purges room-scoped utility state when a room is removed", () => {
   assert.equal(service.listPayments({ buildingId: BUILDING_B, houseNumber: "46" }).length, 0);
 });
 
+test("purges building-scoped utility state when a building is removed", () => {
+  const service = new UtilityBillingService();
+  const dueDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+
+  service.upsertMeter("water", BUILDING_A, "46", {
+    meterNumber: "WTR-A-0046"
+  });
+  service.createBill("water", BUILDING_A, "46", {
+    billingMonth: "2026-03",
+    currentReading: 110,
+    ratePerUnitKsh: 15,
+    fixedChargeKsh: 0,
+    dueDate
+  });
+  service.recordPayment("water", BUILDING_A, "46", {
+    amountKsh: 200,
+    provider: "cash",
+    providerReference: "UTIL-BUILDING-PURGE"
+  });
+  service.upsertMeter("electricity", BUILDING_A, "47", {
+    meterNumber: "ELEC-A-0047"
+  });
+  service.createBill("electricity", BUILDING_A, "47", {
+    billingMonth: "2026-03",
+    currentReading: 20,
+    ratePerUnitKsh: 30,
+    fixedChargeKsh: 50,
+    dueDate
+  });
+  service.upsertMeter("water", BUILDING_B, "46", {
+    meterNumber: "WTR-B-0046"
+  });
+  service.createBill("water", BUILDING_B, "46", {
+    billingMonth: "2026-03",
+    currentReading: 120,
+    ratePerUnitKsh: 15,
+    fixedChargeKsh: 0,
+    dueDate
+  });
+  service.setCombinedChargeBuildingIds([BUILDING_A, BUILDING_B]);
+  service.setCombinedChargeBuildingAmounts([
+    { buildingId: BUILDING_A, amountKsh: 1200 },
+    { buildingId: BUILDING_B, amountKsh: 900 }
+  ]);
+  service.setCombinedChargeMonthlyAmounts([
+    { buildingId: BUILDING_A, billingMonth: "2026-03", amountKsh: 1300 }
+  ]);
+  service.setCombinedChargeRoomAmounts([
+    { buildingId: BUILDING_A, houseNumber: "46", amountKsh: 1400 }
+  ]);
+
+  assert.equal(service.purgeBuilding(BUILDING_A), true);
+  assert.equal(service.purgeBuilding(BUILDING_A), false);
+  assert.equal(service.listMeters({ buildingId: BUILDING_A }).length, 0);
+  assert.equal(service.listBills({ buildingId: BUILDING_A }).length, 0);
+  assert.equal(service.listPayments({ buildingId: BUILDING_A }).length, 0);
+  assert.equal(service.listMeters({ buildingId: BUILDING_B }).length, 1);
+  assert.equal(service.listBills({ buildingId: BUILDING_B }).length, 1);
+  assert.deepEqual(
+    service.exportState().meters.map((item) => item.buildingId),
+    [BUILDING_B]
+  );
+  assert.deepEqual(
+    service.exportState().bills.map((item) => item.buildingId),
+    [BUILDING_B]
+  );
+});
+
 test("records utility payment against oldest outstanding bill", () => {
   const service = new UtilityBillingService();
   const dueDate = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
@@ -663,6 +731,60 @@ test("unrecords manually entered M-PESA utility receipts", () => {
   assert.ok(unrecorded);
   assert.equal(unrecorded.totalAmountKsh, 200);
   assert.equal(service.listBills({ buildingId: BUILDING_A, houseNumber: "B-13" })[0].balanceKsh, 300);
+});
+
+test("edits manual non-M-PESA utility payments and reapplies allocations", () => {
+  const service = new UtilityBillingService();
+  const dueDate = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
+
+  service.createBill("water", BUILDING_A, "B-14", {
+    billingMonth: "2026-02",
+    fixedChargeKsh: 300,
+    dueDate
+  });
+
+  service.createBill("water", BUILDING_A, "B-14", {
+    billingMonth: "2026-03",
+    fixedChargeKsh: 400,
+    dueDate
+  });
+
+  const paid = service.recordPayment("water", BUILDING_A, "B-14", {
+    billingMonth: "2026-02",
+    amountKsh: 500,
+    provider: "cash",
+    providerReference: "util-edit-001",
+    source: "manual"
+  });
+
+  const edited = service.replaceManualPayment(
+    "water",
+    BUILDING_A,
+    "B-14",
+    paid.event.id,
+    {
+      billingMonth: "2026-03",
+      amountKsh: 250,
+      provider: "bank",
+      providerReference: "util-bank-edit-001",
+      note: "Corrected receipt",
+      source: "manual"
+    }
+  );
+
+  assert.ok(edited);
+  assert.equal(edited.event.provider, "bank");
+  assert.equal(edited.event.providerReference, "UTIL-BANK-EDIT-001");
+  assert.equal(edited.totalAppliedAmountKsh, 250);
+
+  const bills = service.listBills({ buildingId: BUILDING_A, houseNumber: "B-14" });
+  const februaryBill = bills.find((item) => item.billingMonth === "2026-02");
+  const marchBill = bills.find((item) => item.billingMonth === "2026-03");
+
+  assert.ok(februaryBill);
+  assert.equal(februaryBill.balanceKsh, 50);
+  assert.ok(marchBill);
+  assert.equal(marchBill.balanceKsh, 400);
 });
 
 test("previews utility payment across the selected month and later open bills", () => {

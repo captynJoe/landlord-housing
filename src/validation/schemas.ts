@@ -402,17 +402,29 @@ const optionalRentAmountSchema = z
   .optional();
 const optionalRentDueDaySchema = z.number().int().min(1).max(31).nullable().optional();
 const optionalRentGraceDaysSchema = z.number().int().min(0).max(31).nullable().optional();
+const optionalRentDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, {
+    message: "Use YYYY-MM-DD format."
+  })
+  .nullable()
+  .optional();
 
 export const landlordRentSetupSheetSchema = z.object({
   buildingDefaultMonthlyRentKsh: optionalRentAmountSchema,
+  buildingDefaultDepositKsh: optionalRentAmountSchema,
   buildingDefaultDueDay: optionalRentDueDaySchema,
   buildingDefaultGraceDays: z.number().int().min(0).max(31).optional(),
+  chargeStartDate: optionalRentDateSchema,
   note: z.string().trim().max(280).optional(),
   rows: z
     .array(
       z.object({
         houseNumber: nonEmptyString.max(24),
         monthlyRentKsh: optionalRentAmountSchema,
+        depositKsh: optionalRentAmountSchema,
+        currentMonthPaidKsh: optionalRentAmountSchema,
         paymentDueDay: optionalRentDueDaySchema,
         graceDays: optionalRentGraceDaysSchema,
         active: z.boolean().optional(),
@@ -628,6 +640,23 @@ export const residentAdminPasswordResetSchema = z.object({
   temporaryPassword: z.string().min(8).max(128)
 });
 
+export const landlordDirectTenantCreateSchema = z.object({
+  buildingId: nonEmptyString.max(120),
+  houseNumber: nonEmptyString.max(24),
+  fullName: nonEmptyString.max(120),
+  phoneNumber: kenyaPhoneSchema,
+  identityType: tenantIdentityTypeSchema.default("national_id"),
+  identityNumber: nonEmptyString.min(4).max(80),
+  billingStartDate: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, {
+      message: "Use YYYY-MM-DD format."
+    })
+    .optional(),
+  note: optionalTenantTextSchema(280)
+});
+
 export const residentPasswordRecoveryRequestSchema = z.object({
   buildingId: nonEmptyString,
   houseNumber: nonEmptyString.max(24),
@@ -706,7 +735,13 @@ export const adminAccessCredentialUpdateSchema = z
     }
   });
 
-export const userRoleSchema = z.enum(["tenant", "landlord", "admin", "root_admin"]);
+export const userRoleSchema = z.enum([
+  "tenant",
+  "landlord",
+  "staff",
+  "admin",
+  "root_admin"
+]);
 
 export const userRegisterSchema = z.object({
   fullName: nonEmptyString.max(120),
@@ -787,6 +822,7 @@ export const tenantAgreementUpsertSchema = z
     leaseEndDate: tenantAgreementDateSchema.optional(),
     monthlyRentKsh: z.number().int().min(0).max(10_000_000).optional(),
     depositKsh: z.number().int().min(0).max(10_000_000).optional(),
+    depositPaidKsh: z.number().int().min(0).max(10_000_000).optional(),
     paymentDueDay: z.number().int().min(1).max(31).optional(),
     specialTerms: z.string().trim().max(1_200).optional()
   })
@@ -830,6 +866,26 @@ export const tenantAgreementUpsertSchema = z
           message: "Lease end date must be on or after the lease start date."
         });
       }
+    }
+
+    if (value.depositPaidKsh != null && value.depositKsh == null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["depositKsh"],
+        message: "Set the agreed deposit before recording how much has been paid."
+      });
+    }
+
+    if (
+      value.depositPaidKsh != null &&
+      value.depositKsh != null &&
+      value.depositPaidKsh > value.depositKsh
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["depositPaidKsh"],
+        message: "Deposit paid cannot be more than the agreed deposit amount."
+      });
     }
   });
 
@@ -1076,6 +1132,10 @@ export const landlordExpenditureCreateSchema = z.object({
   category: z.enum([
     "maintenance",
     "utilities",
+    "common_water",
+    "common_electricity",
+    "security_lighting",
+    "shared_services",
     "cleaning",
     "security",
     "supplies",
@@ -1336,6 +1396,9 @@ export type UserLoginInput = z.infer<typeof userLoginSchema>;
 export type OwnerStaffCreateInput = z.infer<typeof ownerStaffCreateSchema>;
 export type OwnerStaffDisableInput = z.infer<typeof ownerStaffDisableSchema>;
 export type TenantApplicationInput = z.infer<typeof tenantApplicationSchema>;
+export type LandlordDirectTenantCreateInput = z.infer<
+  typeof landlordDirectTenantCreateSchema
+>;
 export type TenantAgreementUpsertInput = z.infer<typeof tenantAgreementUpsertSchema>;
 export type LandlordDecisionInput = z.infer<typeof landlordDecisionSchema>;
 export type LandlordPaymentAccessUpdateInput = z.infer<

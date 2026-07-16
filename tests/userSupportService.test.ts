@@ -145,3 +145,47 @@ test("emits inserted system notifications through the notification handler", asy
   assert.equal(insertedBatches.length, 1);
   assert.equal(insertedBatches[0][0].title, "Rent Reminder");
 });
+
+test("purges all reports and notifications for a deleted building", () => {
+  const service = new UserSupportService();
+  let persisted;
+
+  service.setStateChangeHandler((state) => {
+    persisted = state;
+  });
+
+  const { report } = service.createReport(
+    {
+      type: "general",
+      title: "Smoke ticket",
+      details: "Temporary smoke ticket.",
+      evidenceAttachments: []
+    },
+    {
+      id: "CAPTYN-BLDG-00001",
+      name: "Smoke Block",
+      cctvStatus: "partial"
+    },
+    {
+      houseNumber: "A1",
+      phoneNumber: "+254711111111"
+    }
+  );
+  service.enqueueSystemNotifications("CAPTYN-BLDG-00002", "B1", [
+    {
+      title: "Keep me",
+      message: "Different building.",
+      level: "info",
+      source: "system",
+      dedupeKey: "keep-b1"
+    }
+  ]);
+
+  assert.equal(service.purgeBuilding("CAPTYN-BLDG-00001"), true);
+  assert.equal(service.listReports("A1", "CAPTYN-BLDG-00001").length, 0);
+  assert.equal(service.listNotifications("A1", "CAPTYN-BLDG-00001").length, 0);
+  assert.equal(service.getReportById(report.id), undefined);
+  assert.equal(service.listNotifications("B1", "CAPTYN-BLDG-00002").length, 1);
+  assert.equal(persisted?.reports.length, 0);
+  assert.equal(persisted?.notifications.length, 1);
+});

@@ -29,7 +29,7 @@ export function getLandlordShellBrand(buildingName) {
 
 export function getLandlordPortalTitle(buildingName) {
   const brand = normalizeBuildingBrand(buildingName);
-  return brand ? `${brand} Manager Workspace` : DEFAULT_LANDLORD_BRAND;
+  return brand ? `${brand} Manager` : DEFAULT_LANDLORD_BRAND;
 }
 
 export function getPublicHomeTitle(buildingName) {

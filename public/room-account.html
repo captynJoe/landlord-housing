@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260529a" />
+    <link rel="stylesheet" href="/landlord.css?v=20260529d" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
@@ -219,6 +219,17 @@
                 Deposit (KSh)
                 <input name="depositKsh" type="number" min="0" max="10000000" step="1" />
               </label>
+              <label>
+                Deposit Paid (KSh)
+                <input
+                  name="depositPaidKsh"
+                  type="number"
+                  min="0"
+                  max="10000000"
+                  step="1"
+                  placeholder="0 if pending"
+                />
+              </label>
               <label class="room-management-span">
                 Note
                 <input name="note" type="text" maxlength="280" placeholder="Optional rent setup note" />
@@ -228,28 +239,6 @@
               <button id="room-rent-setup-submit" type="submit">Save Rent Setup</button>
             </div>
           </form>
-        </div>
-      </section>
-
-      <div id="room-balance-confirm-backdrop" class="room-confirm-backdrop hidden"></div>
-      <section
-        id="room-balance-confirm-modal"
-        class="room-confirm-modal hidden"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="room-balance-confirm-title"
-        aria-describedby="room-balance-confirm-message"
-      >
-        <h2 id="room-balance-confirm-title">Confirm Balance Adjustment</h2>
-        <p id="room-balance-confirm-message" class="status-text"></p>
-        <div id="room-balance-confirm-values" class="room-confirm-values"></div>
-        <div class="action-row room-confirm-actions">
-          <button id="room-balance-confirm-cancel" type="button" class="ghost-btn">
-            Cancel
-          </button>
-          <button id="room-balance-confirm-apply" type="button">
-            Update Balance
-          </button>
         </div>
       </section>
 
@@ -435,6 +424,29 @@
       </section>
     </main>
 
-    <script type="module" src="/room-account.js?v=20260529a"></script>
+    <div id="room-balance-confirm-backdrop" class="room-confirm-backdrop hidden"></div>
+    <section
+      id="room-balance-confirm-modal"
+      class="room-confirm-modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="room-balance-confirm-title"
+      aria-describedby="room-balance-confirm-message"
+      tabindex="-1"
+    >
+      <h2 id="room-balance-confirm-title">Confirm Balance Adjustment</h2>
+      <p id="room-balance-confirm-message" class="status-text"></p>
+      <div id="room-balance-confirm-values" class="room-confirm-values"></div>
+      <div class="action-row room-confirm-actions">
+        <button id="room-balance-confirm-cancel" type="button" class="ghost-btn">
+          Cancel
+        </button>
+        <button id="room-balance-confirm-apply" type="button">
+          Update Balance
+        </button>
+      </div>
+    </section>
+
+    <script type="module" src="/room-account.js?v=20260529d"></script>
   </body>
 </html>

@@ -27,6 +27,7 @@ enum IncidentStatus {
 enum UserRole {
   tenant
   landlord
+  staff
   admin
   root_admin
 }
@@ -367,6 +368,7 @@ model TenantAgreement {
   leaseEndDate              DateTime?
   monthlyRentKsh            Int?
   depositKsh                Int?
+  depositPaidKsh            Int?
   paymentDueDay             Int?
   specialTerms              String?
   createdAt                 DateTime                @default(now())

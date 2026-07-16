@@ -159,6 +159,21 @@ export class AutomaticMessageRuleService {
     return cloneRecord(updated);
   }
 
+  removeBuilding(buildingId: string): boolean {
+    const normalizedBuildingId = normalizeBuildingId(buildingId);
+    if (!normalizedBuildingId) {
+      return false;
+    }
+
+    const deleted = this.rulesByBuildingId.delete(normalizedBuildingId);
+    if (!deleted) {
+      return false;
+    }
+
+    this.emitStateChange();
+    return true;
+  }
+
   allows(buildingId: string, kind: AutomaticMessageKind): boolean {
     const rules = this.getForBuilding(buildingId);
     if (kind === "payment_receipt") {

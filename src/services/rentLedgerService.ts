@@ -129,6 +129,23 @@ interface UnrecordRentPaymentInput {
   paymentId: string;
 }
 
+interface ReplaceManualRentPaymentInput {
+  buildingId: string;
+  houseNumber: string;
+  paymentId: string;
+  amountKsh: number;
+  provider: RentPaymentProvider;
+  providerReference: string;
+  phoneNumber?: string;
+  paidAt?: string;
+  billingMonth?: string;
+  tenantUserId?: string;
+  tenantName?: string;
+  paymentProfileId?: string;
+  paymentProfileName?: string;
+  paymentAccountReference?: string;
+}
+
 export interface RentBillingHoldCheck {
   buildingId: string;
   houseNumber: string;
@@ -142,6 +159,13 @@ type RentLatePenaltyPolicyResolver = (
 ) => RentLatePenaltyPolicy | null | undefined;
 
 export interface UnrecordRentPaymentResult {
+  event: RentPaymentEvent;
+  applied: boolean;
+  snapshot: RentDueSnapshot | null;
+}
+
+export interface ReplaceManualRentPaymentResult {
+  previousEvent: RentPaymentEvent;
   event: RentPaymentEvent;
   applied: boolean;
   snapshot: RentDueSnapshot | null;
@@ -291,12 +315,6 @@ function normalizeRentPaymentProvider(value: string | undefined): RentPaymentPro
     default:
       return "mpesa";
   }
-}
-
-function paymentStatusForRecord(record: RentDueRecord): RentDueSnapshot["paymentStatus"] {
-  if (record.balanceKsh <= 0) return "paid";
-  if (record.balanceKsh >= record.monthlyRentKsh) return "not_paid";
-  return "partial";
 }
 
 function normalizeLatePenaltyPolicy(
@@ -682,6 +700,88 @@ export class RentLedgerService {
     return null;
   }
 
+  replaceManualPayment(
+    input: ReplaceManualRentPaymentInput
+  ): ReplaceManualRentPaymentResult | null {
+    const target = this.findPaymentById(
+      input.buildingId,
+      input.houseNumber,
+      input.paymentId
+    );
+    if (!target) {
+      return null;
+    }
+
+    const existingEvent = target.event;
+    if (existingEvent.provider === "mpesa" || existingEvent.source !== "manual") {
+      throw new Error("Only manually recorded non-M-PESA rent payments can be edited.");
+    }
+
+    const originalReference = normalizeProviderReference(existingEvent.providerReference);
+    const nextReference = normalizeProviderReference(input.providerReference);
+    if (
+      nextReference !== originalReference &&
+      this.paymentReferenceIndex.has(nextReference)
+    ) {
+      throw new Error("PAYMENT_REFERENCE_ALREADY_EXISTS");
+    }
+
+    const previousEvent = { ...existingEvent };
+    const removed = this.unrecordCashPayment({
+      buildingId: input.buildingId,
+      houseNumber: input.houseNumber,
+      paymentId: input.paymentId
+    });
+    if (!removed) {
+      return null;
+    }
+
+    try {
+      const outcome = this.recordPayment({
+        buildingId: input.buildingId,
+        houseNumber: input.houseNumber,
+        amountKsh: input.amountKsh,
+        provider: input.provider,
+        providerReference: input.providerReference,
+        phoneNumber: input.phoneNumber ?? existingEvent.phoneNumber,
+        paidAt: input.paidAt ?? existingEvent.paidAt,
+        billingMonth: input.billingMonth ?? existingEvent.billingMonth,
+        tenantUserId: input.tenantUserId ?? existingEvent.tenantUserId,
+        tenantName: input.tenantName ?? existingEvent.tenantName,
+        paymentProfileId: input.paymentProfileId ?? existingEvent.paymentProfileId,
+        paymentProfileName: input.paymentProfileName ?? existingEvent.paymentProfileName,
+        paymentAccountReference:
+          input.paymentAccountReference ?? existingEvent.paymentAccountReference,
+        source: "manual"
+      });
+
+      return {
+        previousEvent,
+        event: outcome.event,
+        applied: outcome.applied,
+        snapshot: outcome.snapshot
+      };
+    } catch (error) {
+      this.recordPayment({
+        buildingId: previousEvent.buildingId,
+        houseNumber: previousEvent.houseNumber,
+        amountKsh: previousEvent.amountKsh,
+        provider: previousEvent.provider,
+        providerReference: previousEvent.providerReference,
+        phoneNumber: previousEvent.phoneNumber,
+        paidAt: previousEvent.paidAt,
+        billingMonth: previousEvent.billingMonth,
+        tenantUserId: previousEvent.tenantUserId,
+        tenantName: previousEvent.tenantName,
+        paymentProfileId: previousEvent.paymentProfileId,
+        paymentProfileName: previousEvent.paymentProfileName,
+        paymentAccountReference: previousEvent.paymentAccountReference,
+        source: previousEvent.source
+      });
+      throw error;
+    }
+  }
+
   purgeHouse(buildingId: string, houseNumber: string): boolean {
     const normalizedBuildingId = normalizeBuildingId(buildingId);
     const normalizedHouse = normalizeHouseNumber(houseNumber);
@@ -722,6 +822,61 @@ export class RentLedgerService {
 
     referencesToDelete.forEach((reference) => {
       this.paymentReferenceIndex.delete(reference);
+    });
+    this.emitStateChange();
+    return true;
+  }
+
+  purgeBuilding(buildingId: string): boolean {
+    const normalizedBuildingId = normalizeBuildingId(buildingId);
+    const referencesToDelete = new Set<string>();
+    let changed = false;
+
+    for (const [key, record] of this.records.entries()) {
+      if (record.buildingId !== normalizedBuildingId) {
+        continue;
+      }
+
+      record.payments.forEach((payment) => {
+        if (payment.providerReference) {
+          referencesToDelete.add(payment.providerReference);
+        }
+      });
+      this.records.delete(key);
+      changed = true;
+    }
+
+    for (const [key, pending] of this.pendingPayments.entries()) {
+      const remaining = pending.filter(
+        (payment) => normalizeBuildingId(payment.buildingId) !== normalizedBuildingId
+      );
+      if (remaining.length === pending.length) {
+        continue;
+      }
+
+      pending.forEach((payment) => {
+        if (
+          normalizeBuildingId(payment.buildingId) === normalizedBuildingId &&
+          payment.providerReference
+        ) {
+          referencesToDelete.add(payment.providerReference);
+        }
+      });
+
+      if (remaining.length > 0) {
+        this.pendingPayments.set(key, remaining);
+      } else {
+        this.pendingPayments.delete(key);
+      }
+      changed = true;
+    }
+
+    if (!changed) {
+      return false;
+    }
+
+    referencesToDelete.forEach((reference) => {
+      this.paymentReferenceIndex.delete(normalizeProviderReference(reference));
     });
     this.emitStateChange();
     return true;
@@ -1171,6 +1326,51 @@ export class RentLedgerService {
     }
   }
 
+  private findPaymentById(
+    buildingId: string,
+    houseNumber: string,
+    paymentId: string
+  ): { event: RentPaymentEvent; applied: boolean } | null {
+    const normalizedBuildingId = normalizeBuildingId(buildingId);
+    const normalizedHouse = normalizeHouseNumber(houseNumber);
+    const normalizedPaymentId = String(paymentId ?? "").trim();
+    if (!normalizedPaymentId) {
+      return null;
+    }
+
+    const scopedKeys = [
+      ledgerKey(normalizedBuildingId, normalizedHouse),
+      ...(normalizedBuildingId === RENT_LEGACY_BUILDING_ID
+        ? []
+        : [ledgerKey(RENT_LEGACY_BUILDING_ID, normalizedHouse)])
+    ];
+
+    for (const key of scopedKeys) {
+      const record = this.records.get(key);
+      const event = record?.payments.find((payment) => payment.id === normalizedPaymentId);
+      if (event) {
+        return {
+          event: { ...event },
+          applied: true
+        };
+      }
+    }
+
+    for (const key of scopedKeys) {
+      const event = this.pendingPayments
+        .get(key)
+        ?.find((payment) => payment.id === normalizedPaymentId);
+      if (event) {
+        return {
+          event: { ...event },
+          applied: false
+        };
+      }
+    }
+
+    return null;
+  }
+
   private emitStateChange(): void {
     if (!this.stateChangeHandler) {
       return;
@@ -1213,6 +1413,17 @@ export class RentLedgerService {
       0
     );
 
+    const paymentStatus: RentDueSnapshot["paymentStatus"] =
+      currentCycleChargeKsh <= 0
+        ? balanceKsh <= 0
+          ? "paid"
+          : "not_paid"
+        : currentMonthOutstandingKsh <= 0
+          ? "paid"
+          : currentMonthOutstandingKsh >= currentCycleChargeKsh
+            ? "not_paid"
+            : "partial";
+
     return {
       buildingId: record.buildingId,
       houseNumber: record.houseNumber,
@@ -1224,7 +1435,7 @@ export class RentLedgerService {
       payments: [...record.payments],
       latePenaltyCharges: [...(record.latePenaltyCharges ?? [])],
       status: getStatus(record.balanceKsh, daysToDue),
-      paymentStatus: paymentStatusForRecord(record),
+      paymentStatus,
       currentBillingMonth,
       paidAmountKsh: currentMonthPaidKsh,
       currentMonthPaidKsh,

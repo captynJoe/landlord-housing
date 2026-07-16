@@ -1,7 +1,7 @@
-limit_req_zone $binary_remote_addr zone=estatedesk_auth_per_ip:20m rate=3r/s;
-limit_req_zone $binary_remote_addr zone=estatedesk_api_per_ip:20m rate=8r/s;
-limit_req_zone $binary_remote_addr zone=estatedesk_site_per_ip:20m rate=20r/s;
-limit_conn_zone $binary_remote_addr zone=estatedesk_conn_per_ip:20m;
+limit_req_zone $binary_remote_addr zone=landlord_housing_auth_per_ip:20m rate=3r/s;
+limit_req_zone $binary_remote_addr zone=landlord_housing_api_per_ip:20m rate=8r/s;
+limit_req_zone $binary_remote_addr zone=landlord_housing_site_per_ip:20m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=landlord_housing_conn_per_ip:20m;
 
 server {
     listen 80;
@@ -42,11 +42,11 @@ server {
 
     limit_req_status 429;
     limit_conn_status 429;
-    limit_conn estatedesk_conn_per_ip 20;
+    limit_conn landlord_housing_conn_per_ip 20;
 
     location = /health {
-        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
-        proxy_pass $estatedesk_api_upstream;
+        set $landlord_housing_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $landlord_housing_api_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -57,9 +57,9 @@ server {
     }
 
     location ^~ /api/auth/ {
-        limit_req zone=estatedesk_auth_per_ip burst=12 nodelay;
-        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
-        proxy_pass $estatedesk_api_upstream;
+        limit_req zone=landlord_housing_auth_per_ip burst=12 nodelay;
+        set $landlord_housing_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $landlord_housing_api_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -70,9 +70,9 @@ server {
     }
 
     location ^~ /api/ {
-        limit_req zone=estatedesk_api_per_ip burst=24 nodelay;
-        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
-        proxy_pass $estatedesk_api_upstream;
+        limit_req zone=landlord_housing_api_per_ip burst=24 nodelay;
+        set $landlord_housing_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $landlord_housing_api_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -83,8 +83,8 @@ server {
     }
 
     location ^~ /uploads/ {
-        set $estatedesk_api_upstream ${ESTATEDESK_API_UPSTREAM};
-        proxy_pass $estatedesk_api_upstream;
+        set $landlord_housing_api_upstream ${ESTATEDESK_API_UPSTREAM};
+        proxy_pass $landlord_housing_api_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -93,9 +93,9 @@ server {
     }
 
     location / {
-        limit_req zone=estatedesk_site_per_ip burst=40 nodelay;
-        set $estatedesk_web_upstream ${ESTATEDESK_WEB_UPSTREAM};
-        proxy_pass $estatedesk_web_upstream;
+        limit_req zone=landlord_housing_site_per_ip burst=40 nodelay;
+        set $landlord_housing_web_upstream ${ESTATEDESK_WEB_UPSTREAM};
+        proxy_pass $landlord_housing_web_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

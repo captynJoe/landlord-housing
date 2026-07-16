@@ -1035,6 +1035,15 @@ async function deleteBuildingFromAdmin(buildingId, buildingName) {
   return true;
 }
 
+function canDeleteAdminPaymentRecord(item) {
+  return Boolean(
+    item &&
+      item.provider !== "mpesa" &&
+      (item.provider === "cash" || item.source === "manual") &&
+      item.id
+  );
+}
+
 function renderAdminUtilityPayments(rows) {
   if (!(adminUtilityPaymentsBodyEl instanceof HTMLElement)) {
     return;
@@ -1045,7 +1054,7 @@ function renderAdminUtilityPayments(rows) {
   if (!Array.isArray(rows) || rows.length === 0) {
     appendEmptyRow(
       adminUtilityPaymentsBodyEl,
-      8,
+      9,
       "No utility payments found for the selected building."
     );
     return;
@@ -1053,6 +1062,10 @@ function renderAdminUtilityPayments(rows) {
 
   rows.forEach((item) => {
     const row = document.createElement("tr");
+    const canDelete = canDeleteAdminPaymentRecord(item);
+    const actionCell = canDelete
+      ? `<button type="button" class="btn-danger" data-action="delete-utility-payment" data-payment-id="${escapeHtml(item.id)}" data-utility-type="${escapeHtml(item.utilityType)}" data-house-number="${escapeHtml(item.houseNumber)}" data-provider="${escapeHtml(item.provider)}" data-reference="${escapeHtml(item.providerReference ?? "")}">Delete</button>`
+      : `<small>${item.provider === "mpesa" ? "M-PESA locked" : "System locked"}</small>`;
     row.innerHTML = `
       <td>${escapeHtml(item.utilityType)}</td>
       <td>${escapeHtml(item.houseNumber)}</td>
@@ -1062,6 +1075,7 @@ function renderAdminUtilityPayments(rows) {
       <td>${escapeHtml(item.providerReference ?? "-")}</td>
       <td>${escapeHtml(formatCurrency(item.amountKsh))}</td>
       <td>${escapeHtml(formatDateTime(item.paidAt))}</td>
+      <td>${actionCell}</td>
     `;
     adminUtilityPaymentsBodyEl.append(row);
   });
@@ -1818,6 +1832,53 @@ if (adminUtilityPaymentFormEl instanceof HTMLFormElement) {
     })();
   });
 }
+
+adminUtilityPaymentsBodyEl?.addEventListener("click", (event) => {
+  const target = event.target;
+  const button =
+    target instanceof HTMLElement
+      ? target.closest("[data-action='delete-utility-payment']")
+      : null;
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const buildingId = getSelectedAdminBillingBuildingId();
+  const paymentId = String(button.dataset.paymentId || "").trim();
+  const utilityType = String(button.dataset.utilityType || "").trim();
+  const houseNumber = String(button.dataset.houseNumber || "").trim();
+  const provider = String(button.dataset.provider || "").trim();
+  const reference = String(button.dataset.reference || "").trim();
+  if (!buildingId || !paymentId || !utilityType || !houseNumber) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Delete ${provider || "manual"} ${utilityType} payment ${reference || paymentId} for house ${houseNumber}? M-PESA records stay locked.`
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  button.disabled = true;
+  clearError();
+
+  void (async () => {
+    try {
+      await requestJson(
+        `/api/admin/utilities/${encodeURIComponent(utilityType)}/${encodeURIComponent(houseNumber)}/payments/${encodeURIComponent(paymentId)}?buildingId=${encodeURIComponent(buildingId)}`,
+        { method: "DELETE" }
+      );
+
+      setStatus(`Deleted ${utilityType} payment for house ${houseNumber}.`);
+      await Promise.all([loadAdminUtilityRegistry(), loadAdminUtilityPayments()]);
+    } catch (error) {
+      handleAdminError(error, "Failed to delete utility payment.");
+    } finally {
+      button.disabled = false;
+    }
+  })();
+});
 
 if (adminAccessFormEl instanceof HTMLFormElement) {
   adminAccessFormEl.addEventListener("submit", (event) => {

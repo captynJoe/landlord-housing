@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/admin.css?v=20260323b" />
+    <link rel="stylesheet" href="/admin.css?v=20260529b" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
@@ -21,8 +21,7 @@
           <p class="tag">JK Flats Operations</p>
           <h1>Manager Sign-In</h1>
           <p class="subtitle">
-            Sign in with your property account (email, phone, or username + password)
-            to manage buildings, approve tenant applications, and publish utility bills.
+            Choose your access type, then sign in with the details assigned to that role.
           </p>
         </div>
         <a href="/" class="home-link">Back to Portal</a>
@@ -30,31 +29,120 @@
 
       <section class="panel auth-panel" style="grid-template-columns: 1fr; max-width: 700px;">
         <form id="landlord-login-form" class="package-card">
-          <p class="status-text">
-            Manager login: use email, phone, or recovery username + password.
-          </p>
-          <label>
-            Email, Phone, or Username
-            <input
-              id="landlord-email"
-              type="text"
-              autocomplete="username"
-              placeholder="manager@example.com, 07XXXXXXXX, or username"
-              required
-            />
-          </label>
-          <label>
-            Password
-            <input
-              id="landlord-password"
-              type="password"
-              autocomplete="current-password"
-              placeholder="Your password"
-              required
-            />
-          </label>
+          <p class="status-text">Who is logging in?</p>
 
-          <button id="landlord-login-btn" type="submit">Sign In</button>
+          <div class="auth-mode-toggle" role="tablist" aria-label="Manager sign-in type">
+            <button
+              id="manager-mode-landlord"
+              type="button"
+              aria-selected="false"
+              data-manager-mode="landlord"
+            >
+              <strong>Landlord</strong>
+              <span>Owner or recovery access</span>
+            </button>
+            <button
+              id="manager-mode-staff"
+              type="button"
+              aria-selected="false"
+              data-manager-mode="staff"
+            >
+              <strong>Staff</strong>
+              <span>Issued staff credentials</span>
+            </button>
+            <button
+              id="manager-mode-caretaker"
+              type="button"
+              aria-selected="false"
+              data-manager-mode="caretaker"
+            >
+              <strong>House Manager</strong>
+              <span>Phone and verification house</span>
+            </button>
+          </div>
+
+          <section id="owner-login-fields" class="auth-mode-fields hidden">
+            <label>
+              <span id="owner-identifier-label">Email, Phone, or Recovery Username</span>
+              <input
+                id="landlord-email"
+                type="text"
+                autocomplete="username"
+                placeholder="manager@example.com, 07XXXXXXXX, or username"
+              />
+            </label>
+            <label>
+              Password
+              <input
+                id="landlord-password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Your password"
+              />
+            </label>
+          </section>
+
+          <section id="caretaker-login-fields" class="auth-mode-fields hidden">
+            <label>
+              Phone Number
+              <input
+                id="caretaker-phone"
+                type="tel"
+                inputmode="tel"
+                autocomplete="username"
+                placeholder="07XXXXXXXX"
+              />
+            </label>
+            <label>
+              Building
+              <select id="caretaker-building">
+                <option value="">Auto-detect building</option>
+              </select>
+            </label>
+            <label>
+              Verification House
+              <input
+                id="caretaker-house-number"
+                type="text"
+                maxlength="24"
+                autocomplete="off"
+                placeholder="A-12"
+              />
+            </label>
+            <label>
+              Password
+              <input
+                id="caretaker-password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Current password"
+              />
+            </label>
+            <label>
+              New Password (First-Time Setup)
+              <input
+                id="caretaker-new-password"
+                type="password"
+                minlength="8"
+                maxlength="128"
+                autocomplete="new-password"
+                placeholder="Minimum 8 characters"
+              />
+            </label>
+            <label>
+              Confirm New Password
+              <input
+                id="caretaker-confirm-password"
+                type="password"
+                minlength="8"
+                maxlength="128"
+                autocomplete="new-password"
+                placeholder="Repeat new password"
+              />
+            </label>
+          </section>
+
+          <button id="landlord-login-btn" type="submit">Choose Login Type</button>
           <section
             id="login-error"
             class="error-box hidden inline-error-box"
@@ -133,6 +221,6 @@
       </section>
     </main>
 
-    <script type="module" src="/landlord-login.js?v=20260529a"></script>
+    <script type="module" src="/landlord-login.js?v=20260529d"></script>
   </body>
 </html>

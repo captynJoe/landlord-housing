@@ -5,9 +5,12 @@ import {
   adminAccessCredentialUpdateSchema,
   createRoomBillingHoldSchema,
   depositRefundRecordSchema,
+  landlordDirectTenantCreateSchema,
+  landlordRentSetupSheetSchema,
   landlordRemoveBuildingUserSchema,
   residentDebtCollectionSchema,
-  residentPhoneLoginSchema
+  residentPhoneLoginSchema,
+  tenantAgreementUpsertSchema
 } from "../src/validation/schemas.js";
 
 test("admin credential updates accept email-style usernames", () => {
@@ -29,6 +32,63 @@ test("resident phone login does not require building or house selection", () => 
   assert.equal(parsed.buildingId, undefined);
   assert.equal(parsed.houseNumber, undefined);
   assert.equal(parsed.phoneNumber, "0700000001");
+});
+
+test("landlord direct tenant onboarding defaults to national ID", () => {
+  const parsed = landlordDirectTenantCreateSchema.parse({
+    buildingId: "BLDG-A",
+    houseNumber: "a10",
+    fullName: "Jane Wanjiku",
+    phoneNumber: "0712345678",
+    identityNumber: "12345678"
+  });
+
+  assert.equal(parsed.identityType, "national_id");
+  assert.equal(parsed.identityNumber, "12345678");
+});
+
+test("rent setup sheet accepts default deposit, charge start date, and first month paid", () => {
+  const parsed = landlordRentSetupSheetSchema.parse({
+    buildingDefaultMonthlyRentKsh: 8000,
+    buildingDefaultDepositKsh: 8000,
+    buildingDefaultDueDay: 24,
+    buildingDefaultGraceDays: 0,
+    chargeStartDate: "2026-05-24",
+    rows: [
+      {
+        houseNumber: "A10",
+        depositKsh: 8000,
+        currentMonthPaidKsh: 1000,
+        active: true
+      }
+    ]
+  });
+
+  assert.equal(parsed.buildingDefaultDepositKsh, 8000);
+  assert.equal(parsed.chargeStartDate, "2026-05-24");
+  assert.equal(parsed.rows[0].currentMonthPaidKsh, 1000);
+});
+
+test("tenant agreement accepts confirmed deposit paid up to the agreed amount", () => {
+  const parsed = tenantAgreementUpsertSchema.parse({
+    monthlyRentKsh: 12000,
+    depositKsh: 12000,
+    depositPaidKsh: 6000
+  });
+
+  assert.equal(parsed.depositKsh, 12000);
+  assert.equal(parsed.depositPaidKsh, 6000);
+});
+
+test("tenant agreement rejects deposit paid above the agreed amount", () => {
+  assert.throws(
+    () =>
+      tenantAgreementUpsertSchema.parse({
+        depositKsh: 8000,
+        depositPaidKsh: 9000
+      }),
+    /Deposit paid cannot be more than the agreed deposit amount/
+  );
 });
 
 test("account password change requires confirmation match", () => {

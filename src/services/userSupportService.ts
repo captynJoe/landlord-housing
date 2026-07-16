@@ -611,6 +611,48 @@ export class UserSupportService {
     return inserted;
   }
 
+  purgeBuilding(buildingId: string): boolean {
+    const normalizedBuildingId = normalizeBuildingId(buildingId);
+    let changed = false;
+
+    for (const [key, reports] of [...this.reportsByScope.entries()]) {
+      if (parseScopeKey(key).buildingId !== normalizedBuildingId) {
+        continue;
+      }
+
+      for (const report of reports) {
+        this.reportIndex.delete(report.id);
+      }
+      this.reportsByScope.delete(key);
+      changed = true;
+    }
+
+    for (const key of [...this.notificationsByScope.keys()]) {
+      if (parseScopeKey(key).buildingId !== normalizedBuildingId) {
+        continue;
+      }
+
+      this.notificationsByScope.delete(key);
+      this.notificationKeysByScope.delete(key);
+      changed = true;
+    }
+
+    for (const key of [...this.notificationKeysByScope.keys()]) {
+      if (parseScopeKey(key).buildingId !== normalizedBuildingId) {
+        continue;
+      }
+
+      this.notificationKeysByScope.delete(key);
+      changed = true;
+    }
+
+    if (changed) {
+      this.emitStateChange();
+    }
+
+    return changed;
+  }
+
   private emitStateChange(): void {
     if (!this.stateChangeHandler) {
       return;

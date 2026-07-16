@@ -102,8 +102,65 @@ body {
 
 .auth-panel label,
 .auth-panel .status-text,
-.auth-panel .inline-error-box {
+.auth-panel .inline-error-box,
+.auth-panel .auth-mode-toggle,
+.auth-panel .auth-mode-fields {
   grid-column: 1 / -1;
+}
+
+.auth-mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid rgba(16, 35, 49, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 4px;
+}
+
+.auth-mode-toggle button {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  min-height: 74px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-700);
+  padding: 10px;
+  text-align: left;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.auth-mode-toggle button strong,
+.auth-mode-toggle button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.auth-mode-toggle button strong {
+  font-size: 0.9rem;
+}
+
+.auth-mode-toggle button span {
+  color: rgba(42, 63, 84, 0.78);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.auth-mode-toggle button.active {
+  background: var(--teal-600);
+  color: var(--white);
+}
+
+.auth-mode-toggle button.active span {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.auth-mode-fields {
+  display: grid;
+  gap: 10px;
 }
 
 .status-text {
@@ -393,6 +450,14 @@ tbody td {
 
   .auth-panel {
     grid-template-columns: 1fr;
+  }
+
+  .auth-mode-toggle {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-mode-toggle button {
+    min-height: 58px;
   }
 
   .inline-fields {

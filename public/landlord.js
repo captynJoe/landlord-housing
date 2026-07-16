@@ -10,7 +10,7 @@ import {
   applyDocumentBranding,
   getLandlordPortalTitle,
   getLandlordShellBrand
-} from "./portal-branding.js?v=20260521b";
+} from "./portal-branding.js?v=20260716b";
 
 const LANDLORD_SW_URL = "/resident-sw.js?v=20260525a";
 const authStatusEl = document.getElementById("auth-status");
@@ -75,6 +75,15 @@ const landlordGlobalSearchInputEl = document.getElementById("landlord-global-sea
 const landlordGlobalSearchBuildingEl = document.getElementById(
   "landlord-global-search-building"
 );
+const roomsWorkspacePathSegments = window.location.pathname.split("/").filter(Boolean);
+const roomsWorkspaceBuildingId =
+  roomsWorkspacePathSegments.length === 3 &&
+  roomsWorkspacePathSegments[0] === "landlord" &&
+  roomsWorkspacePathSegments[1] === "rooms"
+    ? decodeURIComponent(roomsWorkspacePathSegments[2] ?? "").trim()
+    : "";
+
+document.body.classList.toggle("landlord-rooms-route", Boolean(roomsWorkspaceBuildingId));
 
 const metricMetersEl = document.getElementById("metric-meters");
 const metricUsersEl = document.getElementById("metric-users");
@@ -86,6 +95,11 @@ const metricBalanceEl = document.getElementById("metric-balance");
 const landlordFocusBuildingSelectEl = document.getElementById(
   "landlord-focus-building-select"
 );
+const settingsBuildingSelectEl = document.getElementById("settings-building-select");
+const settingsSummaryEl = document.getElementById("settings-summary");
+const refreshSettingsViewBtnEl = document.getElementById("refresh-settings-view");
+const settingsClearCacheBtnEl = document.getElementById("settings-clear-cache-btn");
+const settingsClearDataBtnEl = document.getElementById("settings-clear-data-btn");
 const landlordFocusUnitsEl = document.getElementById("landlord-focus-units");
 const landlordFocusResidentsEl = document.getElementById("landlord-focus-residents");
 const landlordFocusOpenBillsEl = document.getElementById("landlord-focus-open-bills");
@@ -115,6 +129,26 @@ const residentDrawerEl = document.getElementById("resident-drawer");
 const residentDrawerBackdropEl = document.getElementById("resident-drawer-backdrop");
 const residentDrawerBodyEl = document.getElementById("resident-drawer-body");
 const closeResidentDrawerBtnEl = document.getElementById("close-resident-drawer-btn");
+const openDirectTenantDrawerBtnEl = document.getElementById(
+  "open-direct-tenant-drawer-btn"
+);
+const directTenantDrawerEl = document.getElementById("direct-tenant-drawer");
+const directTenantDrawerBackdropEl = document.getElementById(
+  "direct-tenant-drawer-backdrop"
+);
+const closeDirectTenantDrawerBtnEl = document.getElementById(
+  "close-direct-tenant-drawer-btn"
+);
+const directTenantFormEl = document.getElementById("direct-tenant-form");
+const directTenantBuildingEl = document.getElementById("direct-tenant-building");
+const directTenantHouseEl = document.getElementById("direct-tenant-house");
+const directTenantNameEl = document.getElementById("direct-tenant-name");
+const directTenantPhoneEl = document.getElementById("direct-tenant-phone");
+const directTenantIdTypeEl = document.getElementById("direct-tenant-id-type");
+const directTenantIdNumberEl = document.getElementById("direct-tenant-id-number");
+const directTenantNoteEl = document.getElementById("direct-tenant-note");
+const directTenantStatusEl = document.getElementById("direct-tenant-status");
+const directTenantSubmitBtnEl = document.getElementById("direct-tenant-submit-btn");
 
 const createBuildingFormEl = document.getElementById("create-building-form");
 const createBuildingNameEl = document.getElementById("create-building-name");
@@ -194,10 +228,14 @@ const residentsBuildingSelectEl = document.getElementById("residents-building-se
 const residentsStatusFilterEl = document.getElementById("residents-status-filter");
 const residentsSearchInputEl = document.getElementById("residents-search-input");
 const residentsOpenMatchBtnEl = document.getElementById("residents-open-match-btn");
+const residentsOpenRentSheetBtnEl = document.getElementById("residents-open-rent-sheet-btn");
 const residentsOverviewEl = document.getElementById("residents-overview");
 const residentsSearchSummaryEl = document.getElementById("residents-search-summary");
 const roomLedgerSummaryEl = document.getElementById("room-ledger-summary");
 const roomLedgerTableEl = document.querySelector(".room-ledger-table");
+const roomLedgerSectionEl = document.getElementById("room-ledger-section");
+const overviewRentStatusSectionEl = document.getElementById("overview-rent-status-section");
+const utilityRoomStatusSectionEl = document.getElementById("utility-room-status-section");
 const roomLedgerBodyEl = document.getElementById("room-ledger-body");
 const residentSourceTableEl = document.querySelector(".resident-source-table");
 const residentsBodyEl = document.getElementById("residents-body");
@@ -236,14 +274,19 @@ const rentSheetBuildingSelectEl = document.getElementById("rent-sheet-building-s
 const rentSheetDefaultMonthlyRentEl = document.getElementById(
   "rent-sheet-default-monthly-rent"
 );
+const rentSheetDefaultDepositEl = document.getElementById("rent-sheet-default-deposit");
 const rentSheetDefaultDueDayEl = document.getElementById("rent-sheet-default-due-day");
 const rentSheetDefaultGraceDaysEl = document.getElementById(
   "rent-sheet-default-grace-days"
+);
+const rentSheetChargeStartDateEl = document.getElementById(
+  "rent-sheet-charge-start-date"
 );
 const rentSheetNoteEl = document.getElementById("rent-sheet-note");
 const rentSheetBodyEl = document.getElementById("rent-sheet-body");
 const rentSheetSubmitBtnEl = document.getElementById("rent-sheet-submit-btn");
 const rentSheetReloadBtnEl = document.getElementById("rent-sheet-reload-btn");
+const rentSheetStatusEl = document.getElementById("rent-sheet-status");
 const paymentAccessBodyEl = document.getElementById("payment-access-body");
 const refreshPaymentAccessBtnEl = document.getElementById("refresh-payment-access");
 const paymentProfilesBodyEl = document.getElementById("payment-profiles-body");
@@ -265,6 +308,15 @@ const overviewCollectionsBodyEl = document.getElementById("overview-collections-
 const overviewRoomBuildingSelectEl = document.getElementById("overview-room-building-select");
 const overviewRoomSearchInputEl = document.getElementById("overview-room-search-input");
 const overviewOpenRoomBtnEl = document.getElementById("overview-open-room-btn");
+const overviewDailyHeadingEl = document.getElementById("overview-daily-heading");
+const overviewDailySubtitleEl = document.getElementById("overview-daily-subtitle");
+const overviewDailyCollectedEl = document.getElementById("overview-daily-collected");
+const overviewDailyOutstandingEl = document.getElementById("overview-daily-outstanding");
+const overviewDailyUnpaidEl = document.getElementById("overview-daily-unpaid");
+const overviewDailyIssuesEl = document.getElementById("overview-daily-issues");
+const overviewDailyRequestsEl = document.getElementById("overview-daily-requests");
+const overviewDailyVacantEl = document.getElementById("overview-daily-vacant");
+const dashboardActionButtons = [...document.querySelectorAll("[data-dashboard-action]")];
 const openUtilitySetupBtnEl = document.getElementById("open-utility-setup-btn");
 const utilitySetupBackdropEl = document.getElementById("utility-setup-backdrop");
 const utilitySetupModalEl = document.getElementById("utility-setup-modal");
@@ -431,7 +483,7 @@ const landlordErrorEl = document.getElementById("landlord-error");
 
 const state = {
   role: "-",
-  activeLandlordView: "tenants",
+  activeLandlordView: "overview",
   buildings: [],
   buildingById: new Map(),
   applications: [],
@@ -441,8 +493,10 @@ const state = {
   selectedRentSheetBuildingId: "",
   rentSheetDefaults: {
     monthlyRentKsh: null,
+    depositKsh: null,
     dueDay: null,
-    graceDays: 0
+    graceDays: 0,
+    chargeStartDate: ""
   },
   rentSheetRows: [],
   paymentAccess: [],
@@ -840,6 +894,47 @@ function isCaretakerRole() {
   return state.role === "caretaker";
 }
 
+function isStaffRole() {
+  return state.role === "staff";
+}
+
+function isOwnerAccessRole() {
+  return state.role === "landlord" || state.role === "admin" || state.role === "root_admin";
+}
+
+function isLandlordViewAvailableForRole(view) {
+  const normalizedView = String(view ?? "").trim();
+
+  if (isCaretakerRole()) {
+    return normalizedView === "overview" || normalizedView === "tenants" || normalizedView === "applications";
+  }
+
+  if (isStaffRole()) {
+    return normalizedView !== "settings";
+  }
+
+  if (!isOwnerAccessRole() && normalizedView === "settings") {
+    return false;
+  }
+
+  return true;
+}
+
+function getDefaultLandlordViewForRole() {
+  return "overview";
+}
+
+function syncRoleScopedNavigation() {
+  [...landlordNavButtons, ...landlordFocusTargetButtons].forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const view = button.dataset.landlordView || button.dataset.landlordFocusTargetView || "";
+    button.classList.toggle("hidden", !isLandlordViewAvailableForRole(view));
+  });
+}
+
 const applicationsNavButtonEl = landlordNavButtons.find(
   (button) => button instanceof HTMLButtonElement && button.dataset.landlordView === "applications"
 );
@@ -868,7 +963,7 @@ function updateApplicationsIndicator() {
 }
 
 function isOwnerAlertRole() {
-  return state.role === "landlord" || state.role === "admin" || state.role === "root_admin";
+  return isOwnerAccessRole() || isStaffRole();
 }
 
 function updateOwnerNotificationControls() {
@@ -1128,14 +1223,23 @@ function renderMessageCenter() {
 
   const sms = state.messageCenterSms ?? {};
   const messages = Array.isArray(state.messages) ? state.messages : [];
+  const selectedBuildingId = String(
+    state.selectedMessageBuildingId || getFocusedBuildingId() || ""
+  ).trim();
+  const buildingLabel = selectedBuildingId
+    ? getBuildingDisplayNameById(selectedBuildingId, selectedBuildingId)
+    : "All buildings";
+  const openIssues = Array.isArray(state.tickets)
+    ? state.tickets.filter((ticket) => String(ticket?.status || "") !== "resolved").length
+    : 0;
   if (messageCenterSummaryEl instanceof HTMLElement) {
     const provider = sms.provider ? sms.provider : "SMS";
     const sender = sms.senderId ? ` from ${sms.senderId}` : "";
+    const issueText = `${openIssues} open resident issue${openIssues === 1 ? "" : "s"}`;
+    const messageText = `${messages.length} recent SMS message${messages.length === 1 ? "" : "s"}`;
     messageCenterSummaryEl.textContent = sms.enabled
-      ? `${provider} is ready${sender}. Showing ${messages.length} recent message${
-          messages.length === 1 ? "" : "s"
-        }.`
-      : "SMS is not configured on this server.";
+      ? `${buildingLabel} has ${issueText} and ${messageText}. ${provider} is ready${sender}.`
+      : `${buildingLabel} has ${issueText}. SMS is not configured on this server.`;
   }
 
   if (messageSendBtnEl instanceof HTMLButtonElement) {
@@ -1147,7 +1251,7 @@ function renderMessageCenter() {
   }
 
   if (messages.length === 0) {
-    messagesBodyEl.innerHTML = '<tr><td colspan="7">No messages sent yet.</td></tr>';
+    messagesBodyEl.innerHTML = '<tr><td colspan="7">No SMS activity yet.</td></tr>';
     return;
   }
 
@@ -1204,9 +1308,19 @@ function renderMessageCenter() {
 
 function applyRoleCapabilities() {
   const caretaker = isCaretakerRole();
+  const staff = isStaffRole();
+  const ownerAccess = isOwnerAccessRole();
+
+  document.body.classList.toggle("landlord-staff-role", staff);
+  document.body.classList.toggle("landlord-caretaker-role", caretaker);
+  document.body.classList.toggle("landlord-simple-manager-role", staff || caretaker);
+  syncRoleScopedNavigation();
+  if (!isLandlordViewAvailableForRole(state.activeLandlordView)) {
+    setActiveLandlordView(getDefaultLandlordViewForRole());
+  }
 
   if (ownerStaffManagementPanelEl instanceof HTMLElement) {
-    ownerStaffManagementPanelEl.classList.toggle("hidden", caretaker);
+    ownerStaffManagementPanelEl.classList.toggle("hidden", !ownerAccess);
   }
 
   if (caretakerManagementPanelEl instanceof HTMLElement) {
@@ -1217,15 +1331,20 @@ function applyRoleCapabilities() {
     if (!(button instanceof HTMLButtonElement)) {
       return;
     }
-    button.classList.toggle("hidden", caretaker);
+    button.classList.toggle("hidden", !ownerAccess);
   });
 
   if (openRentSheetBtnEl instanceof HTMLButtonElement) {
     openRentSheetBtnEl.classList.toggle("hidden", caretaker);
   }
 
+  if (openDirectTenantDrawerBtnEl instanceof HTMLButtonElement) {
+    openDirectTenantDrawerBtnEl.classList.toggle("hidden", caretaker);
+  }
+
   updateOwnerNotificationControls();
   renderMessageCenter();
+  renderSettingsPanel();
 }
 
 function redirectToLogin() {
@@ -1316,15 +1435,19 @@ function setActiveLandlordView(nextView) {
     requestedView === "residents" || requestedView === "utilities"
       ? "tenants"
       : requestedView;
-  const targetView =
+  const requestedTargetView =
     normalizedView === "overview" ||
     normalizedView === "buildings" ||
+    normalizedView === "settings" ||
     normalizedView === "applications" ||
     normalizedView === "messages" ||
     normalizedView === "tenants" ||
     normalizedView === "expenses"
       ? normalizedView
       : "overview";
+  const targetView = isLandlordViewAvailableForRole(requestedTargetView)
+    ? requestedTargetView
+    : getDefaultLandlordViewForRole();
   state.activeLandlordView = targetView;
 
   landlordNavButtons.forEach((button) => {
@@ -1402,6 +1525,10 @@ function openMetricTarget(target) {
 
 function openCreateBuildingDrawer() {
   if (!(createBuildingDrawerEl instanceof HTMLElement)) {
+    return;
+  }
+  if (!isOwnerAccessRole()) {
+    showError("Landlord access is required to create buildings.");
     return;
   }
 
@@ -1517,6 +1644,135 @@ function closeResidentDrawer() {
   state.selectedResidentAgreement = null;
   state.selectedResidentAgreementError = "";
   state.residentAgreementLoading = false;
+}
+
+function setDirectTenantStatus(message) {
+  if (directTenantStatusEl instanceof HTMLElement) {
+    directTenantStatusEl.textContent = message;
+  }
+}
+
+function getDefaultDirectTenantBuildingId(preferredBuildingId = "") {
+  const preferred = String(preferredBuildingId || "").trim();
+  if (preferred && state.buildings.some((item) => item.id === preferred)) {
+    return preferred;
+  }
+
+  const residentsSelection =
+    state.selectedResidentsBuildingId && state.selectedResidentsBuildingId !== "all"
+      ? state.selectedResidentsBuildingId
+      : "";
+  if (
+    residentsSelection &&
+    state.buildings.some((item) => item.id === residentsSelection)
+  ) {
+    return residentsSelection;
+  }
+
+  if (
+    state.selectedRegistryBuildingId &&
+    state.buildings.some((item) => item.id === state.selectedRegistryBuildingId)
+  ) {
+    return state.selectedRegistryBuildingId;
+  }
+
+  return state.buildings[0]?.id ?? "";
+}
+
+function syncDirectTenantBuildingOptions(preferredBuildingId = "") {
+  if (!(directTenantBuildingEl instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  directTenantBuildingEl.replaceChildren();
+  if (!Array.isArray(state.buildings) || state.buildings.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No buildings";
+    directTenantBuildingEl.append(option);
+    directTenantBuildingEl.disabled = true;
+    return;
+  }
+
+  const selected = getDefaultDirectTenantBuildingId(preferredBuildingId);
+  directTenantBuildingEl.disabled = false;
+  state.buildings.forEach((building) => {
+    const option = document.createElement("option");
+    option.value = building.id;
+    option.textContent = getBuildingDisplayName(building);
+    if (building.id === selected) {
+      option.selected = true;
+    }
+    directTenantBuildingEl.append(option);
+  });
+}
+
+function openDirectTenantDrawer(prefill = {}) {
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot add tenants directly.");
+    return;
+  }
+  if (!(directTenantDrawerEl instanceof HTMLElement)) {
+    return;
+  }
+
+  syncDirectTenantBuildingOptions(prefill.buildingId);
+  if (directTenantBuildingEl instanceof HTMLSelectElement) {
+    directTenantBuildingEl.value = getDefaultDirectTenantBuildingId(prefill.buildingId);
+  }
+  if (directTenantHouseEl instanceof HTMLInputElement) {
+    directTenantHouseEl.value = prefill.houseNumber
+      ? normalizeHouse(prefill.houseNumber)
+      : "";
+  }
+  if (directTenantNameEl instanceof HTMLInputElement && !prefill.keepTenantFields) {
+    directTenantNameEl.value = "";
+  }
+  if (directTenantPhoneEl instanceof HTMLInputElement && !prefill.keepTenantFields) {
+    directTenantPhoneEl.value = "";
+  }
+  if (directTenantIdTypeEl instanceof HTMLSelectElement) {
+    directTenantIdTypeEl.value = "national_id";
+  }
+  if (
+    directTenantIdNumberEl instanceof HTMLInputElement &&
+    !prefill.keepTenantFields
+  ) {
+    directTenantIdNumberEl.value = "";
+  }
+  if (directTenantNoteEl instanceof HTMLInputElement && !prefill.keepTenantFields) {
+    directTenantNoteEl.value = "";
+  }
+
+  setDirectTenantStatus(
+    "Temporary password: ID number. Password change required at first sign-in."
+  );
+  clearError();
+  directTenantDrawerEl.classList.remove("hidden");
+  if (directTenantDrawerBackdropEl instanceof HTMLElement) {
+    directTenantDrawerBackdropEl.classList.remove("hidden");
+  }
+  if (directTenantHouseEl instanceof HTMLInputElement && !directTenantHouseEl.value) {
+    directTenantHouseEl.focus();
+  } else if (directTenantNameEl instanceof HTMLInputElement) {
+    directTenantNameEl.focus();
+  }
+}
+
+function closeDirectTenantDrawer() {
+  if (!(directTenantDrawerEl instanceof HTMLElement)) {
+    return;
+  }
+  directTenantDrawerEl.classList.add("hidden");
+  if (directTenantDrawerBackdropEl instanceof HTMLElement) {
+    directTenantDrawerBackdropEl.classList.add("hidden");
+  }
+}
+
+function setDirectTenantSubmitting(isSubmitting) {
+  if (directTenantSubmitBtnEl instanceof HTMLButtonElement) {
+    directTenantSubmitBtnEl.disabled = Boolean(isSubmitting);
+  }
 }
 
 function closeUtilitySetupModal() {
@@ -1916,6 +2172,41 @@ function renderUtilityStatus(status) {
   return `<span class="utility-status ${meta.className}">${meta.label}</span>`;
 }
 
+function utilityStatusToneClass(status) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "overdue" || normalized === "overdue_payable") {
+    return "is-danger";
+  }
+  if (normalized === "payable" || normalized === "due_soon") {
+    return "is-warning";
+  }
+  if (normalized === "clear") {
+    return "is-success";
+  }
+  return "is-muted";
+}
+
+function tableRowToneClass(toneClass) {
+  switch (String(toneClass ?? "").trim()) {
+    case "is-danger":
+      return "table-row-tone-danger";
+    case "is-warning":
+      return "table-row-tone-warning";
+    case "is-success":
+      return "table-row-tone-success";
+    default:
+      return "";
+  }
+}
+
+function renderTableStatusPill(label, toneClass) {
+  const normalizedLabel = String(label ?? "").trim() || "-";
+  const normalizedTone = String(toneClass ?? "is-muted").trim() || "is-muted";
+  return `<span class="table-status-pill ${normalizedTone}">${escapeHtml(
+    normalizedLabel
+  )}</span>`;
+}
+
 function renderUtilityStatusAction(summaryRow) {
   const meta = utilityStatusMeta(summaryRow?.status);
   const action = summaryRow?.overdueAction ?? summaryRow?.payableAction ?? null;
@@ -1958,6 +2249,24 @@ function compareHouseNumber(a, b) {
     numeric: true,
     sensitivity: "base"
   });
+}
+
+function compareStableRoomOrder(a, b) {
+  const buildingDelta = compareBuildingRecords(
+    {
+      id: String(a?.buildingId ?? ""),
+      name: String(a?.buildingName ?? getBuildingNameById(a?.buildingId, "") ?? "")
+    },
+    {
+      id: String(b?.buildingId ?? ""),
+      name: String(b?.buildingName ?? getBuildingNameById(b?.buildingId, "") ?? "")
+    }
+  );
+  if (buildingDelta !== 0) {
+    return buildingDelta;
+  }
+
+  return compareHouseNumber(a?.houseNumber, b?.houseNumber);
 }
 
 function buildResidentSearchText(resident) {
@@ -2502,6 +2811,63 @@ function getResidentBillingStatusLabel(resident) {
   return `${label} + utility`;
 }
 
+function getResidentBillingToneClass(resident, utilitySummary = null) {
+  const hasResident =
+    resident?.hasActiveResident || resident?.residentUserId || resident?.residentName;
+  if (!hasResident) {
+    return "is-muted";
+  }
+  if (!canDisplayResidentBilling(resident)) {
+    return "is-warning";
+  }
+
+  const resolvedUtilitySummary = utilitySummary ?? getResidentUtilityRoomSummary(resident);
+  const arrearsKsh = getResidentOperationalArrearsKsh(resident, resolvedUtilitySummary);
+  const currentDueKsh = getResidentOperationalCurrentDueKsh(
+    resident,
+    resolvedUtilitySummary
+  );
+
+  if (arrearsKsh > 0) {
+    return "is-danger";
+  }
+  if (currentDueKsh > 0) {
+    return "is-warning";
+  }
+  return "is-success";
+}
+
+function getRentCollectionVisualState(item) {
+  const arrearsKsh = Math.max(0, Number(item?.arrearsKsh ?? 0));
+  const currentOutstandingKsh = Math.max(
+    0,
+    Number(item?.currentMonthOutstandingKsh ?? item?.balanceKsh ?? 0)
+  );
+  const currentPaidKsh = Math.max(
+    0,
+    Number(item?.currentMonthPaidKsh ?? item?.paidAmountKsh ?? 0)
+  );
+
+  if (arrearsKsh > 0) {
+    return {
+      label: "Overdue",
+      toneClass: "is-danger"
+    };
+  }
+  if (currentOutstandingKsh > 0) {
+    return {
+      label: currentPaidKsh > 0 ? "Partial" : "Unpaid",
+      toneClass: "is-warning"
+    };
+  }
+
+  const rawLabel = String(item?.paymentStatus ?? "").trim().toUpperCase();
+  return {
+    label: rawLabel === "PAID" || !rawLabel ? "Paid" : rawLabel.replaceAll("_", " "),
+    toneClass: "is-success"
+  };
+}
+
 function getResidentTotalRentPaidKsh(resident) {
   if (!canDisplayResidentBilling(resident)) {
     return 0;
@@ -2619,12 +2985,29 @@ function findResidentDirectoryEntry(buildingId, houseNumber) {
 }
 
 function getRoomsDeepLinkBuildingId() {
-  const segments = window.location.pathname.split("/").filter(Boolean);
-  if (segments.length !== 3 || segments[0] !== "landlord" || segments[1] !== "rooms") {
-    return "";
+  return roomsWorkspaceBuildingId;
+}
+
+function isRoomsWorkspaceRoute() {
+  return Boolean(roomsWorkspaceBuildingId);
+}
+
+function applyRoomsWorkspaceLayout() {
+  document.body.classList.toggle("landlord-rooms-route", isRoomsWorkspaceRoute());
+  if (!isRoomsWorkspaceRoute()) {
+    return;
   }
 
-  return decodeURIComponent(segments[2] ?? "").trim();
+  setActiveLandlordView("tenants");
+  if (overviewRentStatusSectionEl instanceof HTMLDetailsElement) {
+    overviewRentStatusSectionEl.open = true;
+  }
+  if (utilityRoomStatusSectionEl instanceof HTMLDetailsElement) {
+    utilityRoomStatusSectionEl.open = true;
+  }
+  if (roomLedgerSectionEl instanceof HTMLDetailsElement) {
+    roomLedgerSectionEl.open = false;
+  }
 }
 
 function getRentSetupDeepLink() {
@@ -2759,40 +3142,13 @@ async function openResidentLookup(query, buildingId = "all") {
 }
 
 function sortResidentsForDirectory(rows) {
-  return [...rows].sort((a, b) => {
-    const balanceDelta =
-      getResidentOutstandingBalanceKsh(b) - getResidentOutstandingBalanceKsh(a);
-    if (balanceDelta !== 0) {
-      return balanceDelta;
-    }
-
-    const occupancyOrder = {
-      pending_review: 0,
-      occupied: 1,
-      vacant: 2
-    };
-    const occupancyDelta =
-      (occupancyOrder[getResidentOccupancyLabel(a)] ?? 9) -
-      (occupancyOrder[getResidentOccupancyLabel(b)] ?? 9);
-    if (occupancyDelta !== 0) {
-      return occupancyDelta;
-    }
-
-    const buildingDelta = String(a.buildingName ?? a.buildingId ?? "").localeCompare(
-      String(b.buildingName ?? b.buildingId ?? "")
-    );
-    if (buildingDelta !== 0) {
-      return buildingDelta;
-    }
-
-    return compareHouseNumber(a.houseNumber, b.houseNumber);
-  });
+  return [...rows].sort(compareStableRoomOrder);
 }
 
 function getResidentOverviewTargetSection(filter) {
   return filter === "awaiting_readings"
     ? "utility-room-status-section"
-    : "residents-directory-section";
+    : "room-ledger-section";
 }
 
 function renderResidentsOverview(rows) {
@@ -5308,7 +5664,7 @@ async function enableLandlordPushAlerts() {
   clearError();
 
   if (!isOwnerAlertRole()) {
-    showError("Owner alerts are only available for owner/staff accounts.");
+    showError("Owner alerts are only available for landlord or staff accounts.");
     return;
   }
   if (!supportsLandlordPush()) {
@@ -5415,11 +5771,16 @@ async function loadMessageCenter() {
   const params = new URLSearchParams({ limit: "100" });
   if (state.selectedMessageBuildingId) {
     params.set("rulesBuildingId", state.selectedMessageBuildingId);
+    state.selectedTicketBuildingId = state.selectedMessageBuildingId;
+    if (landlordTicketBuildingSelectEl instanceof HTMLSelectElement) {
+      landlordTicketBuildingSelectEl.value = state.selectedMessageBuildingId;
+    }
   }
   const payload = await requestJson(`/api/landlord/messages?${params.toString()}`, {
     cache: "no-store"
   });
   setMessageCenterData(payload.data ?? {});
+  await loadLandlordTickets();
   renderMessageCenter();
 }
 
@@ -5725,6 +6086,7 @@ function applyLandlordRole(roleValue) {
   const role = String(roleValue || "").trim() || "tenant";
   if (
     role !== "landlord" &&
+    role !== "staff" &&
     role !== "admin" &&
     role !== "root_admin" &&
     role !== "caretaker"
@@ -5750,6 +6112,111 @@ async function ensureSession() {
   }
 }
 
+function getRecordBuildingId(item) {
+  return normalizeLookupBuildingId(item?.buildingId || item?.building?.id || "");
+}
+
+function getRowsForFocusedBuilding(rows) {
+  const allRows = Array.isArray(rows) ? rows : [];
+  const focusedBuildingId = getFocusedBuildingId();
+
+  if (!focusedBuildingId) {
+    return allRows;
+  }
+
+  return allRows.filter((item) => getRecordBuildingId(item) === focusedBuildingId);
+}
+
+function getOpenIssueRowsForFocusedBuilding() {
+  return getRowsForFocusedBuilding(state.tickets).filter(
+    (item) => String(item?.status || "").trim() !== "resolved"
+  );
+}
+
+function getPendingApplicationRowsForFocusedBuilding() {
+  return getRowsForFocusedBuilding(state.applications).filter(
+    (item) => String(item?.status || "pending").trim() === "pending"
+  );
+}
+
+function renderDailyDashboard() {
+  const requiredEls = [
+    overviewDailyHeadingEl,
+    overviewDailySubtitleEl,
+    overviewDailyCollectedEl,
+    overviewDailyOutstandingEl,
+    overviewDailyUnpaidEl,
+    overviewDailyIssuesEl,
+    overviewDailyRequestsEl,
+    overviewDailyVacantEl
+  ];
+  if (requiredEls.some((item) => !(item instanceof HTMLElement))) {
+    return;
+  }
+
+  const focusedBuildingId = getFocusedBuildingId();
+  const buildingLabel = focusedBuildingId
+    ? getBuildingDisplayNameById(focusedBuildingId, "Focused building")
+    : "Portfolio";
+  const residentRows = dedupeResidentDirectoryRows(getRowsForFocusedBuilding(state.residentDirectory));
+  const rentRows = getRowsForFocusedBuilding(state.rentStatus);
+  const utilityBills = getActionableUtilityBills(getRowsForFocusedBuilding(state.bills));
+  const currentMonthKey = currentBillingMonth();
+  const rentCollectedThisMonth = residentRows.reduce(
+    (sum, item) => sum + getResidentCurrentMonthRentPaidKsh(item),
+    0
+  );
+  const utilityCollectedThisMonth = getRowsForFocusedBuilding(state.payments)
+    .filter((item) => monthKeyFromValue(item.paidAt || item.billingMonth) === currentMonthKey)
+    .reduce((sum, item) => sum + Math.max(0, Number(item.amountKsh ?? 0)), 0);
+  const outstanding = residentRows.length > 0
+    ? residentRows.reduce(
+        (sum, item) =>
+          sum + getResidentOperationalOutstandingKsh(item, getResidentUtilityRoomSummary(item)),
+        0
+      )
+    : rentRows.reduce((sum, item) => sum + Math.max(0, Number(item.balanceKsh ?? 0)), 0) +
+      utilityBills.reduce((sum, item) => sum + utilityAmount(item.balanceKsh), 0);
+  const unpaidRoomKeys = new Set();
+
+  rentRows.forEach((item) => {
+    const balanceKsh = Math.max(
+      0,
+      Number(item.currentMonthOutstandingKsh ?? item.balanceKsh ?? 0)
+    );
+    if (balanceKsh > 0) {
+      unpaidRoomKeys.add(`${getRecordBuildingId(item)}::${normalizeHouse(item.houseNumber)}`);
+    }
+  });
+  residentRows.forEach((item) => {
+    if (getResidentOutstandingBalanceKsh(item) > 0) {
+      unpaidRoomKeys.add(`${getRecordBuildingId(item)}::${normalizeHouse(item.houseNumber)}`);
+    }
+  });
+  utilityBills.forEach((item) => {
+    if (utilityAmount(item.balanceKsh) > 0) {
+      unpaidRoomKeys.add(`${getRecordBuildingId(item)}::${normalizeHouse(item.houseNumber)}`);
+    }
+  });
+
+  const vacantRooms = residentRows.filter(
+    (item) => !(item?.hasActiveResident || item?.residentUserId || item?.residentName)
+  ).length;
+  const openIssues = getOpenIssueRowsForFocusedBuilding().length;
+  const pendingRequests = getPendingApplicationRowsForFocusedBuilding().length;
+
+  overviewDailyHeadingEl.textContent = `${buildingLabel} Dashboard`;
+  overviewDailySubtitleEl.textContent = focusedBuildingId
+    ? "Daily collection, issue, request, and room signals for the focused building."
+    : "Daily collection, issue, request, and room signals across the portfolio.";
+  overviewDailyCollectedEl.textContent = formatCurrency(rentCollectedThisMonth + utilityCollectedThisMonth);
+  overviewDailyOutstandingEl.textContent = formatCurrency(outstanding);
+  overviewDailyUnpaidEl.textContent = String(unpaidRoomKeys.size);
+  overviewDailyIssuesEl.textContent = String(openIssues);
+  overviewDailyRequestsEl.textContent = String(pendingRequests);
+  overviewDailyVacantEl.textContent = String(vacantRooms);
+}
+
 function getFocusedBuildingSummary(buildingId) {
   const building = getBuildingRecord(buildingId);
   if (!building) {
@@ -5769,7 +6236,8 @@ function getFocusedBuildingSummary(buildingId) {
   const outstanding =
     residentRows.length > 0
       ? residentRows.reduce(
-          (sum, item) => sum + getResidentOutstandingBalanceKsh(item),
+          (sum, item) =>
+            sum + getResidentOperationalOutstandingKsh(item, getResidentUtilityRoomSummary(item)),
           0
         )
       : utilityBills.reduce(
@@ -6042,6 +6510,63 @@ function handleDeleteBuildingClick(target, buildingId, buildingName) {
   })();
 }
 
+function handleSettingsClearCacheClick() {
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot clear building cache.");
+    return;
+  }
+
+  const buildingId = getSelectedSettingsBuildingId();
+  if (!buildingId) {
+    showError("Select a building first.");
+    return;
+  }
+
+  const buildingName = getBuildingDisplayNameById(buildingId, buildingId);
+  const confirmation = window.prompt(
+    `Type CLEAR CACHE to refresh workspace cache for ${buildingName}. Live rent, utility, room, and resident data will stay intact.`,
+    ""
+  );
+  if (confirmation !== "CLEAR CACHE") {
+    return;
+  }
+
+  if (settingsClearCacheBtnEl instanceof HTMLButtonElement) {
+    settingsClearCacheBtnEl.disabled = true;
+  }
+  clearError();
+
+  void (async () => {
+    try {
+      await requestJson(
+        `/api/landlord/buildings/${encodeURIComponent(buildingId)}/clear-cache`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            confirmBuildingId: buildingId,
+            confirmationText: "CLEAR CACHE"
+          })
+        }
+      );
+
+      setStatus(`Cleared workspace cache for ${buildingName}.`);
+      await loadData({ quick: false });
+      setActiveLandlordView("settings");
+      if (settingsBuildingSelectEl instanceof HTMLSelectElement) {
+        settingsBuildingSelectEl.value = buildingId;
+      }
+      renderSettingsPanel();
+    } catch (error) {
+      handleLandlordError(error, "Failed to clear building cache.");
+    } finally {
+      renderSettingsPanel();
+    }
+  })();
+}
+
 function setPreferredBuildingSelection(buildingId, options = {}) {
   const normalizedBuildingId = String(buildingId ?? "").trim();
   if (!normalizedBuildingId) {
@@ -6056,6 +6581,7 @@ function setPreferredBuildingSelection(buildingId, options = {}) {
   state.selectedWifiPackageBuildingId = normalizedBuildingId;
   state.selectedRentPaymentBuildingId = normalizedBuildingId;
   state.selectedRentSheetBuildingId = normalizedBuildingId;
+  state.selectedMessageBuildingId = normalizedBuildingId;
   if (options.includeResidents !== false) {
     state.selectedResidentsBuildingId = normalizedBuildingId;
   }
@@ -6093,6 +6619,9 @@ function setPreferredBuildingSelection(buildingId, options = {}) {
   if (landlordGlobalSearchBuildingEl instanceof HTMLSelectElement) {
     landlordGlobalSearchBuildingEl.value = normalizedBuildingId;
   }
+  if (settingsBuildingSelectEl instanceof HTMLSelectElement) {
+    settingsBuildingSelectEl.value = normalizedBuildingId;
+  }
   if (
     options.includeResidents !== false &&
     residentsBuildingSelectEl instanceof HTMLSelectElement
@@ -6103,7 +6632,89 @@ function setPreferredBuildingSelection(buildingId, options = {}) {
   syncBuildingPhotoPreview();
   renderLandlordFocusPanel();
   renderBuildings(state.buildings);
+  renderRentStatus(state.rentStatus);
+  renderOverviewCollections(state.rentStatus);
+  renderResidentDirectory(state.residentDirectory);
+  renderMetrics();
+  renderMessageCenterBuildingOptions();
+  renderMessageCenter();
+  renderDailyDashboard();
   updateLandlordBranding();
+}
+
+function getSelectedSettingsBuildingId() {
+  return String(
+    settingsBuildingSelectEl?.value || state.selectedRegistryBuildingId || ""
+  ).trim();
+}
+
+function renderSettingsPanel() {
+  if (!(settingsSummaryEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const buildingId = getSelectedSettingsBuildingId();
+  const building = state.buildings.find((item) => item.id === buildingId) ?? null;
+  const hasBuildings = Array.isArray(state.buildings) && state.buildings.length > 0;
+  const actionsDisabled = isCaretakerRole() || !building;
+
+  if (!hasBuildings) {
+    settingsSummaryEl.textContent =
+      "No buildings are available yet. Add a building before using workspace settings.";
+  } else if (isCaretakerRole()) {
+    settingsSummaryEl.textContent =
+      "House manager accounts can view this page but cannot run cache-clearing or destructive building actions.";
+  } else {
+    settingsSummaryEl.textContent = `Settings are focused on ${
+      building?.name || getBuildingDisplayNameById(buildingId, "the selected building")
+    }. Clear cache refreshes workspace state only. Delete data permanently removes the whole building.`;
+  }
+
+  if (settingsClearCacheBtnEl instanceof HTMLButtonElement) {
+    settingsClearCacheBtnEl.disabled = actionsDisabled;
+  }
+
+  if (settingsClearDataBtnEl instanceof HTMLButtonElement) {
+    settingsClearDataBtnEl.disabled = actionsDisabled;
+  }
+}
+
+function syncSettingsBuildingOptions() {
+  if (!(settingsBuildingSelectEl instanceof HTMLSelectElement)) {
+    return;
+  }
+
+  settingsBuildingSelectEl.replaceChildren();
+
+  if (!Array.isArray(state.buildings) || state.buildings.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No buildings available";
+    settingsBuildingSelectEl.append(option);
+    settingsBuildingSelectEl.disabled = true;
+    renderSettingsPanel();
+    return;
+  }
+
+  const selected =
+    state.selectedRegistryBuildingId &&
+    state.buildings.some((item) => item.id === state.selectedRegistryBuildingId)
+      ? state.selectedRegistryBuildingId
+      : state.buildings[0].id;
+
+  settingsBuildingSelectEl.disabled = false;
+  state.buildings.forEach((building) => {
+    const option = document.createElement("option");
+    option.value = building.id;
+    option.textContent = getBuildingDisplayName(building);
+    if (building.id === selected) {
+      option.selected = true;
+    }
+    settingsBuildingSelectEl.append(option);
+  });
+
+  settingsBuildingSelectEl.value = selected;
+  renderSettingsPanel();
 }
 
 function renderRoomBuildingOptions() {
@@ -6276,6 +6887,12 @@ function rentDefaultPlaceholder(value, formatter) {
   return `Default: ${formatter(value)}`;
 }
 
+function setRentSheetStatus(message) {
+  if (rentSheetStatusEl instanceof HTMLElement) {
+    rentSheetStatusEl.textContent = message;
+  }
+}
+
 function formatRentDueDay(value) {
   const day = toOptionalNumber(value);
   return day == null ? "" : `Day ${day}`;
@@ -6293,13 +6910,18 @@ function formatRentGraceDays(value) {
 function setRentSheetDefaultInputs(data) {
   state.rentSheetDefaults = {
     monthlyRentKsh: data?.buildingDefaultMonthlyRentKsh ?? null,
+    depositKsh: data?.buildingDefaultDepositKsh ?? null,
     dueDay: data?.buildingDefaultDueDay ?? null,
-    graceDays: data?.buildingDefaultGraceDays ?? 0
+    graceDays: data?.buildingDefaultGraceDays ?? 0,
+    chargeStartDate: String(data?.chargeStartDate ?? "")
   };
   if (rentSheetDefaultMonthlyRentEl instanceof HTMLInputElement) {
     rentSheetDefaultMonthlyRentEl.value = optionalInputValue(
       data?.buildingDefaultMonthlyRentKsh
     );
+  }
+  if (rentSheetDefaultDepositEl instanceof HTMLInputElement) {
+    rentSheetDefaultDepositEl.value = optionalInputValue(data?.buildingDefaultDepositKsh);
   }
   if (rentSheetDefaultDueDayEl instanceof HTMLInputElement) {
     rentSheetDefaultDueDayEl.value = optionalInputValue(data?.buildingDefaultDueDay);
@@ -6309,6 +6931,12 @@ function setRentSheetDefaultInputs(data) {
       data?.buildingDefaultGraceDays ?? 0
     );
   }
+  if (rentSheetChargeStartDateEl instanceof HTMLInputElement) {
+    rentSheetChargeStartDateEl.value = String(data?.chargeStartDate ?? "");
+  }
+  setRentSheetStatus(
+    "Current month paid cannot exceed the resolved monthly rent. Due day controls the monthly due date."
+  );
 }
 
 function renderRentSheetRows(rows) {
@@ -6319,7 +6947,7 @@ function renderRentSheetRows(rows) {
   rentSheetBodyEl.replaceChildren();
   if (!Array.isArray(rows) || rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="11">No rooms found for this building.</td>';
+    row.innerHTML = '<td colspan="13">No rooms found for this building.</td>';
     rentSheetBodyEl.append(row);
     return;
   }
@@ -6337,10 +6965,18 @@ function renderRentSheetRows(rows) {
     );
     const arrearsKsh = Math.max(0, Math.round(Number(item.arrearsKsh ?? 0)));
     const roomDefaultMonthlyRentKsh = optionalInputValue(item.roomDefaultMonthlyRentKsh);
+    const depositKsh =
+      Math.max(0, Math.round(Number(item.depositKsh ?? 0))) > 0
+        ? optionalInputValue(item.depositKsh)
+        : "";
     const roomDefaultDueDay = optionalInputValue(item.roomDefaultDueDay);
     const roomDefaultGraceDays = optionalInputValue(item.roomDefaultGraceDays);
     const rentPlaceholder = rentDefaultPlaceholder(
       state.rentSheetDefaults.monthlyRentKsh,
+      formatCurrency
+    );
+    const depositPlaceholder = rentDefaultPlaceholder(
+      state.rentSheetDefaults.depositKsh,
       formatCurrency
     );
     const dueDayPlaceholder = rentDefaultPlaceholder(
@@ -6364,6 +7000,8 @@ function renderRentSheetRows(rows) {
     const row = document.createElement("tr");
     row.dataset.houseNumber = houseNumber;
     row.dataset.hasActiveResident = item.hasActiveResident ? "true" : "false";
+    row.dataset.resolvedMonthlyRentKsh = String(resolvedMonthlyRentKsh);
+    row.dataset.originalCurrentMonthPaidKsh = String(currentMonthPaidKsh);
     row.innerHTML = `
       <td><strong>${escapeHtml(houseNumber)}</strong></td>
       <td>
@@ -6384,6 +7022,17 @@ function renderRentSheetRows(rows) {
           step="1"
           value="${escapeHtml(roomDefaultMonthlyRentKsh)}"
           placeholder="${escapeHtml(rentPlaceholder)}"
+        />
+      </td>
+      <td>
+        <input
+          class="registry-table-input utility-sheet-input"
+          data-field="depositKsh"
+          type="number"
+          min="0"
+          step="1"
+          value="${escapeHtml(depositKsh)}"
+          placeholder="${escapeHtml(depositPlaceholder)}"
         />
       </td>
       <td>
@@ -6411,10 +7060,25 @@ function renderRentSheetRows(rows) {
         />
       </td>
       <td>
-        <input data-field="active" type="checkbox" ${roomDefaultActive ? "checked" : ""} />
+        <input
+          data-field="active"
+          type="checkbox"
+          title="Charge rent for this room when occupied"
+          ${roomDefaultActive ? "checked" : ""}
+        />
       </td>
       <td>${formatCurrency(balanceKsh)}</td>
-      <td>${formatCurrency(currentMonthPaidKsh)}</td>
+      <td>
+        <input
+          class="registry-table-input utility-sheet-input"
+          data-field="currentMonthPaidKsh"
+          type="number"
+          min="0"
+          step="1"
+          value="${currentMonthPaidKsh > 0 ? escapeHtml(currentMonthPaidKsh) : ""}"
+          placeholder="${escapeHtml(formatCurrency(currentMonthPaidKsh))}"
+        />
+      </td>
       <td>${formatCurrency(arrearsKsh)}</td>
     `;
     rentSheetBodyEl.append(row);
@@ -6426,6 +7090,10 @@ function buildRentSheetPayload() {
     rentSheetDefaultMonthlyRentEl instanceof HTMLInputElement
       ? toOptionalNumber(rentSheetDefaultMonthlyRentEl.value)
       : null;
+  const buildingDefaultDepositKsh =
+    rentSheetDefaultDepositEl instanceof HTMLInputElement
+      ? toOptionalNumber(rentSheetDefaultDepositEl.value)
+      : null;
   const buildingDefaultDueDay =
     rentSheetDefaultDueDayEl instanceof HTMLInputElement
       ? toOptionalNumber(rentSheetDefaultDueDayEl.value)
@@ -6434,9 +7102,16 @@ function buildRentSheetPayload() {
     rentSheetDefaultGraceDaysEl instanceof HTMLInputElement
       ? toOptionalNumber(rentSheetDefaultGraceDaysEl.value)
       : 0;
+  const chargeStartDate =
+    rentSheetChargeStartDateEl instanceof HTMLInputElement
+      ? String(rentSheetChargeStartDateEl.value || "").trim()
+      : "";
 
   if (buildingDefaultMonthlyRentKsh != null && buildingDefaultMonthlyRentKsh < 0) {
     throw new Error("Building Default rent cannot be negative.");
+  }
+  if (buildingDefaultDepositKsh != null && buildingDefaultDepositKsh < 0) {
+    throw new Error("Default deposit cannot be negative.");
   }
   if (
     buildingDefaultDueDay != null &&
@@ -6456,9 +7131,13 @@ function buildRentSheetPayload() {
   trList.forEach((tr) => {
     const houseNumber = normalizeHouse(tr.dataset.houseNumber);
     const rentInput = tr.querySelector('input[data-field="monthlyRentKsh"]');
+    const depositInput = tr.querySelector('input[data-field="depositKsh"]');
     const dueDayInput = tr.querySelector('input[data-field="paymentDueDay"]');
     const graceDaysInput = tr.querySelector('input[data-field="graceDays"]');
     const activeInput = tr.querySelector('input[data-field="active"]');
+    const currentMonthPaidInput = tr.querySelector(
+      'input[data-field="currentMonthPaidKsh"]'
+    );
     if (!(rentInput instanceof HTMLInputElement)) {
       return;
     }
@@ -6466,6 +7145,12 @@ function buildRentSheetPayload() {
     const monthlyRentKsh = toOptionalNumber(rentInput.value);
     if (monthlyRentKsh != null && monthlyRentKsh < 0) {
       throw new Error(`Room Default rent for ${houseNumber} cannot be negative.`);
+    }
+
+    const depositKsh =
+      depositInput instanceof HTMLInputElement ? toOptionalNumber(depositInput.value) : null;
+    if (depositKsh != null && depositKsh < 0) {
+      throw new Error(`Deposit for ${houseNumber} cannot be negative.`);
     }
 
     const paymentDueDay =
@@ -6482,9 +7167,44 @@ function buildRentSheetPayload() {
       throw new Error(`Grace days for ${houseNumber} must be from 0 to 31.`);
     }
 
+    const currentMonthPaidKsh =
+      currentMonthPaidInput instanceof HTMLInputElement
+        ? toOptionalNumber(currentMonthPaidInput.value)
+        : null;
+    if (currentMonthPaidKsh != null && currentMonthPaidKsh < 0) {
+      throw new Error(`Paid this month for ${houseNumber} cannot be negative.`);
+    }
+    const originalCurrentMonthPaidKsh = Math.max(
+      0,
+      Math.round(Number(tr.dataset.originalCurrentMonthPaidKsh ?? 0))
+    );
+    const resolvedMonthlyRentKsh = Math.max(
+      0,
+      Math.round(
+        Number(
+          monthlyRentKsh ??
+            buildingDefaultMonthlyRentKsh ??
+            tr.dataset.resolvedMonthlyRentKsh ??
+            0
+        )
+      )
+    );
+    const paidChanged =
+      currentMonthPaidKsh != null &&
+      Math.round(currentMonthPaidKsh) !== originalCurrentMonthPaidKsh;
+    if (paidChanged && Math.round(currentMonthPaidKsh) > resolvedMonthlyRentKsh) {
+      throw new Error(
+        `Paid this month for ${houseNumber} cannot be more than ${formatCurrency(
+          resolvedMonthlyRentKsh
+        )}.`
+      );
+    }
+
     rows.push({
       houseNumber,
       monthlyRentKsh: monthlyRentKsh == null ? null : Math.round(monthlyRentKsh),
+      depositKsh: depositKsh == null ? null : Math.round(depositKsh),
+      currentMonthPaidKsh: paidChanged ? Math.round(currentMonthPaidKsh) : null,
       paymentDueDay: paymentDueDay == null ? null : Math.round(paymentDueDay),
       graceDays: graceDays == null ? null : Math.round(graceDays),
       active: activeInput instanceof HTMLInputElement ? activeInput.checked : true
@@ -6494,10 +7214,13 @@ function buildRentSheetPayload() {
   return {
     buildingDefaultMonthlyRentKsh:
       buildingDefaultMonthlyRentKsh == null ? null : Math.round(buildingDefaultMonthlyRentKsh),
+    buildingDefaultDepositKsh:
+      buildingDefaultDepositKsh == null ? null : Math.round(buildingDefaultDepositKsh),
     buildingDefaultDueDay:
       buildingDefaultDueDay == null ? null : Math.round(buildingDefaultDueDay),
     buildingDefaultGraceDays:
       buildingDefaultGraceDays == null ? 0 : Math.round(buildingDefaultGraceDays),
+    chargeStartDate: chargeStartDate || null,
     note: String(rentSheetNoteEl?.value ?? "").trim() || undefined,
     rows
   };
@@ -6529,6 +7252,15 @@ function showRentSheetModal() {
 function closeRentSheetModal() {
   rentSheetBackdropEl?.classList.add("hidden");
   rentSheetModalEl?.classList.add("hidden");
+}
+
+function focusTenantsSection(buildingId) {
+  if (buildingId) {
+    setPreferredBuildingSelection(buildingId);
+  }
+
+  setActiveLandlordView("tenants");
+  scrollToLandlordSection("residents-section");
 }
 
 async function openRentSheetModal() {
@@ -6606,6 +7338,7 @@ function renderRegistryBuildingOptions() {
   syncUtilitySheetBuildingOptions();
   syncCaretakerBuildingOptions();
   syncLandlordTicketBuildingOptions();
+  syncDirectTenantBuildingOptions();
 }
 
 function renderResidentsBuildingOptions() {
@@ -6624,6 +7357,7 @@ function renderResidentsBuildingOptions() {
     option.textContent = "No buildings";
     residentsBuildingSelectEl.append(option);
     syncOverviewLookupBuildingOptions();
+    syncDirectTenantBuildingOptions();
     renderResidentDirectory([]);
     return;
   }
@@ -6655,6 +7389,7 @@ function renderResidentsBuildingOptions() {
   });
 
   syncOverviewLookupBuildingOptions();
+  syncDirectTenantBuildingOptions();
 }
 
 function syncOverviewLookupBuildingOptions() {
@@ -6758,15 +7493,15 @@ function renderOwnerStaff() {
   const activeCount = Array.isArray(state.ownerStaff) ? state.ownerStaff.length : 0;
   const limit = Number(state.ownerStaffLimit || 3);
   const remaining = Math.max(0, Number(state.ownerStaffRemaining || 0));
-  const caretaker = isCaretakerRole();
+  const ownerAccess = isOwnerAccessRole();
 
   if (ownerStaffSummaryEl instanceof HTMLElement) {
     const slotText = remaining === 1 ? "slot" : "slots";
-    ownerStaffSummaryEl.textContent = `${activeCount} of ${limit} owner/staff accounts active. ${remaining} ${slotText} available.`;
+    ownerStaffSummaryEl.textContent = `${activeCount} of ${limit} staff accounts active. ${remaining} ${slotText} available.`;
   }
 
   if (ownerStaffSubmitBtnEl instanceof HTMLButtonElement) {
-    ownerStaffSubmitBtnEl.disabled = caretaker || remaining <= 0;
+    ownerStaffSubmitBtnEl.disabled = !ownerAccess || remaining <= 0;
   }
 
   if (!(ownerStaffBodyEl instanceof HTMLElement)) {
@@ -6776,7 +7511,7 @@ function renderOwnerStaff() {
   ownerStaffBodyEl.replaceChildren();
   if (!Array.isArray(state.ownerStaff) || state.ownerStaff.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="6">No owner/staff accounts found.</td>';
+    row.innerHTML = '<td colspan="6">No staff accounts found.</td>';
     ownerStaffBodyEl.append(row);
     return;
   }
@@ -6792,7 +7527,7 @@ function renderOwnerStaff() {
       <td>${formatDateTime(item.createdAt)}</td>
       <td>
         ${
-          caretaker
+          !ownerAccess
             ? "-"
             : `<button type="button" class="btn-danger" data-action="disable-owner-staff" data-user-id="${escapeHtml(item.id)}">Disable</button>`
         }
@@ -6929,6 +7664,7 @@ function renderLandlordTickets(tickets) {
     const row = document.createElement("tr");
     row.innerHTML = '<td colspan="7">No resident issues found.</td>';
     landlordTicketsBodyEl.append(row);
+    renderDailyDashboard();
     return;
   }
 
@@ -6952,10 +7688,11 @@ function renderLandlordTickets(tickets) {
       <td>${escapeHtml(slaText)}</td>
       <td>${formatDateTime(ticket.createdAt)}</td>
       <td>
-        <div class="inline-fields compact-fields" style="grid-template-columns: 1fr 1fr;">
+        <div class="landlord-ticket-response">
+          <span class="landlord-ticket-response-label">Resident update</span>
           <select data-action="status">${createLandlordTicketStatusOptions(ticket.status)}</select>
-          <input data-action="note" type="text" maxlength="500" placeholder="Reply note (optional)" />
-          <button data-action="save" type="button">Reply</button>
+          <textarea data-action="note" rows="3" maxlength="500" placeholder="What did you send or tell the resident?">${escapeHtml(replyText || "")}</textarea>
+          <button data-action="save" type="button">Save Update</button>
         </div>
       </td>
     `;
@@ -6972,11 +7709,11 @@ function renderLandlordTickets(tickets) {
     }
 
     const statusSelect = row.querySelector('select[data-action="status"]');
-    const noteInput = row.querySelector('input[data-action="note"]');
+    const noteInput = row.querySelector('textarea[data-action="note"]');
     const saveButton = row.querySelector('button[data-action="save"]');
     if (
       !(statusSelect instanceof HTMLSelectElement) ||
-      !(noteInput instanceof HTMLInputElement) ||
+      !(noteInput instanceof HTMLTextAreaElement) ||
       !(saveButton instanceof HTMLButtonElement)
     ) {
       landlordTicketsBodyEl.append(row);
@@ -7018,6 +7755,7 @@ function renderLandlordTickets(tickets) {
 
     landlordTicketsBodyEl.append(row);
   });
+  renderDailyDashboard();
 }
 
 function renderExpenditures(rows) {
@@ -7825,6 +8563,7 @@ function renderApplications(rows) {
     const row = document.createElement("tr");
     row.innerHTML = '<td colspan="10">No tenant applications found.</td>';
     applicationsBodyEl.append(row);
+    renderDailyDashboard();
     return;
   }
 
@@ -7860,19 +8599,21 @@ function renderApplications(rows) {
     `;
     applicationsBodyEl.append(row);
   });
+  renderDailyDashboard();
 }
 
 function renderRentStatus(rows) {
   rentStatusBodyEl.replaceChildren();
 
-  if (!Array.isArray(rows) || rows.length === 0) {
+  const visibleRows = getRowsForFocusedBuilding(rows);
+  if (visibleRows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="11">No rent status data available.</td>';
+    row.innerHTML = '<td colspan="11">No rent status data for the current building.</td>';
     rentStatusBodyEl.append(row);
     return;
   }
 
-  rows.forEach((item) => {
+  visibleRows.forEach((item) => {
     const row = document.createElement("tr");
     const buildingLabel = getBuildingDisplayNameById(item.buildingId, "-");
     const currentDueKsh = Number(item.currentMonthOutstandingKsh ?? item.balanceKsh ?? 0);
@@ -7881,10 +8622,12 @@ function renderRentStatus(rows) {
     const quickPaymentAmountKsh = Math.max(0, totalOutstandingKsh || currentDueKsh);
     const billingMonth = monthKeyFromValue(item.dueDate) || currentBillingMonth();
     const canRecordPayment = quickPaymentAmountKsh > 0;
+    const rentVisualState = getRentCollectionVisualState(item);
+    row.className = tableRowToneClass(rentVisualState.toneClass);
     row.innerHTML = `
       <td>${escapeHtml(buildingLabel)}</td>
       <td>${item.houseNumber}</td>
-      <td>${item.paymentStatus}</td>
+      <td>${renderTableStatusPill(rentVisualState.label, rentVisualState.toneClass)}</td>
       <td>${formatCurrency(item.monthlyRentKsh)}</td>
       <td>${formatCurrency(item.currentMonthPaidKsh ?? item.paidAmountKsh ?? 0)}</td>
       <td>${formatCurrency(latePenaltyKsh)}</td>
@@ -7920,38 +8663,55 @@ function renderOverviewCollections(rows) {
 
   overviewCollectionsBodyEl.replaceChildren();
 
-  if (!Array.isArray(rows) || rows.length === 0) {
+  const visibleRows = getRowsForFocusedBuilding(rows);
+  if (visibleRows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="10">No rent collection records found yet.</td>';
+    row.innerHTML = '<td colspan="10">No rent collection records for the current building.</td>';
     overviewCollectionsBodyEl.append(row);
     return;
   }
 
-  const rankedRows = [...rows].sort((a, b) => {
-    const balanceDelta = Number(b.balanceKsh ?? 0) - Number(a.balanceKsh ?? 0);
-    if (balanceDelta !== 0) {
-      return balanceDelta;
-    }
-
-    return String(a.houseNumber ?? "").localeCompare(String(b.houseNumber ?? ""));
-  });
+  const rankedRows = [...visibleRows].sort(compareStableRoomOrder);
 
   rankedRows.forEach((item) => {
     const row = document.createElement("tr");
     const buildingLabel = getBuildingDisplayNameById(item.buildingId, "-");
+    const resident = findResidentDirectoryEntry(item.buildingId, item.houseNumber);
+    const utilitySummary = resident ? getResidentUtilityRoomSummary(resident) : null;
+    const monthlyRentKsh = resident
+      ? getResidentMonthlyRentKsh(resident)
+      : Number(item.monthlyRentKsh ?? 0);
+    const paidThisMonthKsh = resident
+      ? getResidentCurrentMonthRentPaidKsh(resident)
+      : Number(item.currentMonthPaidKsh ?? item.paidAmountKsh ?? 0);
+    const latePenaltyKsh = resident
+      ? getResidentCurrentLatePenaltyKsh(resident)
+      : Math.max(0, Number(item.currentMonthLatePenaltyKsh ?? 0));
+    const dueThisMonthKsh = resident
+      ? getResidentOperationalCurrentDueKsh(resident, utilitySummary)
+      : Number(item.currentMonthOutstandingKsh ?? item.balanceKsh ?? 0);
+    const totalOutstandingKsh = resident
+      ? getResidentOperationalOutstandingKsh(resident, utilitySummary)
+      : Number(item.balanceKsh ?? dueThisMonthKsh ?? 0);
+    const rentVisualState = resident
+      ? {
+          label: getResidentBillingStatusLabel(resident),
+          toneClass: getResidentBillingToneClass(resident, utilitySummary)
+        }
+      : getRentCollectionVisualState(item);
     const latestPayment = Number(item.latestPaymentAmountKsh ?? 0) > 0
       ? `${formatCurrency(item.latestPaymentAmountKsh)} • ${formatDateTime(item.latestPaymentAt)}`
       : "-";
-    const latePenaltyKsh = Math.max(0, Number(item.currentMonthLatePenaltyKsh ?? 0));
+    row.className = tableRowToneClass(rentVisualState.toneClass);
     row.innerHTML = `
       <td>${escapeHtml(buildingLabel)}</td>
       <td>${escapeHtml(item.houseNumber)}</td>
-      <td>${escapeHtml(item.paymentStatus ?? "-")}</td>
-      <td>${escapeHtml(formatCurrency(item.monthlyRentKsh))}</td>
-      <td>${escapeHtml(formatCurrency(item.currentMonthPaidKsh ?? item.paidAmountKsh ?? 0))}</td>
+      <td>${renderTableStatusPill(rentVisualState.label, rentVisualState.toneClass)}</td>
+      <td>${escapeHtml(formatCurrency(monthlyRentKsh))}</td>
+      <td>${escapeHtml(formatCurrency(paidThisMonthKsh))}</td>
       <td>${escapeHtml(formatCurrency(latePenaltyKsh))}</td>
-      <td>${escapeHtml(formatCurrency(item.currentMonthOutstandingKsh ?? item.balanceKsh))}</td>
-      <td>${escapeHtml(formatCurrency(item.balanceKsh))}</td>
+      <td>${escapeHtml(formatCurrency(dueThisMonthKsh))}</td>
+      <td>${escapeHtml(formatCurrency(totalOutstandingKsh))}</td>
       <td>${escapeHtml(latestPayment)}</td>
       <td>${escapeHtml(item.latestPaymentReference ?? "-")}</td>
     `;
@@ -8012,6 +8772,14 @@ function renderRoomLedgerActions(resident, totalBalanceKsh) {
       buildingId
     )}" data-house-number="${escapeHtml(houseNumber)}">Manage</button>`
   ];
+
+  if (!hasResident && !isCaretakerRole()) {
+    buttons.push(
+      `<button type="button" data-action="open-direct-tenant-drawer" data-building-id="${escapeHtml(
+        buildingId
+      )}" data-house-number="${escapeHtml(houseNumber)}">Add Tenant</button>`
+    );
+  }
 
   if (hasResident && residentUserId) {
     buttons.push(
@@ -8141,6 +8909,7 @@ function renderRoomLedger(rows) {
     const billingStatus = hasResident
       ? getResidentBillingStatusLabel(resident)
       : formatRoomLedgerSettlement(latestSettlement) || "Vacant";
+    const billingToneClass = getResidentBillingToneClass(resident, utilitySummary);
     const rentCurrentDueKsh = getResidentCurrentRentDueKsh(resident);
     const rentArrearsKsh = getResidentRentArrearsKsh(resident);
     const rentBalanceKsh = Math.max(
@@ -8171,7 +8940,9 @@ function renderRoomLedger(rows) {
         ? formatDateTime(nextDueDate)
         : "-";
 
-    row.className = "account-drilldown-row room-ledger-row";
+    row.className = ["account-drilldown-row", "room-ledger-row", tableRowToneClass(billingToneClass)]
+      .filter(Boolean)
+      .join(" ");
     row.dataset.action = "open-room-account-row";
     row.dataset.buildingId = String(resident.buildingId ?? "");
     row.dataset.houseNumber = houseNumber;
@@ -8187,7 +8958,9 @@ function renderRoomLedger(rows) {
       </td>
       <td>
         <span class="room-ledger-status ${occupancyClass}">${escapeHtml(occupancy)}</span>
-        <small>${escapeHtml(billingStatus)}</small>
+        <span class="table-status-pill room-ledger-billing-note ${billingToneClass}">${escapeHtml(
+          billingStatus
+        )}</span>
       </td>
       <td>
         <strong>${escapeHtml(formatCurrency(rentBalanceKsh))}</strong>
@@ -8249,6 +9022,7 @@ function renderResidentDirectory(rows) {
       resident.hasActiveResident || resident.residentUserId || resident.residentName;
     const utilitySummary = getResidentUtilityRoomSummary(resident);
     const billingStatus = hasResident ? getResidentBillingStatusLabel(resident) : "-";
+    const billingToneClass = getResidentBillingToneClass(resident, utilitySummary);
     const latePenalty = hasResident
       ? formatCurrency(getResidentCurrentLatePenaltyKsh(resident))
       : "-";
@@ -8273,6 +9047,28 @@ function renderResidentDirectory(rows) {
       ? summarizeResidentOccupation(resident)
       : { title: "-", details: "" };
     const emergencySummary = hasResident ? summarizeEmergencyContact(resident) : "-";
+    const rowActions = [
+      `<button
+        type="button"
+        data-action="open-room-account"
+        data-building-id="${escapeHtml(resident.buildingId)}"
+        data-house-number="${escapeHtml(resident.houseNumber)}"
+      >
+        Manage
+      </button>`
+    ];
+    if (!hasResident && !isCaretakerRole()) {
+      rowActions.push(
+        `<button
+          type="button"
+          data-action="open-direct-tenant-drawer"
+          data-building-id="${escapeHtml(resident.buildingId)}"
+          data-house-number="${escapeHtml(resident.houseNumber)}"
+        >
+          Add Tenant
+        </button>`
+      );
+    }
     row.innerHTML = `
       ${buildingCell}
       <td>${escapeHtml(resident.houseNumber)}</td>
@@ -8286,20 +9082,13 @@ function renderResidentDirectory(rows) {
           : ""
       }</td>
       <td>${escapeHtml(emergencySummary)}</td>
-      <td>${escapeHtml(billingStatus)}</td>
+      <td>${renderTableStatusPill(billingStatus, billingToneClass)}</td>
       <td>${escapeHtml(latePenalty)}</td>
       <td>${escapeHtml(outstandingBalance)}</td>
       <td>${escapeHtml(dueDate)}</td>
       <td>
         <div class="resident-row-actions">
-          <button
-            type="button"
-            data-action="open-room-account"
-            data-building-id="${escapeHtml(resident.buildingId)}"
-            data-house-number="${escapeHtml(resident.houseNumber)}"
-          >
-            Manage
-          </button>
+          ${rowActions.join("")}
         </div>
       </td>
     `;
@@ -9775,6 +10564,8 @@ function renderUtilityBills(rows) {
   visibleRows.forEach((item) => {
     const row = document.createElement("tr");
     const displayStatus = getUtilityDisplayStatus(item);
+    const toneClass = utilityStatusToneClass(displayStatus);
+    row.className = tableRowToneClass(toneClass);
     row.innerHTML = `
       <td>${item.utilityType}</td>
       <td>${item.houseNumber}</td>
@@ -9831,7 +10622,9 @@ function renderUtilityRoomSummary(rows) {
         state.selectedRegistryBuildingId ||
         "";
       const row = document.createElement("tr");
-      row.className = "account-drilldown-row";
+      row.className = ["account-drilldown-row", tableRowToneClass(utilityStatusToneClass(item.status))]
+        .filter(Boolean)
+        .join(" ");
       row.dataset.action = "open-room-account-row";
       row.dataset.buildingId = accountBuildingId;
       row.dataset.houseNumber = item.houseNumber;
@@ -10013,6 +10806,7 @@ function renderMetrics() {
   metricPaymentsEl.textContent = formatCurrency(paidTotal);
   metricBalanceEl.textContent = formatCurrency(outstanding);
   renderLandlordFocusPanel();
+  renderDailyDashboard();
 }
 
 function createUtilityBillPayload() {
@@ -10205,6 +10999,7 @@ async function loadBuildings() {
   renderGlobalSearchBuildingOptions();
   renderRegistryBuildingOptions();
   renderResidentsBuildingOptions();
+  syncSettingsBuildingOptions();
   renderMessageCenterBuildingOptions();
   renderMetrics();
   updateLandlordBranding();
@@ -10221,6 +11016,7 @@ async function loadApplications() {
     updateApplicationsIndicator();
   }
   renderApplications(state.applications);
+  renderDailyDashboard();
 }
 
 async function refreshPendingApplicationsIndicator() {
@@ -10369,7 +11165,7 @@ async function loadCaretakers() {
 }
 
 async function loadOwnerStaff() {
-  if (isCaretakerRole()) {
+  if (!isOwnerAccessRole()) {
     setOwnerStaffData({ users: [], limit: state.ownerStaffLimit, remaining: 0 });
     renderOwnerStaff();
     return;
@@ -10422,6 +11218,7 @@ async function loadLandlordTickets() {
   const payload = await requestJson(`/api/landlord/tickets?${params.toString()}`);
   state.tickets = payload.data ?? [];
   renderLandlordTickets(state.tickets);
+  renderDailyDashboard();
 }
 
 async function loadRegistryRows() {
@@ -10591,6 +11388,7 @@ async function activateBuilding(buildingId, options = {}) {
     loadCaretakerAccessRequests(),
     loadCaretakers(),
     loadLandlordTickets(),
+    loadLandlordWifiPackages(),
     loadResidents()
   ]);
 }
@@ -10632,7 +11430,14 @@ function applyLandlordStartupData(startup) {
     selection.wifiPackageBuildingId || ""
   ).trim();
   state.selectedRentPaymentBuildingId = String(
-    selection.rentPaymentBuildingId || ""
+    (hasDeepLinkBuilding ? deepLinkBuildingId : selection.rentPaymentBuildingId) ||
+      state.selectedRegistryBuildingId ||
+      ""
+  ).trim();
+  state.selectedRentSheetBuildingId = String(
+    (hasDeepLinkBuilding ? deepLinkBuildingId : selection.rentSheetBuildingId) ||
+      state.selectedRegistryBuildingId ||
+      ""
   ).trim();
   state.selectedMessageBuildingId = String(
     selection.messageBuildingId || state.selectedRegistryBuildingId || state.buildings[0]?.id || ""
@@ -10724,6 +11529,7 @@ function applyLandlordStartupData(startup) {
   renderExpenditures(state.expenditures);
   renderMoveOutSettlementReport(state.moveOutSettlements);
   renderMetrics();
+  renderDailyDashboard();
   updateLandlordBranding();
 
   if (
@@ -10880,6 +11686,45 @@ metricCardButtons.forEach((button) => {
   });
 });
 
+dashboardActionButtons.forEach((button) => {
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  button.addEventListener("click", () => {
+    const action = String(button.dataset.dashboardAction || "").trim();
+    const focusedBuildingId = getFocusedBuildingId();
+
+    switch (action) {
+      case "rooms":
+        setActiveLandlordView("tenants");
+        scrollToLandlordSection("residents-section");
+        break;
+      case "record-rent":
+        setActiveLandlordView("tenants");
+        if (rentPaymentDetailsEl instanceof HTMLDetailsElement) {
+          rentPaymentDetailsEl.open = true;
+        }
+        scrollToLandlordSection("overview-rent-status-section");
+        break;
+      case "requests":
+        setActiveLandlordView("applications");
+        scrollToLandlordSection("applications-section");
+        break;
+      case "issues":
+        setActiveLandlordView("messages");
+        scrollToLandlordSection("overview-issues-section");
+        break;
+      case "add-tenant":
+        openDirectTenantDrawer({ buildingId: focusedBuildingId });
+        break;
+      default:
+        setActiveLandlordView("overview");
+        break;
+    }
+  });
+});
+
 openCreateBuildingDrawerButtons.forEach((button) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -10910,6 +11755,18 @@ residentDrawerBackdropEl?.addEventListener("click", () => {
   closeResidentDrawer();
 });
 
+openDirectTenantDrawerBtnEl?.addEventListener("click", () => {
+  openDirectTenantDrawer();
+});
+
+closeDirectTenantDrawerBtnEl?.addEventListener("click", () => {
+  closeDirectTenantDrawer();
+});
+
+directTenantDrawerBackdropEl?.addEventListener("click", () => {
+  closeDirectTenantDrawer();
+});
+
 openUtilitySetupBtnEl?.addEventListener("click", () => {
   void openUtilitySetupModal().catch((error) => {
     handleLandlordError(error, "Unable to open utility setup.");
@@ -10929,6 +11786,10 @@ openUtilitySheetBtnEl?.addEventListener("click", () => {
 });
 
 openRentSheetBtnEl?.addEventListener("click", () => {
+  void openRentSheetModal();
+});
+
+residentsOpenRentSheetBtnEl?.addEventListener("click", () => {
   void openRentSheetModal();
 });
 
@@ -10966,6 +11827,7 @@ document.addEventListener("keydown", (event) => {
     closeUtilitySheetModal();
     closeRentSheetModal();
     closeResidentDrawer();
+    closeDirectTenantDrawer();
   }
 });
 
@@ -10996,12 +11858,128 @@ roomTargetBuildingEl?.addEventListener("change", () => {
   updateLandlordBranding();
 });
 
-ownerStaffFormEl?.addEventListener("submit", (event) => {
+directTenantFormEl?.addEventListener("submit", (event) => {
   event.preventDefault();
   clearError();
 
   if (isCaretakerRole()) {
-    showError("House manager accounts cannot manage owner/staff access.");
+    showError("House manager accounts cannot add tenants directly.");
+    return;
+  }
+
+  const buildingId = String(directTenantBuildingEl?.value || "").trim();
+  const houseNumber = normalizeHouse(directTenantHouseEl?.value || "");
+  const fullName = String(directTenantNameEl?.value || "").trim();
+  const phoneNumber = String(directTenantPhoneEl?.value || "").trim();
+  const identityType = String(directTenantIdTypeEl?.value || "national_id").trim();
+  const identityNumber = String(directTenantIdNumberEl?.value || "").trim();
+  const note = String(directTenantNoteEl?.value || "").trim() || undefined;
+
+  if (!buildingId || !houseNumber || !fullName || !phoneNumber || !identityNumber) {
+    showError("Tenant onboarding requires building, room, name, phone, and ID number.");
+    return;
+  }
+
+  const defaultBillingStartDate = "2026-07-16";
+  const buildingLabel = getBuildingDisplayNameById(buildingId, "selected building");
+  const billingStartInput = window.prompt(
+    `Billing start date for ${buildingLabel} ${houseNumber} (YYYY-MM-DD). Billing stays paused until this date if it falls in a future month.`,
+    defaultBillingStartDate
+  );
+  if (billingStartInput == null) {
+    return;
+  }
+
+  const billingStartDate = String(billingStartInput || "").trim();
+  const billingStartAt = new Date(`${billingStartDate}T00:00:00.000Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(billingStartDate) || Number.isNaN(billingStartAt.getTime())) {
+    showError("Enter the billing start date in YYYY-MM-DD format.");
+    return;
+  }
+
+  setDirectTenantSubmitting(true);
+  setDirectTenantStatus(`Adding tenant. Billing starts ${billingStartDate}...`);
+
+  void (async () => {
+    try {
+      const payload = await requestJson("/api/landlord/residents/direct", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          buildingId,
+          houseNumber,
+          fullName,
+          phoneNumber,
+          identityType,
+          identityNumber,
+          billingStartDate,
+          note
+        })
+      });
+
+      const data = payload.data ?? {};
+      const smsStatus = data.sms?.status;
+      const smsText =
+        smsStatus === "sent"
+          ? " SMS sent."
+          : smsStatus === "failed"
+            ? " SMS failed; share the sign-in details manually."
+            : " SMS is not configured; share the sign-in details manually.";
+      const buildingName =
+        data.building?.name || getBuildingDisplayNameById(buildingId, "selected building");
+      const residentName = data.tenant?.fullName || fullName;
+      const resolvedBillingStartDate = String(data.billingStartDate || billingStartDate || "").trim();
+      const billingPauseText = data.billingHold?.active
+        ? ` Billing is paused until ${resolvedBillingStartDate}.`
+        : ` Billing starts ${resolvedBillingStartDate}.`;
+
+      if (data.messageCenter) {
+        setMessageCenterData(data.messageCenter);
+        renderMessageCenter();
+      }
+
+      if (directTenantFormEl instanceof HTMLFormElement) {
+        directTenantFormEl.reset();
+      }
+      if (directTenantBuildingEl instanceof HTMLSelectElement) {
+        syncDirectTenantBuildingOptions(buildingId);
+        directTenantBuildingEl.value = buildingId;
+      }
+      if (directTenantIdTypeEl instanceof HTMLSelectElement) {
+        directTenantIdTypeEl.value = "national_id";
+      }
+
+      closeDirectTenantDrawer();
+      setStatus(
+        `${residentName} added to ${buildingName} ${data.houseNumber || houseNumber}. They can sign in with their phone number and ID number as the temporary password.${billingPauseText}${smsText}`
+      );
+      await Promise.all([
+        loadBuildings(),
+        loadApplications(),
+        loadRentStatus(),
+        loadRegistryRows(),
+        loadMessageCenter()
+      ]);
+      await loadResidents();
+    } catch (error) {
+      setDirectTenantStatus(
+        "Temporary password: ID number. Password change required at first sign-in."
+      );
+      handleLandlordError(error, "Failed to add tenant.");
+    } finally {
+      setDirectTenantSubmitting(false);
+    }
+  })();
+});
+
+ownerStaffFormEl?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  clearError();
+
+  if (!isOwnerAccessRole()) {
+    showError("Landlord access is required to manage staff accounts.");
     return;
   }
 
@@ -11011,7 +11989,7 @@ ownerStaffFormEl?.addEventListener("submit", (event) => {
   const temporaryPassword = String(ownerStaffPasswordEl?.value || "");
   const note = String(ownerStaffNoteEl?.value || "").trim() || undefined;
   if (!fullName || !email || !phoneNumber || !temporaryPassword) {
-    showError("Owner/staff access requires name, email, phone, and password.");
+    showError("Staff access requires name, email, phone, and password.");
     return;
   }
 
@@ -11053,9 +12031,9 @@ ownerStaffFormEl?.addEventListener("submit", (event) => {
 
       setOwnerStaffData(payload.data?.ownerStaff ?? payload.data);
       renderOwnerStaff();
-      setStatus("Owner/staff account added.");
+      setStatus("Staff account added.");
     } catch (error) {
-      handleLandlordError(error, "Failed to add owner/staff account.");
+      handleLandlordError(error, "Failed to add staff account.");
     } finally {
       renderOwnerStaff();
     }
@@ -11071,13 +12049,17 @@ ownerStaffBodyEl?.addEventListener("click", (event) => {
   if (!(button instanceof HTMLButtonElement)) {
     return;
   }
+  if (!isOwnerAccessRole()) {
+    showError("Landlord access is required to manage staff accounts.");
+    return;
+  }
 
   const userId = String(button.dataset.userId || "").trim();
   if (!userId) {
     return;
   }
 
-  const shouldProceed = window.confirm("Disable this owner/staff account?");
+  const shouldProceed = window.confirm("Disable this staff account?");
   if (!shouldProceed) {
     return;
   }
@@ -11103,9 +12085,9 @@ ownerStaffBodyEl?.addEventListener("click", (event) => {
 
       setOwnerStaffData(payload.data?.ownerStaff ?? payload.data);
       renderOwnerStaff();
-      setStatus("Owner/staff account disabled.");
+      setStatus("Staff account disabled.");
     } catch (error) {
-      handleLandlordError(error, "Failed to disable owner/staff account.");
+      handleLandlordError(error, "Failed to disable staff account.");
     } finally {
       button.disabled = false;
     }
@@ -11718,6 +12700,11 @@ createBuildingFormEl?.addEventListener("submit", (event) => {
   event.preventDefault();
   clearError();
 
+  if (!isOwnerAccessRole()) {
+    showError("Landlord access is required to create buildings.");
+    return;
+  }
+
   const name = String(createBuildingNameEl?.value ?? "").trim();
   const county = String(createBuildingCountyEl?.value ?? "").trim();
   const address = String(createBuildingAddressEl?.value ?? "").trim();
@@ -12270,6 +13257,11 @@ residentsBodyEl?.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "open-direct-tenant-drawer") {
+    openDirectTenantDrawer({ buildingId, houseNumber });
+    return;
+  }
+
   if (action !== "open-resident-drawer") {
     return;
   }
@@ -12318,6 +13310,11 @@ roomLedgerBodyEl?.addEventListener("click", (event) => {
 
     if (action === "open-room-account") {
       openRoomAccountPage(buildingId, houseNumber);
+      return;
+    }
+
+    if (action === "open-direct-tenant-drawer") {
+      openDirectTenantDrawer({ buildingId, houseNumber });
       return;
     }
 
@@ -13296,6 +14293,7 @@ rentSheetFormEl?.addEventListener("submit", (event) => {
   try {
     payload = buildRentSheetPayload();
   } catch (error) {
+    setRentSheetStatus(error instanceof Error ? error.message : "Invalid values in rent setup sheet.");
     handleLandlordError(error, "Invalid values in rent setup sheet.");
     return;
   }
@@ -13303,6 +14301,7 @@ rentSheetFormEl?.addEventListener("submit", (event) => {
   if (rentSheetSubmitBtnEl instanceof HTMLButtonElement) {
     rentSheetSubmitBtnEl.disabled = true;
   }
+  setRentSheetStatus("Saving rent setup...");
 
   void (async () => {
     try {
@@ -13317,6 +14316,7 @@ rentSheetFormEl?.addEventListener("submit", (event) => {
         }
       );
 
+      setPreferredBuildingSelection(buildingId);
       state.selectedRentSheetBuildingId = buildingId;
       state.rentSheetRows = Array.isArray(response?.data?.rows) ? response.data.rows : [];
       setRentSheetDefaultInputs(response?.data);
@@ -13325,8 +14325,11 @@ rentSheetFormEl?.addEventListener("submit", (event) => {
       setStatus(
         `Saved rent setup for ${getBuildingDisplayNameById(buildingId, buildingId)}.`
       );
+      setRentSheetStatus("Rent setup saved.");
       closeRentSheetModal();
+      focusTenantsSection(buildingId);
     } catch (error) {
+      setRentSheetStatus(error instanceof Error ? error.message : "Failed to save rent setup sheet.");
       handleLandlordError(error, "Failed to save rent setup sheet.");
     } finally {
       if (rentSheetSubmitBtnEl instanceof HTMLButtonElement) {
@@ -13491,7 +14494,7 @@ rentStatusBodyEl?.addEventListener("click", (event) => {
 
 refreshOwnerStaffBtnEl?.addEventListener("click", () => {
   void loadOwnerStaff().catch((error) => {
-    handleLandlordError(error, "Unable to refresh owner/staff access.");
+    handleLandlordError(error, "Unable to refresh staff access.");
   });
 });
 
@@ -13731,8 +14734,15 @@ refreshPaymentsBtnEl.addEventListener("click", () => {
 });
 
 refreshOverviewDashboardBtnEl?.addEventListener("click", () => {
-  void Promise.all([loadRentStatus(), loadBills()]).catch((error) => {
-    handleLandlordError(error, "Unable to refresh overview dashboard.");
+  void Promise.all([
+    loadRentStatus(),
+    loadResidents(),
+    loadBills(),
+    loadPayments(),
+    loadApplications(),
+    loadLandlordTickets()
+  ]).catch((error) => {
+    handleLandlordError(error, "Unable to refresh dashboard.");
   });
 });
 
@@ -13920,8 +14930,12 @@ messageRecipientScopeEl?.addEventListener("change", () => {
 
 messageBuildingSelectEl?.addEventListener("change", () => {
   state.selectedMessageBuildingId = String(messageBuildingSelectEl.value || "").trim();
-  void loadAutomaticMessageRules().catch((error) => {
-    handleLandlordError(error, "Unable to load automatic message rules.");
+  state.selectedTicketBuildingId = state.selectedMessageBuildingId;
+  if (landlordTicketBuildingSelectEl instanceof HTMLSelectElement) {
+    landlordTicketBuildingSelectEl.value = state.selectedMessageBuildingId;
+  }
+  void loadMessageCenter().catch((error) => {
+    handleLandlordError(error, "Unable to refresh messages.");
   });
 });
 
@@ -13975,6 +14989,7 @@ void (async () => {
     due.setHours(23, 59, 0, 0);
     utilitySheetDueDateEl.value = toDateTimeLocalInputValue(due);
   }
+  applyRoomsWorkspaceLayout();
   setActiveLandlordView(state.activeLandlordView);
   try {
     renderGeneratedHousePreview(buildGeneratedHouseNumbers());
@@ -13983,6 +14998,7 @@ void (async () => {
   }
   syncUtilityBillInputMode();
   await loadData();
+  applyRoomsWorkspaceLayout();
   try {
     await openRentSetupDeepLinkIfRequested();
   } catch (error) {
