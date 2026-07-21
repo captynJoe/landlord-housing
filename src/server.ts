@@ -209,6 +209,7 @@ const RECURRING_UTILITY_VISIBILITY_WINDOW_DAYS = 7;
 const RESIDENT_ID_GRACE_PERIOD_HOURS = 48;
 const RESIDENT_ID_GRACE_PERIOD_MS =
   RESIDENT_ID_GRACE_PERIOD_HOURS * 60 * 60 * 1000;
+const EMPTY_ROOM_ONBOARDING_BALANCE_TOLERANCE_KSH = 5;
 const HOUSING_DIAGNOSTIC_LOGS_ENABLED =
   process.env.HOUSING_DIAGNOSTIC_LOGS_ENABLED !== "false";
 const LOCAL_MEDIA_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
@@ -16992,20 +16993,66 @@ async function bootstrap() {
           });
         }
 
+        let negligibleEmptyRoomSummary: Awaited<
+          ReturnType<typeof buildEmptyRoomLossSettlementSummary>
+        > | null = null;
+
         if (!activeTenancy) {
           const emptyRoomSummary = await buildEmptyRoomLossSettlementSummary(
             building.id,
             normalizedHouseNumber
           );
-          if (emptyRoomSummary.totalOutstandingKsh > 0) {
+          const emptyRoomOutstandingKsh = Math.max(
+            0,
+            Math.round(Number(emptyRoomSummary.totalOutstandingKsh ?? 0))
+          );
+
+          if (emptyRoomOutstandingKsh > EMPTY_ROOM_ONBOARDING_BALANCE_TOLERANCE_KSH) {
             return res.status(409).json({
-              error: `House ${normalizedHouseNumber} still has KSh ${emptyRoomSummary.totalOutstandingKsh.toLocaleString("en-US")} in open balances. Clear the room balance before adding a new tenant.`
+              error: `House ${normalizedHouseNumber} still has KSh ${emptyRoomOutstandingKsh.toLocaleString("en-US")} in open balances. Clear the room balance before adding a new tenant.`
             });
+          }
+
+          if (emptyRoomOutstandingKsh > 0) {
+            negligibleEmptyRoomSummary = emptyRoomSummary;
           }
         }
 
         try {
           const actor = actorFromLandlordContext(context);
+          if (negligibleEmptyRoomSummary) {
+            const settlement = await settleRoomBalancesForResidentRemoval(
+              building.id,
+              normalizedHouseNumber,
+              "write_off",
+              `Auto-cleared KSh ${negligibleEmptyRoomSummary.totalOutstandingKsh.toLocaleString("en-US")} stale empty-room residue before onboarding.`
+            );
+            const settlementRecord = await recordResidentMoveOutSettlement({
+              summary: negligibleEmptyRoomSummary,
+              action: "write_off",
+              reason: "Auto-cleared negligible empty-room residue before onboarding",
+              actor,
+              settlement
+            });
+
+            await recordRoomAccountAuditEvent({
+              buildingId: building.id,
+              houseNumber: normalizedHouseNumber,
+              action: "room.balance.auto_writeoff",
+              summary: `KSh ${settlement.totalSettledKsh.toLocaleString("en-US")} in stale empty-room balances auto-cleared before adding a new resident.`,
+              actor,
+              metadata: {
+                settlementRecordId: settlementRecord?.id,
+                toleranceKsh: EMPTY_ROOM_ONBOARDING_BALANCE_TOLERANCE_KSH,
+                rentKsh: settlement.rentSettledKsh,
+                utilityKsh: settlement.utilitySettledKsh,
+                roomChargesKsh: settlement.roomChargesSettledKsh,
+                utilityBills: settlement.utilities.bills,
+                roomChargeCount: settlement.roomChargeCount
+              }
+            });
+          }
+
           const data = await userAccountService.createDirectTenant(parsed, {
             userId: actor.userId
           });

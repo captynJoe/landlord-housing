@@ -10926,7 +10926,7 @@ function createRentPaymentPayload() {
       billingMonth: toBillingMonth(rentPaymentMonthEl?.value) || undefined,
       amountKsh: Number(rentPaymentAmountEl?.value),
       provider: String(rentPaymentProviderEl?.value ?? "cash"),
-      providerReference: String(rentPaymentReferenceEl?.value ?? "").trim(),
+      providerReference: String(rentPaymentReferenceEl?.value ?? "").trim() || undefined,
       paidAt: toIsoFromDateTimeLocal(rentPaymentPaidAtEl?.value) || undefined
     }
   };

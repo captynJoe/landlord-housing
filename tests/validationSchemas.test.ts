@@ -8,6 +8,7 @@ import {
   landlordDirectTenantCreateSchema,
   landlordRentSetupSheetSchema,
   landlordRemoveBuildingUserSchema,
+  recordAdminRentPaymentSchema,
   residentDebtCollectionSchema,
   residentPhoneLoginSchema,
   tenantAgreementUpsertSchema
@@ -67,6 +68,16 @@ test("rent setup sheet accepts default deposit, charge start date, and first mon
   assert.equal(parsed.buildingDefaultDepositKsh, 8000);
   assert.equal(parsed.chargeStartDate, "2026-05-24");
   assert.equal(parsed.rows[0].currentMonthPaidKsh, 1000);
+});
+
+test("admin rent payment treats an empty optional reference as omitted", () => {
+  const parsed = recordAdminRentPaymentSchema.parse({
+    amountKsh: 1000,
+    provider: "cash",
+    providerReference: "   "
+  });
+
+  assert.equal(parsed.providerReference, undefined);
 });
 
 test("tenant agreement accepts confirmed deposit paid up to the agreed amount", () => {

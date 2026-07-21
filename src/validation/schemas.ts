@@ -19,6 +19,8 @@ const emptyStringToUndefined = (value: unknown) => {
 
   return value.trim() === "" ? undefined : value;
 };
+const optionalNonEmptyString = (maxLength: number) =>
+  z.preprocess(emptyStringToUndefined, nonEmptyString.max(maxLength).optional());
 
 export const createBuildingSchema = z.object({
   name: nonEmptyString,
@@ -143,8 +145,8 @@ export const createWifiPaymentSchema = z.object({
 
 export const confirmWifiPaymentSchema = z.object({
   status: z.enum(["success", "failed"]),
-  providerReference: z.string().trim().min(1).optional(),
-  message: z.string().trim().min(1).optional()
+  providerReference: optionalNonEmptyString(120),
+  message: optionalNonEmptyString(500)
 });
 
 export const updateWifiPackageSchema = z
@@ -1233,7 +1235,7 @@ export const createRentPaymentSchema = z.object({
 export const recordAdminRentPaymentSchema = z.object({
   amountKsh: z.number().positive().max(500_000),
   provider: utilityPaymentProviderSchema.default("cash"),
-  providerReference: nonEmptyString.max(120).optional(),
+  providerReference: optionalNonEmptyString(120),
   billingMonth: billingMonthSchema.optional(),
   paidAt: z.string().datetime().optional(),
   phoneNumber: kenyaPhoneSchema.optional()
@@ -1242,7 +1244,7 @@ export const recordAdminRentPaymentSchema = z.object({
 export const residentDebtCollectionSchema = z.object({
   amountKsh: z.number().positive().max(5_000_000).optional(),
   provider: utilityPaymentProviderSchema.default("cash"),
-  providerReference: nonEmptyString.max(120).optional(),
+  providerReference: optionalNonEmptyString(120),
   paidAt: z.string().datetime().optional(),
   note: z.string().trim().max(280).optional()
 });
@@ -1250,7 +1252,7 @@ export const residentDebtCollectionSchema = z.object({
 export const depositRefundRecordSchema = z.object({
   amountKsh: z.number().positive().max(10_000_000).optional(),
   provider: utilityPaymentProviderSchema.default("cash"),
-  providerReference: nonEmptyString.max(120).optional(),
+  providerReference: optionalNonEmptyString(120),
   paidAt: z.string().datetime().optional(),
   note: z.string().trim().max(280).optional()
 });
