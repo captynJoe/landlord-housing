@@ -1845,6 +1845,7 @@ export class UserAccountService {
     const fullName = normalizeOptionalText(input.fullName) ?? `Resident ${houseNumber}`;
     const identityNumber = normalizeOptionalText(input.identityNumber);
     const identityType = input.identityType ?? "national_id";
+    const identityDocumentUrls = normalizeStringList(input.identityDocumentUrls);
 
     if (!identityNumber) {
       throw new Error("IDENTITY_NUMBER_REQUIRED");
@@ -1933,7 +1934,8 @@ export class UserAccountService {
           houseNumber,
           residentUserId: provisionedUser.id,
           identityType,
-          identityNumber
+          identityNumber,
+          identityDocumentUrls
         },
         create: {
           tenancyId: tenancy.id,
@@ -1941,7 +1943,8 @@ export class UserAccountService {
           houseNumber,
           residentUserId: provisionedUser.id,
           identityType,
-          identityNumber
+          identityNumber,
+          identityDocumentUrls
         }
       });
 

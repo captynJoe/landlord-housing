@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260716c" />
+    <link rel="stylesheet" href="/landlord.css?v=20260722a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260716b" />
   </head>
   <body>
@@ -136,6 +136,14 @@
               data-landlord-section-target="message-center-section"
             >
               Messages
+            </button>
+            <button
+              type="button"
+              class="landlord-nav-btn"
+              data-landlord-view="documents"
+              data-landlord-section-target="documents-section"
+            >
+              Documents
             </button>
             <button
               type="button"
@@ -573,77 +581,6 @@
             </div>
           </div>
 
-          <div id="caretaker-management-panel" class="package-card">
-            <div class="panel-head">
-              <h3>House Manager Access</h3>
-              <button id="refresh-caretakers" type="button">Refresh</button>
-            </div>
-            <form id="caretaker-form" class="inline-fields compact-fields">
-              <label>
-                Building
-                <select id="caretaker-building-select"></select>
-              </label>
-              <label>
-                House Manager Phone
-                <input
-                  id="caretaker-identifier"
-                  type="text"
-                  maxlength="160"
-                  placeholder="+254711111111"
-                  required
-                />
-              </label>
-              <label>
-                Verification House
-                <input
-                  id="caretaker-house-number"
-                  type="text"
-                  maxlength="24"
-                  placeholder="A-12"
-                  required
-                />
-              </label>
-              <label>
-                Note (optional)
-                <input id="caretaker-note" type="text" maxlength="280" placeholder="Night shift manager" />
-              </label>
-              <button type="submit">Approve House Manager</button>
-            </form>
-            <section class="section-head">
-              <h4>Pending House Manager Requests</h4>
-            </section>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Requested</th>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>House</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="caretaker-requests-body"></tbody>
-              </table>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>House</th>
-                    <th>Approved</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="caretakers-body"></tbody>
-              </table>
-            </div>
-          </div>
-
           <div class="table-wrap">
             <table>
               <thead>
@@ -789,6 +726,41 @@
                 </tr>
               </thead>
               <tbody id="landlord-tickets-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          id="documents-section"
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="documents"
+        >
+          <div class="panel-head">
+            <div>
+              <h2>Tenant Documents</h2>
+              <p id="documents-summary" class="status-text">
+                Staff writing desk for tenant details, verification, agreement documents, and printable paperwork.
+              </p>
+            </div>
+            <div class="action-row">
+              <button id="refresh-documents" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Building</th>
+                  <th>Room</th>
+                  <th>Tenant</th>
+                  <th>Verification</th>
+                  <th>ID</th>
+                  <th>Documents</th>
+                  <th>Updated</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="documents-body"></tbody>
             </table>
           </div>
         </section>
@@ -2214,6 +2186,26 @@
           </label>
 
           <label>
+            Agreement / ID Document Photos
+            <input
+              id="direct-tenant-documents"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+            />
+          </label>
+          <div id="direct-tenant-document-preview" class="upload-preview"></div>
+          <label>
+            Agreement Document Links
+            <textarea
+              id="direct-tenant-document-urls"
+              rows="3"
+              maxlength="4096"
+              placeholder="Optional: one signed agreement or ID photo URL per line"
+            ></textarea>
+          </label>
+
+          <label>
             Note
             <input
               id="direct-tenant-note"
@@ -2233,6 +2225,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260716d"></script>
+    <script type="module" src="/landlord.js?v=20260722b"></script>
   </body>
 </html>

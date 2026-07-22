@@ -649,6 +649,7 @@ export const landlordDirectTenantCreateSchema = z.object({
   phoneNumber: kenyaPhoneSchema,
   identityType: tenantIdentityTypeSchema.default("national_id"),
   identityNumber: nonEmptyString.min(4).max(80),
+  identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
   billingStartDate: z
     .string()
     .trim()

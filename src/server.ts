@@ -206,6 +206,7 @@ const MPESA_VERIFY_RATE_WINDOW_MS = 60 * 1000;
 const MPESA_VERIFY_RATE_MAX_PER_ID = 80;
 const AUTH_ROUTE_RATE_WINDOW_MS = 10 * 60 * 1000;
 const RECURRING_UTILITY_VISIBILITY_WINDOW_DAYS = 7;
+const HOUSE_MANAGER_ACCESS_DISABLED = true;
 const RESIDENT_ID_GRACE_PERIOD_HOURS = 48;
 const RESIDENT_ID_GRACE_PERIOD_MS =
   RESIDENT_ID_GRACE_PERIOD_HOURS * 60 * 60 * 1000;
@@ -1295,7 +1296,12 @@ function isOwnerStaffUserRole(role: UserRole | string): boolean {
 }
 
 function isOwnerAccessRole(role: string): boolean {
-  return role === "landlord" || role === "admin" || role === "root_admin";
+  return (
+    role === "landlord" ||
+    role === "staff" ||
+    role === "admin" ||
+    role === "root_admin"
+  );
 }
 
 async function bootstrap() {
@@ -1303,6 +1309,20 @@ async function bootstrap() {
   const store = repositoryContext.buildingRepository;
   const app = express();
   app.set("trust proxy", 1);
+  app.use((req, res, next) => {
+    if (
+      HOUSE_MANAGER_ACCESS_DISABLED &&
+      (req.path.startsWith("/api/auth/caretaker") ||
+        req.path.startsWith("/api/landlord/caretaker-access-requests") ||
+        /^\/api\/landlord\/buildings\/[^/]+\/caretakers(?:\/|$)/.test(req.path))
+    ) {
+      return res.status(410).json({
+        error: "House manager access has been retired. Use a staff account instead."
+      });
+    }
+
+    return next();
+  });
   app.set("etag", false);
 
   const callbackToken =
@@ -4261,6 +4281,14 @@ async function bootstrap() {
     return userAccountService.getSession(readUserSessionToken(req));
   };
 
+  type OptionalUserSession = Awaited<ReturnType<typeof resolveOptionalUserSession>>;
+  type LandlordAccessRole = "landlord" | "staff" | "admin" | "root_admin" | "caretaker";
+  type LandlordAccessContext = {
+    role: LandlordAccessRole;
+    userId?: string;
+    userSession: OptionalUserSession;
+  };
+
   const hasAnyActiveAuthSession = async (req: express.Request) => {
     const userSession = await resolveOptionalUserSession(req);
     if (userSession) {
@@ -4274,28 +4302,18 @@ async function bootstrap() {
   const resolveLandlordAccessContext = async (
     req: express.Request,
     res: express.Response
-  ) => {
+  ): Promise<LandlordAccessContext | null> => {
     const userSession = await resolveOptionalUserSession(req);
     if (userSession && hasUserRoleAtLeast(userSession.role, "landlord")) {
       return {
-        role: userSession.role,
+        role: userSession.role as LandlordAccessRole,
         userId: userSession.userId,
         userSession
       };
     }
 
-    if (userSession) {
-      const caretakerBuildingIds = listCaretakerBuildingIdsForUser(
-        userSession.userId
-      );
-      if (caretakerBuildingIds.size > 0) {
-        return {
-          role: "caretaker",
-          userId: userSession.userId,
-          userSession
-        };
-      }
-    }
+    // House-manager access has been retired. Only explicit landlord/staff roles
+    // can enter the management workspace.
 
     const legacySession = adminAuthService.getSession(readAdminSessionToken(req));
     if (legacySession && adminAuthService.hasRole(legacySession, "landlord")) {
@@ -4315,7 +4333,7 @@ async function bootstrap() {
             );
 
             return {
-              role: bridgedSession.role,
+              role: bridgedSession.role as LandlordAccessRole,
               userId: bridgedSession.userId,
               userSession: bridgedSession
             };
@@ -4324,7 +4342,7 @@ async function bootstrap() {
       }
 
       return {
-        role: legacySession.role,
+        role: legacySession.role as LandlordAccessRole,
         userId: undefined as string | undefined,
         userSession: null
       };
@@ -4962,6 +4980,7 @@ async function bootstrap() {
         organizationLocation?: string;
         emergencyContactName?: string;
         emergencyContactPhone?: string;
+        identityDocumentUrls?: string[];
         monthlyRentKsh?: number;
         depositKsh?: number;
         depositPaidKsh?: number;
@@ -5019,6 +5038,7 @@ async function bootstrap() {
             houseNumber: true,
             identityType: true,
             identityNumber: true,
+            identityDocumentUrls: true,
             occupationStatus: true,
             occupationLabel: true,
             organizationName: true,
@@ -5096,6 +5116,7 @@ async function bootstrap() {
         agreementByHouse.set(houseNumber, {
           identityType: agreement.identityType ?? undefined,
           identityNumber: agreement.identityNumber ?? undefined,
+          identityDocumentUrls: listResidentIdentityDocumentUrls(agreement.identityDocumentUrls),
           occupationStatus: agreement.occupationStatus ?? undefined,
           occupationLabel: agreement.occupationLabel ?? undefined,
           organizationName: agreement.organizationName ?? undefined,
@@ -5336,6 +5357,7 @@ async function bootstrap() {
         verificationStatus,
         identityType: agreement?.identityType,
         identityNumber: agreement?.identityNumber,
+        identityDocumentUrls: agreement?.identityDocumentUrls ?? [],
         occupationStatus: agreement?.occupationStatus,
         occupationLabel: agreement?.occupationLabel,
         organizationName: agreement?.organizationName,
@@ -5959,13 +5981,17 @@ async function bootstrap() {
       metadata?: Record<string, unknown>;
     }
   ) => {
-    if (context.role !== "caretaker" || !userAccountService) {
+    if (
+      (context.role !== "caretaker" && context.role !== "staff") ||
+      !userAccountService
+    ) {
       return null;
     }
 
     const ownerStaff = await userAccountService.listLandlordAndStaffUsers();
     const recipientUserIds = [
       ...ownerStaff.users
+        .filter((item) => item.role === "landlord")
         .map((item) => item.id)
         .filter((id) => id !== context.userSession?.userId),
       LEGACY_OWNER_ALERT_USER_ID
@@ -6016,7 +6042,7 @@ async function bootstrap() {
       metadata?: Record<string, unknown>;
     }
   ) => {
-    if (context.role === "caretaker") {
+    if (context.role === "caretaker" || context.role === "staff") {
       return enqueueOwnerNotificationForManagerAction(context, input);
     }
 
@@ -7096,7 +7122,6 @@ async function bootstrap() {
     const ownerStaffPromise =
       quickStartup ||
       context.role === "caretaker" ||
-      context.role === "staff" ||
       !userAccountService
         ? Promise.resolve({
             users: [],

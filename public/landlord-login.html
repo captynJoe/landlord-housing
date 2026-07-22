@@ -50,15 +50,6 @@
               <strong>Staff</strong>
               <span>Issued staff credentials</span>
             </button>
-            <button
-              id="manager-mode-caretaker"
-              type="button"
-              aria-selected="false"
-              data-manager-mode="caretaker"
-            >
-              <strong>House Manager</strong>
-              <span>Phone and verification house</span>
-            </button>
           </div>
 
           <section id="owner-login-fields" class="auth-mode-fields hidden">
@@ -78,66 +69,6 @@
                 type="password"
                 autocomplete="current-password"
                 placeholder="Your password"
-              />
-            </label>
-          </section>
-
-          <section id="caretaker-login-fields" class="auth-mode-fields hidden">
-            <label>
-              Phone Number
-              <input
-                id="caretaker-phone"
-                type="tel"
-                inputmode="tel"
-                autocomplete="username"
-                placeholder="07XXXXXXXX"
-              />
-            </label>
-            <label>
-              Building
-              <select id="caretaker-building">
-                <option value="">Auto-detect building</option>
-              </select>
-            </label>
-            <label>
-              Verification House
-              <input
-                id="caretaker-house-number"
-                type="text"
-                maxlength="24"
-                autocomplete="off"
-                placeholder="A-12"
-              />
-            </label>
-            <label>
-              Password
-              <input
-                id="caretaker-password"
-                type="password"
-                autocomplete="current-password"
-                placeholder="Current password"
-              />
-            </label>
-            <label>
-              New Password (First-Time Setup)
-              <input
-                id="caretaker-new-password"
-                type="password"
-                minlength="8"
-                maxlength="128"
-                autocomplete="new-password"
-                placeholder="Minimum 8 characters"
-              />
-            </label>
-            <label>
-              Confirm New Password
-              <input
-                id="caretaker-confirm-password"
-                type="password"
-                minlength="8"
-                maxlength="128"
-                autocomplete="new-password"
-                placeholder="Repeat new password"
               />
             </label>
           </section>
@@ -221,6 +152,6 @@
       </section>
     </main>
 
-    <script type="module" src="/landlord-login.js?v=20260529d"></script>
+    <script type="module" src="/landlord-login.js?v=20260722a"></script>
   </body>
 </html>

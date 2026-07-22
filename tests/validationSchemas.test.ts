@@ -41,11 +41,13 @@ test("landlord direct tenant onboarding defaults to national ID", () => {
     houseNumber: "a10",
     fullName: "Jane Wanjiku",
     phoneNumber: "0712345678",
-    identityNumber: "12345678"
+    identityNumber: "12345678",
+    identityDocumentUrls: ["https://example.test/agreement.jpg"]
   });
 
   assert.equal(parsed.identityType, "national_id");
   assert.equal(parsed.identityNumber, "12345678");
+  assert.deepEqual(parsed.identityDocumentUrls, ["https://example.test/agreement.jpg"]);
 });
 
 test("rent setup sheet accepts default deposit, charge start date, and first month paid", () => {

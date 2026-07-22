@@ -146,6 +146,9 @@ const directTenantNameEl = document.getElementById("direct-tenant-name");
 const directTenantPhoneEl = document.getElementById("direct-tenant-phone");
 const directTenantIdTypeEl = document.getElementById("direct-tenant-id-type");
 const directTenantIdNumberEl = document.getElementById("direct-tenant-id-number");
+const directTenantDocumentsEl = document.getElementById("direct-tenant-documents");
+const directTenantDocumentPreviewEl = document.getElementById("direct-tenant-document-preview");
+const directTenantDocumentUrlsEl = document.getElementById("direct-tenant-document-urls");
 const directTenantNoteEl = document.getElementById("direct-tenant-note");
 const directTenantStatusEl = document.getElementById("direct-tenant-status");
 const directTenantSubmitBtnEl = document.getElementById("direct-tenant-submit-btn");
@@ -192,6 +195,7 @@ const buildingPhotoBuildingSelectEl = document.getElementById(
 );
 const buildingPhotoFileEl = document.getElementById("building-photo-file");
 const buildingPhotoPreviewEl = document.getElementById("building-photo-preview");
+const HOUSE_MANAGER_ACCESS_DISABLED = true;
 const ownerStaffManagementPanelEl = document.getElementById(
   "owner-staff-management-panel"
 );
@@ -240,6 +244,9 @@ const roomLedgerBodyEl = document.getElementById("room-ledger-body");
 const residentSourceTableEl = document.querySelector(".resident-source-table");
 const residentsBodyEl = document.getElementById("residents-body");
 const refreshResidentsBtnEl = document.getElementById("refresh-residents");
+const documentsSummaryEl = document.getElementById("documents-summary");
+const documentsBodyEl = document.getElementById("documents-body");
+const refreshDocumentsBtnEl = document.getElementById("refresh-documents");
 const landlordTicketFilterStatusEl = document.getElementById(
   "landlord-ticket-filter-status"
 );
@@ -887,7 +894,7 @@ function formatHouseManagerText(message) {
 }
 
 function formatRoleLabel(role) {
-  return role === "caretaker" ? "house manager" : role;
+  return role === "caretaker" ? "retired house manager" : role;
 }
 
 function isCaretakerRole() {
@@ -899,7 +906,12 @@ function isStaffRole() {
 }
 
 function isOwnerAccessRole() {
-  return state.role === "landlord" || state.role === "admin" || state.role === "root_admin";
+  return (
+    state.role === "landlord" ||
+    state.role === "staff" ||
+    state.role === "admin" ||
+    state.role === "root_admin"
+  );
 }
 
 function isLandlordViewAvailableForRole(view) {
@@ -907,10 +919,6 @@ function isLandlordViewAvailableForRole(view) {
 
   if (isCaretakerRole()) {
     return normalizedView === "overview" || normalizedView === "tenants" || normalizedView === "applications";
-  }
-
-  if (isStaffRole()) {
-    return normalizedView !== "settings";
   }
 
   if (!isOwnerAccessRole() && normalizedView === "settings") {
@@ -1324,7 +1332,7 @@ function applyRoleCapabilities() {
   }
 
   if (caretakerManagementPanelEl instanceof HTMLElement) {
-    caretakerManagementPanelEl.classList.toggle("hidden", caretaker);
+    caretakerManagementPanelEl.classList.toggle("hidden", true);
   }
 
   openCreateBuildingDrawerButtons.forEach((button) => {
@@ -1441,6 +1449,7 @@ function setActiveLandlordView(nextView) {
     normalizedView === "settings" ||
     normalizedView === "applications" ||
     normalizedView === "messages" ||
+    normalizedView === "documents" ||
     normalizedView === "tenants" ||
     normalizedView === "expenses"
       ? normalizedView
@@ -1528,7 +1537,7 @@ function openCreateBuildingDrawer() {
     return;
   }
   if (!isOwnerAccessRole()) {
-    showError("Landlord access is required to create buildings.");
+    showError("Landlord or staff access is required to create buildings.");
     return;
   }
 
@@ -3446,6 +3455,20 @@ function isResidentPendingVerification(resident) {
   return resident?.verificationStatus === "pending_review";
 }
 
+function isResidentVerified(resident) {
+  return Boolean(resident?.hasActiveResident || resident?.residentUserId || resident?.residentName) &&
+    !isResidentPendingVerification(resident);
+}
+
+function renderResidentVerificationBadge(resident) {
+  if (!(resident?.hasActiveResident || resident?.residentUserId || resident?.residentName)) {
+    return "-";
+  }
+  return isResidentVerified(resident)
+    ? renderTableStatusPill("Verified", "is-success")
+    : renderTableStatusPill("Pending review", "is-warning");
+}
+
 function isRoomDerivedResidentName(name, houseNumber) {
   const normalizedName = String(name ?? "").trim().toLowerCase().replace(/\s+/g, " ");
   const normalizedHouse = normalizeHouse(houseNumber).toLowerCase();
@@ -3618,6 +3641,42 @@ function buildResidentAgreementUrl(resident) {
   )}/houses/${encodeURIComponent(resident.houseNumber)}/agreement`;
 }
 
+function normalizeDocumentUrls(value) {
+  const raw = Array.isArray(value)
+    ? value
+    : String(value ?? "")
+        .split(/[\n,]+/)
+        .map((item) => item.trim());
+  return [...new Set(raw.map((item) => String(item ?? "").trim()).filter(Boolean))].slice(0, 6);
+}
+
+function renderDocumentLinksHtml(urls, options = {}) {
+  const emptyText = options.emptyText || "No documents";
+  const list = normalizeDocumentUrls(urls);
+  if (list.length === 0) {
+    return escapeHtml(emptyText);
+  }
+  return list
+    .map((url, index) =>
+      '<a href="' + escapeHtml(url) + '" target="_blank" rel="noreferrer">Document ' +
+        escapeHtml(String(index + 1)) +
+        '</a>'
+    )
+    .join("<br />");
+}
+
+function createResidentDocumentUploadRequest(buildingId, houseNumber) {
+  return {
+    url: "/api/media/upload",
+    fields: {
+      category: "resident_identity",
+      buildingId,
+      houseNumber
+    },
+    credentials: "same-origin"
+  };
+}
+
 function formatAgreementIdentityType(value) {
   switch (value) {
     case "national_id":
@@ -3695,6 +3754,64 @@ function summarizeEmergencyContact(resident) {
 function toDateInputValue(value) {
   const raw = String(value ?? "").trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+}
+
+function buildPrintableTenantAgreementHtml(resident, agreementPayload) {
+  const agreement = agreementPayload?.agreement ?? {};
+  const agreementResident = agreementPayload?.resident ?? {};
+  const tenantName = agreementResident.fullName || resident?.residentName || "Tenant";
+  const tenantPhone = agreementResident.phone || resident?.residentPhone || "-";
+  const buildingName = resident?.buildingName || getBuildingNameById(resident?.buildingId) || resident?.buildingId || "-";
+  const documents = normalizeDocumentUrls(agreement.identityDocumentUrls);
+  const row = (label, value) => "<tr><th>" + escapeHtml(label) + "</th><td>" + value + "</td></tr>";
+  const textValue = (value, fallback = "-") => escapeHtml(String(value ?? "").trim() || fallback);
+  const moneyValue = (value) => Number.isFinite(Number(value)) ? escapeHtml(formatCurrency(Number(value))) : "-";
+  return [
+    '<!doctype html><html><head><meta charset="utf-8" />',
+    "<title>Tenant Agreement - " + escapeHtml(tenantName) + "</title>",
+    "<style>body{font-family:Arial,sans-serif;margin:32px;color:#172033;}h1{margin:0 0 4px;}p{margin:4px 0 16px;}table{width:100%;border-collapse:collapse;margin-top:16px;}th,td{border:1px solid #cfd7e6;padding:10px;text-align:left;vertical-align:top;}th{width:32%;background:#f4f7fb}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:42px}.line{border-top:1px solid #172033;padding-top:8px}.documents a{display:block;margin:4px 0}@media print{button{display:none}}</style>",
+    "</head><body>",
+    '<button onclick="window.print()">Print</button>',
+    "<h1>Tenant Agreement Snapshot</h1>",
+    "<p>Generated from the landlord housing manager.</p>",
+    "<table><tbody>",
+    row("Building", textValue(buildingName)),
+    row("House / Room", textValue(resident?.houseNumber)),
+    row("Tenant", textValue(tenantName)),
+    row("Phone", textValue(tenantPhone)),
+    row("Verification", renderResidentVerificationBadge(resident)),
+    row("ID", textValue(formatAgreementIdentityType(agreement.identityType) + (agreement.identityNumber ? " • " + agreement.identityNumber : ""))),
+    row("Occupation", textValue(formatAgreementOccupationStatus(agreement.occupationStatus))),
+    row("Work / School", textValue([agreement.organizationName, agreement.organizationLocation].filter(Boolean).join(" • "))),
+    row("Sponsor / Guardian", textValue([agreement.sponsorName, agreement.sponsorPhone].filter(Boolean).join(" • "))),
+    row("Emergency Contact", textValue([agreement.emergencyContactName, agreement.emergencyContactPhone].filter(Boolean).join(" • "))),
+    row("Lease", textValue([agreement.leaseStartDate || "open", agreement.leaseEndDate || "ongoing"].join(" -> "))),
+    row("Monthly Rent", moneyValue(agreement.monthlyRentKsh)),
+    row("Deposit", moneyValue(agreement.depositKsh)),
+    row("Deposit Paid", moneyValue(agreement.depositPaidKsh)),
+    row("Due Day", textValue(agreement.paymentDueDay)),
+    row("Special Terms", textValue(agreement.specialTerms)),
+    row("Documents", '<span class="documents">' + renderDocumentLinksHtml(documents, { emptyText: "No agreement documents uploaded" }) + '</span>'),
+    "</tbody></table>",
+    '<div class="signatures"><div class="line">Tenant Signature / Date</div><div class="line">Landlord / Staff Signature / Date</div></div>',
+    "</body></html>"
+  ].join("");
+}
+
+async function printTenantAgreement(resident = state.selectedResident) {
+  if (!resident) {
+    throw new Error("Select a tenant first.");
+  }
+  const payload = await requestJson(buildResidentAgreementUrl(resident), { cache: "no-store" });
+  const printable = buildPrintableTenantAgreementHtml(resident, payload.data ?? {});
+  const printWindow = window.open("", "_blank", "noopener,noreferrer");
+  if (!printWindow) {
+    throw new Error("Popup was blocked. Allow popups to print the agreement.");
+  }
+  printWindow.document.open();
+  printWindow.document.write(printable);
+  printWindow.document.close();
+  printWindow.focus();
 }
 
 async function loadResidentAgreement(resident) {
@@ -5962,6 +6079,29 @@ function createBuildingPhotoUploadRequest(buildingId) {
   };
 }
 
+function syncDirectTenantDocumentPreview() {
+  if (!(directTenantDocumentsEl instanceof HTMLInputElement)) {
+    return;
+  }
+
+  try {
+    const selectedFiles = validateImageFiles(directTenantDocumentsEl.files, {
+      maxFiles: 6,
+      maxSizeMb: 10
+    });
+    renderSelectedImagePreviews(directTenantDocumentPreviewEl, selectedFiles, {
+      emptyText: "No agreement or ID document photos selected."
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to preview selected documents.";
+    showError(message);
+    directTenantDocumentsEl.value = "";
+    renderSelectedImagePreviews(directTenantDocumentPreviewEl, [], {
+      emptyText: "No agreement or ID document photos selected."
+    });
+  }
+}
+
 function syncBuildingPhotoPreview() {
   if (!(buildingPhotoFileEl instanceof HTMLInputElement)) {
     return;
@@ -6088,8 +6228,7 @@ function applyLandlordRole(roleValue) {
     role !== "landlord" &&
     role !== "staff" &&
     role !== "admin" &&
-    role !== "root_admin" &&
-    role !== "caretaker"
+    role !== "root_admin"
   ) {
     throw new Error("This account does not have landlord access.");
   }
@@ -8981,10 +9120,58 @@ function renderRoomLedger(rows) {
   });
 }
 
+function renderDocumentsPage(rows = state.residentDirectory) {
+  if (!(documentsBodyEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const allRows = dedupeResidentDirectoryRows(Array.isArray(rows) ? rows : []);
+  const activeRows = allRows
+    .filter((resident) => resident?.hasActiveResident || resident?.residentUserId || resident?.residentName)
+    .sort(compareStableRoomOrder);
+  const verifiedCount = activeRows.filter(isResidentVerified).length;
+  const withDocumentsCount = activeRows.filter(
+    (resident) => normalizeDocumentUrls(resident.identityDocumentUrls).length > 0
+  ).length;
+
+  if (documentsSummaryEl instanceof HTMLElement) {
+    documentsSummaryEl.textContent = `${activeRows.length} active tenant record${activeRows.length === 1 ? "" : "s"}. ${verifiedCount} verified. ${withDocumentsCount} with agreement/ID documents.`;
+  }
+
+  documentsBodyEl.replaceChildren();
+  if (activeRows.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = '<td colspan="8">No active tenants found. Add a tenant from Rooms first.</td>';
+    documentsBodyEl.append(row);
+    return;
+  }
+
+  activeRows.forEach((resident) => {
+    const row = document.createElement("tr");
+    const buildingLabel = resident.buildingName || getBuildingNameById(resident.buildingId) || resident.buildingId || "-";
+    const documentUrls = normalizeDocumentUrls(resident.identityDocumentUrls);
+    row.innerHTML = [
+      "<td>" + escapeHtml(buildingLabel) + "</td>",
+      "<td>" + escapeHtml(resident.houseNumber || "-") + "</td>",
+      "<td><strong>" + escapeHtml(getResidentDisplayName(resident, "Tenant")) + "</strong><br /><small>" + escapeHtml(resident.residentPhone || "-") + "</small></td>",
+      "<td>" + renderResidentVerificationBadge(resident) + "</td>",
+      "<td>" + escapeHtml(summarizeResidentIdentity(resident)) + "</td>",
+      "<td>" + renderDocumentLinksHtml(documentUrls, { emptyText: "No documents uploaded" }) + "</td>",
+      "<td>" + escapeHtml(resident.agreementUpdatedAt ? formatDateTime(resident.agreementUpdatedAt) : "-") + "</td>",
+      '<td><div class="resident-row-actions">' +
+        '<button type="button" data-action="open-room-account" data-building-id="' + escapeHtml(resident.buildingId) + '" data-house-number="' + escapeHtml(resident.houseNumber) + '">Open</button>' +
+        '<button type="button" data-action="print-tenant-agreement" data-building-id="' + escapeHtml(resident.buildingId) + '" data-house-number="' + escapeHtml(resident.houseNumber) + '">Print</button>' +
+        '</div></td>'
+    ].join("");
+    documentsBodyEl.append(row);
+  });
+}
+
 function renderResidentDirectory(rows) {
   const allRows = Array.isArray(rows) ? rows : [];
   renderResidentsOverview(allRows);
   const filteredRows = getVisibleResidentDirectoryRows(allRows);
+  renderDocumentsPage(allRows);
   const singleBuildingView = Boolean(getUtilityLedgerBuildingId());
   const residentDirectoryColumnCount = singleBuildingView ? 12 : 13;
   if (residentSourceTableEl instanceof HTMLTableElement) {
@@ -9072,7 +9259,7 @@ function renderResidentDirectory(rows) {
     row.innerHTML = `
       ${buildingCell}
       <td>${escapeHtml(resident.houseNumber)}</td>
-      <td>${escapeHtml(occupancy)}</td>
+      <td>${escapeHtml(occupancy)}<br />${renderResidentVerificationBadge(resident)}</td>
       <td>${escapeHtml(residentName)}</td>
       <td>${escapeHtml(residentPhone)}</td>
       <td>${escapeHtml(identitySummary)}</td>
@@ -9885,11 +10072,16 @@ function renderResidentDrawer(resident) {
         <p class="status-text">${escapeHtml(agreementStatusText)}</p>
       <div class="resident-agreement-overview">
         <div><span>ID</span><strong>${escapeHtml(identitySummary)}</strong></div>
+        <div><span>Verification</span><strong>${renderResidentVerificationBadge(resident)}</strong></div>
         <div><span>Occupation</span><strong>${escapeHtml(
           formatAgreementOccupationStatus(agreement?.occupationStatus)
         )}</strong></div>
         <div><span>Work / School</span><strong>${escapeHtml(workSchoolSummary)}</strong></div>
         <div><span>Lease</span><strong>${escapeHtml(leaseSummary)}</strong></div>
+        <div><span>Documents</span><strong>${renderDocumentLinksHtml(agreement?.identityDocumentUrls, { emptyText: "Not uploaded" })}</strong></div>
+      </div>
+      <div class="action-row">
+        <button type="button" data-action="print-tenant-agreement">Print Agreement</button>
       </div>
       ${
         agreementResident
@@ -9933,6 +10125,26 @@ function renderResidentDrawer(resident) {
               maxlength="80"
               placeholder="ID / passport number"
               value="${escapeHtml(agreement?.identityNumber ?? "")}"
+              ${disabledAttr}
+            />
+          </label>
+          <label>
+            Agreement / ID Document Links
+            <textarea
+              name="identityDocumentUrls"
+              rows="3"
+              maxlength="4096"
+              placeholder="One document URL per line"
+              ${disabledAttr}
+            >${escapeHtml(normalizeDocumentUrls(agreement?.identityDocumentUrls).join("\n"))}</textarea>
+          </label>
+          <label>
+            Upload Agreement / ID Photos
+            <input
+              name="identityDocumentFiles"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
               ${disabledAttr}
             />
           </label>
@@ -11144,6 +11356,12 @@ async function loadLandlordWifiPackages() {
 }
 
 async function loadCaretakers() {
+  if (HOUSE_MANAGER_ACCESS_DISABLED) {
+    state.caretakers = [];
+    renderCaretakers(state.caretakers);
+    return;
+  }
+
   const buildingId =
     state.selectedCaretakerBuildingId ||
     state.selectedRegistryBuildingId ||
@@ -11177,6 +11395,12 @@ async function loadOwnerStaff() {
 }
 
 async function loadCaretakerAccessRequests() {
+  if (HOUSE_MANAGER_ACCESS_DISABLED) {
+    state.caretakerRequests = [];
+    renderCaretakerRequests(state.caretakerRequests);
+    return;
+  }
+
   const buildingId =
     state.selectedCaretakerBuildingId ||
     state.selectedRegistryBuildingId ||
@@ -11515,6 +11739,7 @@ function applyLandlordStartupData(startup) {
   syncUtilityBillInputMode();
   renderRegistryRows(state.registryRows);
   renderResidentDirectory(state.residentDirectory);
+  renderDocumentsPage();
   renderWifiPackages(state.wifiPackages);
   renderOwnerStaff();
   renderOwnerNotifications();
@@ -11858,6 +12083,39 @@ roomTargetBuildingEl?.addEventListener("change", () => {
   updateLandlordBranding();
 });
 
+directTenantDocumentsEl?.addEventListener("change", () => {
+  syncDirectTenantDocumentPreview();
+});
+
+refreshDocumentsBtnEl?.addEventListener("click", () => {
+  void loadResidents().catch((error) => {
+    handleLandlordError(error, "Unable to refresh tenant documents.");
+  });
+});
+
+documentsBodyEl?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const action = String(target.dataset.action || "").trim();
+  const buildingId = String(target.dataset.buildingId || "").trim();
+  const houseNumber = String(target.dataset.houseNumber || "").trim();
+  const resident = findResidentDirectoryEntry(buildingId, houseNumber);
+
+  if (action === "open-room-account") {
+    openRoomAccountPage(buildingId, houseNumber);
+    return;
+  }
+
+  if (action === "print-tenant-agreement") {
+    void printTenantAgreement(resident).catch((error) => {
+      handleLandlordError(error, "Unable to print tenant agreement.");
+    });
+  }
+});
+
 directTenantFormEl?.addEventListener("submit", (event) => {
   event.preventDefault();
   clearError();
@@ -11873,6 +12131,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
   const phoneNumber = String(directTenantPhoneEl?.value || "").trim();
   const identityType = String(directTenantIdTypeEl?.value || "national_id").trim();
   const identityNumber = String(directTenantIdNumberEl?.value || "").trim();
+  const providedDocumentUrls = normalizeDocumentUrls(directTenantDocumentUrlsEl?.value || "");
   const note = String(directTenantNoteEl?.value || "").trim() || undefined;
 
   if (!buildingId || !houseNumber || !fullName || !phoneNumber || !identityNumber) {
@@ -11902,6 +12161,20 @@ directTenantFormEl?.addEventListener("submit", (event) => {
 
   void (async () => {
     try {
+      const selectedDocumentFiles = validateImageFiles(directTenantDocumentsEl?.files, {
+        maxFiles: 6,
+        maxSizeMb: 10
+      });
+      const uploadedDocumentUrls = selectedDocumentFiles.length
+        ? await uploadImageFiles(selectedDocumentFiles, {
+            createUploadRequest: () => createResidentDocumentUploadRequest(buildingId, houseNumber)
+          })
+        : [];
+      const identityDocumentUrls = normalizeDocumentUrls([
+        ...providedDocumentUrls,
+        ...uploadedDocumentUrls
+      ]);
+
       const payload = await requestJson("/api/landlord/residents/direct", {
         method: "POST",
         headers: {
@@ -11914,6 +12187,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
           phoneNumber,
           identityType,
           identityNumber,
+          identityDocumentUrls,
           billingStartDate,
           note
         })
@@ -11950,6 +12224,13 @@ directTenantFormEl?.addEventListener("submit", (event) => {
       if (directTenantIdTypeEl instanceof HTMLSelectElement) {
         directTenantIdTypeEl.value = "national_id";
       }
+      if (directTenantDocumentsEl instanceof HTMLInputElement) {
+        directTenantDocumentsEl.value = "";
+      }
+      if (directTenantDocumentUrlsEl instanceof HTMLTextAreaElement) {
+        directTenantDocumentUrlsEl.value = "";
+      }
+      syncDirectTenantDocumentPreview();
 
       closeDirectTenantDrawer();
       setStatus(
@@ -11979,7 +12260,7 @@ ownerStaffFormEl?.addEventListener("submit", (event) => {
   clearError();
 
   if (!isOwnerAccessRole()) {
-    showError("Landlord access is required to manage staff accounts.");
+    showError("Landlord or staff access is required to manage staff accounts.");
     return;
   }
 
@@ -12050,7 +12331,7 @@ ownerStaffBodyEl?.addEventListener("click", (event) => {
     return;
   }
   if (!isOwnerAccessRole()) {
-    showError("Landlord access is required to manage staff accounts.");
+    showError("Landlord or staff access is required to manage staff accounts.");
     return;
   }
 
@@ -12095,6 +12376,10 @@ ownerStaffBodyEl?.addEventListener("click", (event) => {
 });
 
 caretakerBuildingSelectEl?.addEventListener("change", () => {
+  if (HOUSE_MANAGER_ACCESS_DISABLED) {
+    return;
+  }
+
   state.selectedCaretakerBuildingId = String(caretakerBuildingSelectEl.value || "").trim();
   updateLandlordBranding();
   void Promise.all([loadCaretakers(), loadCaretakerAccessRequests()]).catch((error) => {
@@ -12105,6 +12390,11 @@ caretakerBuildingSelectEl?.addEventListener("change", () => {
 caretakerFormEl?.addEventListener("submit", (event) => {
   event.preventDefault();
   clearError();
+
+  if (HOUSE_MANAGER_ACCESS_DISABLED) {
+    showError("House manager access has been retired. Use a staff account instead.");
+    return;
+  }
 
   if (isCaretakerRole()) {
     showError("House manager accounts cannot approve house managers.");
@@ -12165,6 +12455,10 @@ caretakerFormEl?.addEventListener("submit", (event) => {
 });
 
 caretakersBodyEl?.addEventListener("click", (event) => {
+  if (HOUSE_MANAGER_ACCESS_DISABLED) {
+    return;
+  }
+
   const target = event.target;
   if (!(target instanceof HTMLButtonElement)) {
     return;
@@ -12208,6 +12502,10 @@ caretakersBodyEl?.addEventListener("click", (event) => {
 });
 
 caretakerRequestsBodyEl?.addEventListener("click", (event) => {
+  if (HOUSE_MANAGER_ACCESS_DISABLED) {
+    return;
+  }
+
   const target = event.target;
   if (!(target instanceof HTMLButtonElement)) {
     return;
@@ -12701,7 +12999,7 @@ createBuildingFormEl?.addEventListener("submit", (event) => {
   clearError();
 
   if (!isOwnerAccessRole()) {
-    showError("Landlord access is required to create buildings.");
+    showError("Landlord or staff access is required to create buildings.");
     return;
   }
 
@@ -13380,13 +13678,109 @@ residentDrawerBodyEl?.addEventListener("click", (event) => {
     return;
   }
 
-  if (String(target.dataset.action || "").trim() !== "open-room-account") {
+  const action = String(target.dataset.action || "").trim();
+  if (action === "print-tenant-agreement") {
+    void printTenantAgreement().catch((error) => {
+      handleLandlordError(error, "Unable to print tenant agreement.");
+    });
+    return;
+  }
+
+  if (action !== "open-room-account") {
     return;
   }
 
   const buildingId = String(target.dataset.buildingId || "").trim();
   const houseNumber = String(target.dataset.houseNumber || "").trim();
   openRoomAccountPage(buildingId, houseNumber);
+});
+
+residentDrawerBodyEl?.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement) || form.id !== "resident-agreement-form") {
+    return;
+  }
+
+  event.preventDefault();
+  clearError();
+
+  const resident = state.selectedResident;
+  if (!resident) {
+    showError("Select a tenant before saving agreement details.");
+    return;
+  }
+
+  const submitButton = form.querySelector("button[type='submit']");
+  if (submitButton instanceof HTMLButtonElement) {
+    submitButton.disabled = true;
+  }
+
+  void (async () => {
+    try {
+      const formData = new FormData(form);
+      const value = (name) => String(formData.get(name) ?? "").trim();
+      const optionalNumber = (name) => {
+        const raw = value(name);
+        return raw ? Number(raw) : undefined;
+      };
+      const fileInput = form.querySelector('input[name="identityDocumentFiles"]');
+      const selectedFiles = fileInput instanceof HTMLInputElement
+        ? validateImageFiles(fileInput.files, { maxFiles: 6, maxSizeMb: 10 })
+        : [];
+      const uploadedUrls = selectedFiles.length
+        ? await uploadImageFiles(selectedFiles, {
+            createUploadRequest: () => createResidentDocumentUploadRequest(resident.buildingId, resident.houseNumber)
+          })
+        : [];
+      const identityDocumentUrls = normalizeDocumentUrls([
+        ...normalizeDocumentUrls(value("identityDocumentUrls")),
+        ...uploadedUrls
+      ]);
+      const payload = {
+        identityType: value("identityType") || undefined,
+        identityNumber: value("identityNumber") || undefined,
+        identityDocumentUrls,
+        occupationStatus: value("occupationStatus") || undefined,
+        occupationLabel: value("occupationLabel") || undefined,
+        organizationName: value("organizationName") || undefined,
+        organizationLocation: value("organizationLocation") || undefined,
+        studentRegistrationNumber: value("studentRegistrationNumber") || undefined,
+        sponsorName: value("sponsorName") || undefined,
+        sponsorPhone: value("sponsorPhone") || undefined,
+        emergencyContactName: value("emergencyContactName") || undefined,
+        emergencyContactPhone: value("emergencyContactPhone") || undefined,
+        leaseStartDate: value("leaseStartDate") || undefined,
+        leaseEndDate: value("leaseEndDate") || undefined,
+        monthlyRentKsh: optionalNumber("monthlyRentKsh"),
+        depositKsh: optionalNumber("depositKsh"),
+        depositPaidKsh: optionalNumber("depositPaidKsh"),
+        paymentDueDay: optionalNumber("paymentDueDay"),
+        specialTerms: value("specialTerms") || undefined,
+      };
+
+      const response = await requestJson(buildResidentAgreementUrl(resident), {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      state.selectedResidentAgreement = response.data ?? null;
+      state.selectedResidentAgreementError = "";
+      setStatus("Tenant agreement saved.");
+      await loadResidents();
+      const refreshed = findResidentDirectoryEntry(resident.buildingId, resident.houseNumber) ?? resident;
+      state.selectedResident = refreshed;
+      renderResidentDrawer(refreshed);
+    } catch (error) {
+      handleLandlordError(error, "Failed to save tenant agreement.");
+    } finally {
+      if (submitButton instanceof HTMLButtonElement) {
+        submitButton.disabled = false;
+      }
+    }
+  })();
 });
 
 applicationsBodyEl.addEventListener("click", (event) => {

@@ -155,7 +155,8 @@ test("direct tenant onboarding forces first login password change and approves t
       fullName: "Jane Wanjiku",
       phoneNumber: "0700000001",
       identityType: "national_id",
-      identityNumber: "12345678"
+      identityNumber: "12345678",
+      identityDocumentUrls: ["https://example.test/id-front.jpg"]
     },
     { userId: "landlord-1" }
   );
@@ -170,6 +171,9 @@ test("direct tenant onboarding forces first login password change and approves t
   assert.equal(tenantApplicationUpsertCalls[0].create.status, "approved");
   assert.equal(tenantApplicationUpsertCalls[0].create.reviewedByUserId, "landlord-1");
   assert.equal(tenantAgreementUpsertCalls[0].create.identityNumber, "12345678");
+  assert.deepEqual(tenantAgreementUpsertCalls[0].create.identityDocumentUrls, [
+    "https://example.test/id-front.jpg"
+  ]);
 });
 
 test("resident phone login resolves the active tenancy without building selection", async () => {

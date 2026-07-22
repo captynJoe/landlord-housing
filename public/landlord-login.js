@@ -9,14 +9,7 @@ const loginStatusEl = document.getElementById("login-status");
 const loginErrorEl = document.getElementById("login-error");
 const landlordSecondaryErrorEl = document.getElementById("landlord-secondary-error");
 const ownerLoginFieldsEl = document.getElementById("owner-login-fields");
-const caretakerLoginFieldsEl = document.getElementById("caretaker-login-fields");
 const managerModeButtons = document.querySelectorAll("[data-manager-mode]");
-const caretakerPhoneEl = document.getElementById("caretaker-phone");
-const caretakerBuildingEl = document.getElementById("caretaker-building");
-const caretakerHouseNumberEl = document.getElementById("caretaker-house-number");
-const caretakerPasswordEl = document.getElementById("caretaker-password");
-const caretakerNewPasswordEl = document.getElementById("caretaker-new-password");
-const caretakerConfirmPasswordEl = document.getElementById("caretaker-confirm-password");
 const landlordPasswordChangeFormEl = document.getElementById(
   "landlord-password-change-form"
 );
@@ -71,18 +64,11 @@ function clearAllErrors() {
   clearPanelError(landlordPasswordChangeErrorEl);
 }
 
-function normalizeHouseNumber(value) {
-  return String(value ?? "").trim().toUpperCase();
-}
-
 function setManagerMode(nextMode) {
-  managerMode = ["landlord", "staff", "caretaker"].includes(nextMode)
-    ? nextMode
-    : "";
+  managerMode = ["landlord", "staff"].includes(nextMode) ? nextMode : "";
   const usesOwnerFields = managerMode === "landlord" || managerMode === "staff";
 
   ownerLoginFieldsEl?.classList.toggle("hidden", !usesOwnerFields);
-  caretakerLoginFieldsEl?.classList.toggle("hidden", managerMode !== "caretaker");
 
   managerModeButtons.forEach((button) => {
     const active = button instanceof HTMLElement && button.dataset.managerMode === managerMode;
@@ -106,19 +92,16 @@ function setManagerMode(nextMode) {
 
   const buttonLabels = {
     landlord: "Sign In as Landlord",
-    staff: "Sign In as Staff",
-    caretaker: "Sign In as House Manager"
+    staff: "Sign In as Staff"
   };
   loginBtnEl.textContent = buttonLabels[managerMode] ?? "Choose Login Type";
 
   const statusMessages = {
     landlord:
       "Landlord sign-in accepts email, phone, or the recovery username for legacy manager access.",
-    staff: "Staff sign-in uses the email or phone number issued by the landlord.",
-    caretaker:
-      "House manager sign-in uses phone number and the approved verification house."
+    staff: "Staff sign-in uses the email or phone number issued by the landlord."
   };
-  setStatus(statusMessages[managerMode] ?? "Choose Landlord, Staff, or House Manager to continue.");
+  setStatus(statusMessages[managerMode] ?? "Choose Landlord or Staff to continue.");
   clearAllErrors();
 }
 
@@ -206,7 +189,7 @@ function looksLikeKenyaPhone(value) {
 }
 
 function isManagementPortalRole(role) {
-  return isOwnerStaffPortalRole(role) || role === "caretaker";
+  return isOwnerStaffPortalRole(role);
 }
 
 function isOwnerStaffPortalRole(role) {
@@ -218,7 +201,7 @@ function isOwnerStaffPortalRole(role) {
   );
 }
 
-function buildCaretakerPayload(extra = {}) {
+) {
   const payload = {
     phoneNumber: String(caretakerPhoneEl?.value || "").trim(),
     houseNumber: normalizeHouseNumber(caretakerHouseNumberEl?.value),
@@ -253,40 +236,7 @@ async function requestJson(url, options = {}) {
   return payload;
 }
 
-async function loadCaretakerBuildings() {
-  if (!(caretakerBuildingEl instanceof HTMLSelectElement)) {
-    return;
-  }
-
-  try {
-    const payload = await requestJson("/api/buildings", { cache: "no-store" });
-    const buildings = Array.isArray(payload.data) ? payload.data : [];
-    const current = caretakerBuildingEl.value;
-
-    caretakerBuildingEl.replaceChildren();
-    const blank = document.createElement("option");
-    blank.value = "";
-    blank.textContent = "Auto-detect building";
-    caretakerBuildingEl.append(blank);
-
-    buildings.forEach((building) => {
-      const id = String(building?.id || "").trim();
-      if (!id) {
-        return;
-      }
-      const option = document.createElement("option");
-      option.value = id;
-      option.textContent = building?.name ? `${building.name} (${id})` : id;
-      caretakerBuildingEl.append(option);
-    });
-
-    caretakerBuildingEl.value = current;
-  } catch (_error) {
-    // Optional helper only. Backend can still auto-detect when the phone + house is unique.
-  }
-}
-
-async function handleSignedInRole(role, identity = {}) {
+async async function handleSignedInRole(role, identity = {}) {
   if (isManagementPortalRole(role)) {
     if (identity?.mustChangePassword) {
       showPermanentPasswordForm(role, identity);
@@ -364,15 +314,10 @@ async function signIn(event) {
     return;
   }
 
-  if (managerMode === "caretaker") {
-    await signInCaretaker();
-    return;
-  }
-
   showPanelError(loginErrorEl, "Choose who is logging in before you continue.", {
     reveal: true
   });
-  setStatus("Choose Landlord, Staff, or House Manager to continue.");
+  setStatus("Choose Landlord or Staff to continue.");
 }
 
 async function signInLandlord() {
@@ -505,94 +450,7 @@ async function signInStaff() {
   }
 }
 
-async function signInCaretaker() {
-  const phoneNumber = String(caretakerPhoneEl?.value || "").trim();
-  const houseNumber = normalizeHouseNumber(caretakerHouseNumberEl?.value);
-  const password = String(caretakerPasswordEl?.value || "");
-  const newPassword = String(caretakerNewPasswordEl?.value || "");
-  const confirmPassword = String(caretakerConfirmPasswordEl?.value || "");
-
-  if (!phoneNumber || !houseNumber) {
-    showPanelError(loginErrorEl, "Provide phone number and verification house.", {
-      reveal: true
-    });
-    return;
-  }
-
-  loginBtnEl.disabled = true;
-  setStatus("Checking house manager access...");
-
-  try {
-    if (newPassword || confirmPassword) {
-      if (newPassword.length < 8) {
-        showPanelError(loginErrorEl, "New password must be at least 8 characters.", {
-          reveal: true
-        });
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        showPanelError(loginErrorEl, "Confirmation password must match the new password.", {
-          reveal: true
-        });
-        return;
-      }
-
-      const payload = await requestJson("/api/auth/caretaker/setup-password", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify(buildCaretakerPayload({ newPassword }))
-      });
-
-      await handleSignedInRole(payload.data?.role, payload.data ?? {});
-      return;
-    }
-
-    if (!password) {
-      const payload = await requestJson("/api/auth/caretaker/resolve", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify(buildCaretakerPayload())
-      });
-      const setupRequired = Boolean(payload.data?.requiresPasswordSetup);
-      showPanelError(
-        loginErrorEl,
-        setupRequired
-          ? "First-time setup required. Enter and confirm a new password below."
-          : "Enter your house manager password.",
-        { reveal: true }
-      );
-      setStatus(
-        setupRequired
-          ? "House manager access found. Set a permanent password to continue."
-          : "House manager access found. Enter password to sign in."
-      );
-      return;
-    }
-
-    const payload = await requestJson("/api/auth/caretaker/login-phone", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify(buildCaretakerPayload({ password }))
-    });
-
-    await handleSignedInRole(payload.data?.role, payload.data ?? {});
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to sign in house manager.";
-    showPanelError(loginErrorEl, message, { reveal: true });
-    setStatus("Check the message above and try again.");
-  } finally {
-    loginBtnEl.disabled = false;
-  }
-}
-
-async function requestPasswordReset(event) {
+async async function requestPasswordReset(event) {
   event.preventDefault();
   clearAllErrors();
 
@@ -713,5 +571,4 @@ managerModeButtons.forEach((button) => {
 
 initPasswordVisibilityToggles();
 setManagerMode("");
-void loadCaretakerBuildings();
 void checkSession();
