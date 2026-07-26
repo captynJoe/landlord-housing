@@ -233,7 +233,8 @@ body.room-confirm-open {
   transform: translate(-50%, -50%);
   border: 1px solid rgba(16, 35, 49, 0.16);
   border-radius: 8px;
-  background: #ffffff;
+  background: #102331;
+  color: #ffffff;
   box-shadow: 0 20px 42px rgba(16, 35, 49, 0.26);
   padding: 18px;
 }
@@ -1844,20 +1845,32 @@ button.resident-overview-card.is-active {
 }
 
 body.landlord-rooms-route .landlord-side-panel,
+body.landlord-room-ledger-focus .landlord-side-panel,
 body.landlord-rooms-route .metrics-panel,
+body.landlord-room-ledger-focus .metrics-panel,
 body.landlord-rooms-route .landlord-focus-panel,
+body.landlord-room-ledger-focus .landlord-focus-panel,
 body.landlord-rooms-route #overview-payment-routing-section,
+body.landlord-room-ledger-focus #overview-payment-routing-section,
 body.landlord-rooms-route #overview-payment-instructions-section,
+body.landlord-room-ledger-focus #overview-payment-instructions-section,
 body.landlord-rooms-route #overview-payment-access-section,
+body.landlord-room-ledger-focus #overview-payment-access-section,
 body.landlord-rooms-route #overview-wifi-packages-section,
+body.landlord-room-ledger-focus #overview-wifi-packages-section,
 body.landlord-rooms-route #overview-rent-status-section,
+body.landlord-room-ledger-focus #overview-rent-status-section,
 body.landlord-rooms-route #utilities-registry-section,
+body.landlord-room-ledger-focus #utilities-registry-section,
 body.landlord-rooms-route #utilities-bills-section,
-body.landlord-rooms-route #utilities-payments-section {
+body.landlord-room-ledger-focus #utilities-bills-section,
+body.landlord-rooms-route #utilities-payments-section,
+body.landlord-room-ledger-focus #utilities-payments-section {
   display: none !important;
 }
 
-body.landlord-rooms-route .landlord-workspace {
+body.landlord-rooms-route .landlord-workspace,
+body.landlord-room-ledger-focus .landlord-workspace {
   grid-template-columns: 1fr;
 }
 
@@ -1865,7 +1878,8 @@ body.landlord-rooms-route #overview-rent-status-section {
   order: 5;
 }
 
-body.landlord-rooms-route #residents-section {
+body.landlord-rooms-route #residents-section,
+body.landlord-room-ledger-focus #residents-section {
   order: 10;
 }
 
@@ -3041,12 +3055,13 @@ body.landlord-rooms-route #residents-section {
   padding: 14px;
   border: 1px solid rgba(16, 35, 49, 0.1);
   border-radius: 8px;
-  background: #ffffff;
+  background: #102331;
+  color: #ffffff;
   box-shadow: 0 10px 24px rgba(16, 35, 49, 0.05);
 }
 
 button.daily-card {
-  color: #102331;
+  color: #ffffff;
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -3074,7 +3089,7 @@ button.daily-card-primary {
 }
 
 .daily-card span {
-  color: #32485a;
+  color: #f4f7fa;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -3088,7 +3103,7 @@ button.daily-card-primary {
 }
 
 .daily-card strong {
-  color: #102331;
+  color: #ffffff;
   font-size: 1.35rem;
   line-height: 1.05;
 }
@@ -3098,7 +3113,7 @@ button.daily-card-primary {
 }
 
 .daily-card small {
-  color: #4d6172;
+  color: #d8e0e7;
   line-height: 1.35;
 }
 

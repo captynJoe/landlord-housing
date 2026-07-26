@@ -1544,14 +1544,19 @@ function openMetricTarget(target) {
   }
 }
 
+function clearRoomLedgerWorkspace() {
+  document.body.classList.remove("landlord-room-ledger-focus");
+}
+
 function openDashboardResidentFilter(filter) {
   const normalizedFilter = normalizeRoomLedgerRouteFilter(filter) || "all";
-  if (!isRoomsWorkspaceRoute()) {
-    return openRoomLedgerPage(normalizedFilter);
-  }
+  return openRoomLedgerWorkspace(normalizedFilter);
+}
 
+function openRoomLedgerWorkspace(filter = "all") {
+  const normalizedFilter = normalizeRoomLedgerRouteFilter(filter) || "all";
   const focusedBuildingId = getFocusedBuildingId();
-  const buildingId = focusedBuildingId || state.selectedOverviewRoomBuildingId || "all";
+  const buildingId = focusedBuildingId || state.selectedOverviewRoomBuildingId || state.selectedResidentsBuildingId || "all";
   state.selectedResidentsBuildingId = buildingId;
   state.selectedOverviewRoomBuildingId = buildingId;
 
@@ -1568,8 +1573,15 @@ function openDashboardResidentFilter(filter) {
   }
 
   renderResidentDirectory(state.residentDirectory);
+  document.body.classList.add("landlord-room-ledger-focus");
   setActiveLandlordView("tenants");
-  scrollToLandlordSection("residents-section");
+  if (roomLedgerSectionEl instanceof HTMLDetailsElement) {
+    roomLedgerSectionEl.open = true;
+  }
+  if (utilityRoomStatusSectionEl instanceof HTMLDetailsElement) {
+    utilityRoomStatusSectionEl.open = false;
+  }
+  scrollToLandlordSection("room-ledger-section");
 }
 
 function openCreateBuildingDrawer() {
@@ -12012,9 +12024,10 @@ dashboardActionButtons.forEach((button) => {
 
     switch (action) {
       case "rooms":
-        openRoomLedgerPage("all");
+        openRoomLedgerWorkspace("all");
         break;
       case "record-rent":
+        clearRoomLedgerWorkspace();
         setActiveLandlordView("tenants");
         if (rentPaymentDetailsEl instanceof HTMLDetailsElement) {
           rentPaymentDetailsEl.open = true;
@@ -12022,6 +12035,7 @@ dashboardActionButtons.forEach((button) => {
         scrollToLandlordSection("overview-rent-status-section");
         break;
       case "payments":
+        clearRoomLedgerWorkspace();
         setActiveLandlordView("overview");
         scrollToLandlordSection("overview-collections-section");
         break;
@@ -12033,14 +12047,17 @@ dashboardActionButtons.forEach((button) => {
         openDashboardResidentFilter("vacant");
         break;
       case "requests":
+        clearRoomLedgerWorkspace();
         setActiveLandlordView("applications");
         scrollToLandlordSection("applications-section");
         break;
       case "issues":
+        clearRoomLedgerWorkspace();
         setActiveLandlordView("messages");
         scrollToLandlordSection("overview-issues-section");
         break;
       case "add-tenant":
+        clearRoomLedgerWorkspace();
         openDirectTenantDrawer({ buildingId: focusedBuildingId });
         break;
       default:
@@ -15029,7 +15046,7 @@ roomLedgerToggleEl?.addEventListener("click", (event) => {
   }
 
   event.preventDefault();
-  openRoomLedgerPage(state.residentStatusFilter || "all");
+  openRoomLedgerWorkspace(state.residentStatusFilter || "all");
 });
 
 residentsBuildingSelectEl?.addEventListener("change", () => {
@@ -15089,7 +15106,7 @@ residentsOverviewEl?.addEventListener("click", (event) => {
 
   const filter = String(card.dataset.residentFilter || "all").trim() || "all";
   if (!isRoomsWorkspaceRoute()) {
-    openRoomLedgerPage(filter);
+    openRoomLedgerWorkspace(filter);
     return;
   }
   state.residentStatusFilter = filter;
