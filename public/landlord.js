@@ -234,6 +234,10 @@ const caretakerRequestsBodyEl = document.getElementById("caretaker-requests-body
 const caretakersBodyEl = document.getElementById("caretakers-body");
 const refreshCaretakersBtnEl = document.getElementById("refresh-caretakers");
 
+if (HOUSE_MANAGER_ACCESS_DISABLED && caretakerManagementPanelEl instanceof HTMLElement) {
+  caretakerManagementPanelEl.remove();
+}
+
 const applicationStatusFilterEl = document.getElementById("application-status-filter");
 const applicationsBodyEl = document.getElementById("applications-body");
 const refreshApplicationsBtnEl = document.getElementById("refresh-applications");
@@ -6355,7 +6359,7 @@ async function ensureSession() {
     setStatus(`Signed in as ${formatRoleLabel(role)}.`);
     return true;
   } catch (error) {
-    handleLandlordError(error, "Manager session is not available.");
+    handleLandlordError(error, "Workspace session is not available.");
     return false;
   }
 }
@@ -11471,7 +11475,6 @@ async function loadLandlordWifiPackages() {
 async function loadCaretakers() {
   if (HOUSE_MANAGER_ACCESS_DISABLED) {
     state.caretakers = [];
-    renderCaretakers(state.caretakers);
     return;
   }
 
@@ -11510,7 +11513,6 @@ async function loadOwnerStaff() {
 async function loadCaretakerAccessRequests() {
   if (HOUSE_MANAGER_ACCESS_DISABLED) {
     state.caretakerRequests = [];
-    renderCaretakerRequests(state.caretakerRequests);
     return;
   }
 
@@ -11722,8 +11724,6 @@ async function activateBuilding(buildingId, options = {}) {
     loadPayments(),
     loadExpenditures(),
     loadMoveOutSettlements(),
-    loadCaretakerAccessRequests(),
-    loadCaretakers(),
     loadLandlordTickets(),
     loadLandlordWifiPackages(),
     loadResidents()
@@ -11812,10 +11812,8 @@ function applyLandlordStartupData(startup) {
     state.selectedRegistryBuildingId
   );
   state.utilitySheetMonthlyCombinedCharge = null;
-  state.caretakerRequests = Array.isArray(startup?.caretakerRequests)
-    ? startup.caretakerRequests
-    : [];
-  state.caretakers = Array.isArray(startup?.caretakers) ? startup.caretakers : [];
+  state.caretakerRequests = [];
+  state.caretakers = [];
   setOwnerStaffData(startup?.ownerStaff);
   state.ownerNotifications = Array.isArray(startup?.ownerNotifications?.notifications)
     ? startup.ownerNotifications.notifications
@@ -11871,8 +11869,10 @@ function applyLandlordStartupData(startup) {
   renderOwnerStaff();
   renderOwnerNotifications();
   renderMessageCenter();
-  renderCaretakerRequests(state.caretakerRequests);
-  renderCaretakers(state.caretakers);
+  if (!HOUSE_MANAGER_ACCESS_DISABLED) {
+    renderCaretakerRequests(state.caretakerRequests);
+    renderCaretakers(state.caretakers);
+  }
   renderLandlordTickets(state.tickets);
   renderMeters(state.meters);
   renderUtilityRoomSummary(state.bills);
@@ -11906,8 +11906,6 @@ async function loadDataLegacy() {
       loadLandlordWifiPackages(),
       loadOwnerStaff(),
       loadMessageCenter(),
-      loadCaretakerAccessRequests(),
-      loadCaretakers(),
       loadLandlordTickets(),
       loadMeters(),
       loadBills(),
@@ -11919,8 +11917,8 @@ async function loadDataLegacy() {
     await loadResidents();
     setStatus(`Signed in as ${formatRoleLabel(state.role)}. Data refreshed.`);
   } catch (error) {
-    handleLandlordError(error, "Unable to load manager data.");
-    setStatus("Manager data load failed.");
+    handleLandlordError(error, "Unable to load workspace data.");
+    setStatus("Workspace data load failed.");
   }
 }
 
@@ -11936,8 +11934,6 @@ async function hydrateDeferredLandlordData() {
     loadLandlordWifiPackages,
     loadOwnerStaff,
     loadMessageCenter,
-    loadCaretakerAccessRequests,
-    loadCaretakers,
     loadLandlordTickets,
     loadRegistryRows,
     loadMeters,
@@ -11953,7 +11949,7 @@ async function hydrateDeferredLandlordData() {
         (result) => result.status === "rejected" && result.reason?.status === 401
       );
       if (unauthorized?.status === "rejected") {
-        handleLandlordError(unauthorized.reason, "Manager session is not available.");
+        handleLandlordError(unauthorized.reason, "Workspace session is not available.");
         return;
       }
 
@@ -11991,8 +11987,8 @@ async function loadData(options = {}) {
       return;
     }
 
-    handleLandlordError(error, "Unable to load manager data.");
-    setStatus("Manager data load failed.");
+    handleLandlordError(error, "Unable to load workspace data.");
+    setStatus("Workspace data load failed.");
   }
 }
 
@@ -14090,8 +14086,6 @@ registryBuildingSelectEl.addEventListener("change", () => {
     loadPayments(),
     loadExpenditures(),
     loadMoveOutSettlements(),
-    loadCaretakerAccessRequests(),
-    loadCaretakers(),
     loadResidents(),
     loadLandlordTickets()
   ]).catch(
@@ -14109,9 +14103,7 @@ registryLoadBtnEl.addEventListener("click", () => {
     loadRegistryReadingBills(),
     loadPayments(),
     loadExpenditures(),
-    loadMoveOutSettlements(),
-    loadCaretakerAccessRequests(),
-    loadCaretakers()
+    loadMoveOutSettlements()
   ]).catch(
     (error) => {
     handleLandlordError(error, "Failed to load building utility registry.");
@@ -14936,8 +14928,6 @@ refreshBuildingsBtnEl.addEventListener("click", () => {
     await loadBuildings();
     await Promise.all([
       loadRegistryRows(),
-      loadCaretakerAccessRequests(),
-      loadCaretakers(),
       loadLandlordTickets()
     ]);
   })().catch((error) => {

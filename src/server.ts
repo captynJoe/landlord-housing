@@ -4371,6 +4371,24 @@ async function bootstrap() {
     return null;
   };
 
+  const hasLandlordOrStaffWorkspaceAccess = (context: { role: string }) =>
+    isOwnerAccessRole(context.role);
+
+  const requireLandlordOrStaffWorkspaceAccess = (
+    res: express.Response,
+    context: { role: string },
+    actionLabel = "complete this action"
+  ) => {
+    if (hasLandlordOrStaffWorkspaceAccess(context)) {
+      return true;
+    }
+
+    res.status(403).json({
+      error: `Sign in as landlord or staff to ${actionLabel}.`
+    });
+    return false;
+  };
+
   const requireBackedLandlordSession = async (
     req: express.Request,
     res: express.Response,
@@ -7051,87 +7069,21 @@ async function bootstrap() {
           limit: 500
         })
       : Promise.resolve([]);
-    const caretakerAccessPromise = quickStartup
-      ? Promise.resolve({
-          caretakerRequests: [] as Array<ReturnType<typeof mapCaretakerAccessRequestWithUser>>,
-          caretakers: [] as Array<
-            CaretakerAccessRecord & {
-              user: {
-                id: string;
-                fullName: string;
-                email: string | null;
-                phone: string;
-                role: string;
-                status: string;
-              } | null;
-            }
-          >
-        })
-      : (async () => {
-      if (!registryBuildingId) {
-        return {
-          caretakerRequests: [] as Array<
-            ReturnType<typeof mapCaretakerAccessRequestWithUser>
-          >,
-          caretakers: [] as Array<
-            CaretakerAccessRecord & {
-              user: {
-                id: string;
-                fullName: string;
-                email: string | null;
-                phone: string;
-                role: string;
-                status: string;
-              } | null;
-            }
-          >
-        };
-      }
-
-      if (!repositoryContext.prisma) {
-        throw new Error("Caretaker access management requires database connection.");
-      }
-
-      const pendingRequests = listCaretakerAccessRequests({
-        buildingId: registryBuildingId,
-        status: "pending"
-      });
-      const caretakerRecords = listCaretakerRecordsForBuilding(registryBuildingId);
-      const userIds = [
-        ...new Set([
-          ...pendingRequests.map((item) => item.userId),
-          ...caretakerRecords.map((item) => item.userId)
-        ])
-      ];
-
-      const users =
-        userIds.length > 0
-          ? await repositoryContext.prisma.housingUser.findMany({
-              where: {
-                id: { in: userIds }
-              },
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-                phone: true,
-                role: true,
-                status: true
-              }
-            })
-          : [];
-      const userById = new Map(users.map((item) => [item.id, item]));
-
-      return {
-        caretakerRequests: pendingRequests.map((item) =>
-          mapCaretakerAccessRequestWithUser(item, userById.get(item.userId) ?? null)
-        ),
-        caretakers: caretakerRecords.map((item) => ({
-          ...item,
-          user: userById.get(item.userId) ?? null
-        }))
-      };
-    })();
+    const caretakerAccessPromise = Promise.resolve({
+      caretakerRequests: [] as Array<ReturnType<typeof mapCaretakerAccessRequestWithUser>>,
+      caretakers: [] as Array<
+        CaretakerAccessRecord & {
+          user: {
+            id: string;
+            fullName: string;
+            email: string | null;
+            phone: string;
+            role: string;
+            status: string;
+          } | null;
+        }
+      >
+    });
     const ownerStaffPromise =
       quickStartup ||
       context.role === "caretaker" ||
@@ -10873,10 +10825,8 @@ async function bootstrap() {
         return;
       }
 
-      if (!isOwnerAccessRole(context.role)) {
-        return res.status(403).json({
-          error: "Landlord access is required to manage staff accounts."
-        });
+      if (!requireLandlordOrStaffWorkspaceAccess(res, context, "manage staff accounts")) {
+        return;
       }
 
       if (!userAccountService) {
@@ -10899,10 +10849,8 @@ async function bootstrap() {
         return;
       }
 
-      if (!isOwnerAccessRole(context.role)) {
-        return res.status(403).json({
-          error: "Landlord access is required to manage staff accounts."
-        });
+      if (!requireLandlordOrStaffWorkspaceAccess(res, context, "manage staff accounts")) {
+        return;
       }
 
       if (!userAccountService) {
@@ -10914,6 +10862,19 @@ async function bootstrap() {
       const parsed = ownerStaffCreateSchema.parse(req.body ?? {});
       try {
         const staff = await userAccountService.createOwnerStaffUser(parsed);
+        await enqueueLandlordWorkspaceNotification(context, {
+          title: "Staff Account Added",
+          message: `${actorFromLandlordContext(context).name || "Landlord or staff"} added staff account ${staff.fullName}.`,
+          level: "info",
+          action: "staff.created",
+          dedupeKey: `staff-created-${staff.id}`,
+          metadata: {
+            staffUserId: staff.id,
+            staffName: staff.fullName,
+            staffEmail: staff.email,
+            staffPhone: staff.phone
+          }
+        });
         const data = await userAccountService.listOwnerStaffUsers();
         return res.status(201).json({
           data: {
@@ -10952,10 +10913,8 @@ async function bootstrap() {
         return;
       }
 
-      if (!isOwnerAccessRole(context.role)) {
-        return res.status(403).json({
-          error: "Landlord access is required to manage staff accounts."
-        });
+      if (!requireLandlordOrStaffWorkspaceAccess(res, context, "manage staff accounts")) {
+        return;
       }
 
       if (!userAccountService) {
@@ -10974,6 +10933,20 @@ async function bootstrap() {
         const staff = await userAccountService.disableOwnerStaffUser(userId, {
           ...parsed,
           actorUserId: context.userId
+        });
+        await enqueueLandlordWorkspaceNotification(context, {
+          title: "Staff Account Disabled",
+          message: `${actorFromLandlordContext(context).name || "Landlord or staff"} disabled staff account ${staff.fullName}.`,
+          level: "warning",
+          action: "staff.disabled",
+          dedupeKey: `staff-disabled-${staff.id}-${staff.updatedAt}`,
+          metadata: {
+            staffUserId: staff.id,
+            staffName: staff.fullName,
+            staffEmail: staff.email,
+            staffPhone: staff.phone,
+            note: parsed.note
+          }
         });
         const data = await userAccountService.listOwnerStaffUsers();
         return res.json({
