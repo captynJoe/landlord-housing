@@ -82,6 +82,17 @@ const roomsWorkspaceBuildingId =
   roomsWorkspacePathSegments[1] === "rooms"
     ? decodeURIComponent(roomsWorkspacePathSegments[2] ?? "").trim()
     : "";
+const ROOM_LEDGER_ROUTE_FILTERS = new Set([
+  "all",
+  "overdue",
+  "current_due",
+  "awaiting_readings",
+  "clear",
+  "with_balance",
+  "vacant",
+  "occupied",
+  "pending_review"
+]);
 
 document.body.classList.toggle("landlord-rooms-route", Boolean(roomsWorkspaceBuildingId));
 
@@ -238,6 +249,7 @@ const residentsSearchSummaryEl = document.getElementById("residents-search-summa
 const roomLedgerSummaryEl = document.getElementById("room-ledger-summary");
 const roomLedgerTableEl = document.querySelector(".room-ledger-table");
 const roomLedgerSectionEl = document.getElementById("room-ledger-section");
+const roomLedgerToggleEl = roomLedgerSectionEl?.querySelector("summary");
 const overviewRentStatusSectionEl = document.getElementById("overview-rent-status-section");
 const utilityRoomStatusSectionEl = document.getElementById("utility-room-status-section");
 const roomLedgerBodyEl = document.getElementById("room-ledger-body");
@@ -1530,6 +1542,34 @@ function openMetricTarget(target) {
       setActiveLandlordView("overview");
       break;
   }
+}
+
+function openDashboardResidentFilter(filter) {
+  const normalizedFilter = normalizeRoomLedgerRouteFilter(filter) || "all";
+  if (!isRoomsWorkspaceRoute()) {
+    return openRoomLedgerPage(normalizedFilter);
+  }
+
+  const focusedBuildingId = getFocusedBuildingId();
+  const buildingId = focusedBuildingId || state.selectedOverviewRoomBuildingId || "all";
+  state.selectedResidentsBuildingId = buildingId;
+  state.selectedOverviewRoomBuildingId = buildingId;
+
+  if (residentsBuildingSelectEl instanceof HTMLSelectElement) {
+    residentsBuildingSelectEl.value = buildingId;
+  }
+  if (overviewRoomBuildingSelectEl instanceof HTMLSelectElement) {
+    overviewRoomBuildingSelectEl.value = buildingId;
+  }
+
+  state.residentStatusFilter = normalizedFilter;
+  if (residentsStatusFilterEl instanceof HTMLSelectElement) {
+    residentsStatusFilterEl.value = state.residentStatusFilter;
+  }
+
+  renderResidentDirectory(state.residentDirectory);
+  setActiveLandlordView("tenants");
+  scrollToLandlordSection("residents-section");
 }
 
 function openCreateBuildingDrawer() {
@@ -3008,15 +3048,47 @@ function applyRoomsWorkspaceLayout() {
   }
 
   setActiveLandlordView("tenants");
-  if (overviewRentStatusSectionEl instanceof HTMLDetailsElement) {
-    overviewRentStatusSectionEl.open = true;
-  }
   if (utilityRoomStatusSectionEl instanceof HTMLDetailsElement) {
-    utilityRoomStatusSectionEl.open = true;
+    utilityRoomStatusSectionEl.open = false;
   }
   if (roomLedgerSectionEl instanceof HTMLDetailsElement) {
-    roomLedgerSectionEl.open = false;
+    roomLedgerSectionEl.open = true;
   }
+  scrollToLandlordSection("room-ledger-section");
+}
+
+function normalizeRoomLedgerRouteFilter(filter) {
+  const normalized = String(filter ?? "").trim();
+  return ROOM_LEDGER_ROUTE_FILTERS.has(normalized) ? normalized : "";
+}
+
+function getRoomsDeepLinkFilter() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeRoomLedgerRouteFilter(params.get("filter"));
+}
+
+function buildRoomLedgerPath(buildingId, filter = "all") {
+  const normalizedBuildingId = String(buildingId || "all").trim() || "all";
+  const normalizedFilter = normalizeRoomLedgerRouteFilter(filter) || "all";
+  const path = "/landlord/rooms/" + encodeURIComponent(normalizedBuildingId);
+  return normalizedFilter === "all"
+    ? path
+    : path + "?filter=" + encodeURIComponent(normalizedFilter);
+}
+
+function getDashboardRoomLedgerBuildingId() {
+  return (
+    getFocusedBuildingId() ||
+    state.selectedOverviewRoomBuildingId ||
+    state.selectedResidentsBuildingId ||
+    state.buildings[0]?.id ||
+    "all"
+  );
+}
+
+function openRoomLedgerPage(filter = "all", buildingId = getDashboardRoomLedgerBuildingId()) {
+  window.location.href = buildRoomLedgerPath(buildingId, filter);
+  return true;
 }
 
 function getRentSetupDeepLink() {
@@ -8805,7 +8877,7 @@ function renderOverviewCollections(rows) {
   const visibleRows = getRowsForFocusedBuilding(rows);
   if (visibleRows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="10">No rent collection records for the current building.</td>';
+    row.innerHTML = '<td colspan="11">No rent collection records for the current building.</td>';
     overviewCollectionsBodyEl.append(row);
     return;
   }
@@ -8853,6 +8925,16 @@ function renderOverviewCollections(rows) {
       <td>${escapeHtml(formatCurrency(totalOutstandingKsh))}</td>
       <td>${escapeHtml(latestPayment)}</td>
       <td>${escapeHtml(item.latestPaymentReference ?? "-")}</td>
+      <td>
+        <button
+          type="button"
+          data-action="open-room-account"
+          data-building-id="${escapeHtml(item.buildingId)}"
+          data-house-number="${escapeHtml(item.houseNumber)}"
+        >
+          Open Room Page
+        </button>
+      </td>
     `;
     overviewCollectionsBodyEl.append(row);
   });
@@ -8909,7 +8991,7 @@ function renderRoomLedgerActions(resident, totalBalanceKsh) {
   const buttons = [
     `<button type="button" data-action="open-room-account" data-building-id="${escapeHtml(
       buildingId
-    )}" data-house-number="${escapeHtml(houseNumber)}">Manage</button>`
+    )}" data-house-number="${escapeHtml(houseNumber)}">Open Page</button>`
   ];
 
   if (!hasResident && !isCaretakerRole()) {
@@ -9079,15 +9161,9 @@ function renderRoomLedger(rows) {
         ? formatDateTime(nextDueDate)
         : "-";
 
-    row.className = ["account-drilldown-row", "room-ledger-row", tableRowToneClass(billingToneClass)]
+    row.className = ["room-ledger-row", tableRowToneClass(billingToneClass)]
       .filter(Boolean)
       .join(" ");
-    row.dataset.action = "open-room-account-row";
-    row.dataset.buildingId = String(resident.buildingId ?? "");
-    row.dataset.houseNumber = houseNumber;
-    row.tabIndex = 0;
-    row.setAttribute("role", "link");
-    row.setAttribute("title", `Open room account ${houseNumber}`);
     row.innerHTML = `
       ${buildingCell}
       <td><strong>${escapeHtml(houseNumber)}</strong></td>
@@ -11010,13 +11086,13 @@ function renderMetrics() {
         )
       : actionableBills.reduce((sum, item) => sum + utilityAmount(item.balanceKsh), 0);
 
-  metricMetersEl.textContent = String(meters);
-  metricUsersEl.textContent = String(residentUsers);
-  metricBillsEl.textContent = String(bills);
-  metricUnpaidEl.textContent = String(unpaid);
-  metricOverdueEl.textContent = String(overdue);
-  metricPaymentsEl.textContent = formatCurrency(paidTotal);
-  metricBalanceEl.textContent = formatCurrency(outstanding);
+  if (metricMetersEl instanceof HTMLElement) metricMetersEl.textContent = String(meters);
+  if (metricUsersEl instanceof HTMLElement) metricUsersEl.textContent = String(residentUsers);
+  if (metricBillsEl instanceof HTMLElement) metricBillsEl.textContent = String(bills);
+  if (metricUnpaidEl instanceof HTMLElement) metricUnpaidEl.textContent = String(unpaid);
+  if (metricOverdueEl instanceof HTMLElement) metricOverdueEl.textContent = String(overdue);
+  if (metricPaymentsEl instanceof HTMLElement) metricPaymentsEl.textContent = formatCurrency(paidTotal);
+  if (metricBalanceEl instanceof HTMLElement) metricBalanceEl.textContent = formatCurrency(outstanding);
   renderLandlordFocusPanel();
   renderDailyDashboard();
 }
@@ -11630,6 +11706,13 @@ function applyLandlordStartupData(startup) {
   const hasDeepLinkBuilding = state.buildings.some(
     (item) => item.id === deepLinkBuildingId
   );
+  const roomRouteTargetsAllBuildings = isRoomsWorkspaceRoute() && deepLinkBuildingId === "all";
+  const roomRouteBuildingId = hasDeepLinkBuilding
+    ? deepLinkBuildingId
+    : roomRouteTargetsAllBuildings
+      ? "all"
+      : "";
+  const roomRouteFilter = getRoomsDeepLinkFilter();
 
   state.selectedRoomBuildingId = String(
     (hasDeepLinkBuilding ? deepLinkBuildingId : selection.roomBuildingId) ||
@@ -11645,10 +11728,10 @@ function applyLandlordStartupData(startup) {
     selection.caretakerBuildingId || state.selectedRegistryBuildingId || ""
   ).trim();
   state.selectedResidentsBuildingId = state.buildings.length
-    ? String(hasDeepLinkBuilding ? deepLinkBuildingId : selection.residentsBuildingId || "all").trim() || "all"
+    ? String(roomRouteBuildingId || selection.residentsBuildingId || "all").trim() || "all"
     : "";
   state.selectedOverviewRoomBuildingId =
-    String(hasDeepLinkBuilding ? deepLinkBuildingId : selection.overviewRoomBuildingId || "all").trim() || "all";
+    String(roomRouteBuildingId || selection.overviewRoomBuildingId || "all").trim() || "all";
   state.selectedTicketBuildingId = String(selection.ticketBuildingId || "").trim();
   state.selectedWifiPackageBuildingId = String(
     selection.wifiPackageBuildingId || ""
@@ -11666,6 +11749,13 @@ function applyLandlordStartupData(startup) {
   state.selectedMessageBuildingId = String(
     selection.messageBuildingId || state.selectedRegistryBuildingId || state.buildings[0]?.id || ""
   ).trim();
+
+  if (roomRouteFilter) {
+    state.residentStatusFilter = roomRouteFilter;
+    if (residentsStatusFilterEl instanceof HTMLSelectElement) {
+      residentsStatusFilterEl.value = roomRouteFilter;
+    }
+  }
 
   state.residentUsersCount = state.buildings.reduce(
     (sum, item) => sum + Number(item.residentUsers ?? 0),
@@ -11922,8 +12012,7 @@ dashboardActionButtons.forEach((button) => {
 
     switch (action) {
       case "rooms":
-        setActiveLandlordView("tenants");
-        scrollToLandlordSection("residents-section");
+        openRoomLedgerPage("all");
         break;
       case "record-rent":
         setActiveLandlordView("tenants");
@@ -11931,6 +12020,17 @@ dashboardActionButtons.forEach((button) => {
           rentPaymentDetailsEl.open = true;
         }
         scrollToLandlordSection("overview-rent-status-section");
+        break;
+      case "payments":
+        setActiveLandlordView("overview");
+        scrollToLandlordSection("overview-collections-section");
+        break;
+      case "outstanding":
+      case "unpaid-rooms":
+        openDashboardResidentFilter("with_balance");
+        break;
+      case "vacant-rooms":
+        openDashboardResidentFilter("vacant");
         break;
       case "requests":
         setActiveLandlordView("applications");
@@ -14867,6 +14967,20 @@ refreshRentStatusBtnEl.addEventListener("click", () => {
   });
 });
 
+overviewCollectionsBodyEl?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const button = target.closest("button[data-action='open-room-account']");
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  openRoomAccountPage(button.dataset.buildingId, button.dataset.houseNumber);
+});
+
 rentStatusBodyEl?.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) {
@@ -14908,6 +15022,15 @@ landlordTicketFilterStatusEl?.addEventListener("change", refreshLandlordTickets)
 landlordTicketFilterQueueEl?.addEventListener("change", refreshLandlordTickets);
 landlordTicketBuildingSelectEl?.addEventListener("change", refreshLandlordTickets);
 refreshLandlordTicketsBtnEl?.addEventListener("click", refreshLandlordTickets);
+
+roomLedgerToggleEl?.addEventListener("click", (event) => {
+  if (isRoomsWorkspaceRoute()) {
+    return;
+  }
+
+  event.preventDefault();
+  openRoomLedgerPage(state.residentStatusFilter || "all");
+});
 
 residentsBuildingSelectEl?.addEventListener("change", () => {
   state.selectedResidentsBuildingId = String(residentsBuildingSelectEl.value || "");
@@ -14965,11 +15088,18 @@ residentsOverviewEl?.addEventListener("click", (event) => {
   }
 
   const filter = String(card.dataset.residentFilter || "all").trim() || "all";
+  if (!isRoomsWorkspaceRoute()) {
+    openRoomLedgerPage(filter);
+    return;
+  }
   state.residentStatusFilter = filter;
   if (residentsStatusFilterEl instanceof HTMLSelectElement) {
     residentsStatusFilterEl.value = filter;
   }
   renderResidentDirectory(state.residentDirectory);
+  if (roomLedgerSectionEl instanceof HTMLDetailsElement) {
+    roomLedgerSectionEl.open = true;
+  }
   scrollToLandlordSection(
     String(card.dataset.residentTargetSection || getResidentOverviewTargetSection(filter))
   );

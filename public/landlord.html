@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260722a" />
+    <link rel="stylesheet" href="/landlord.css?v=20260726a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260716b" />
   </head>
   <body>
@@ -226,21 +226,6 @@
               Choose a building to keep the workspace aligned.
             </p>
           </section>
-
-          <section class="metrics-panel">
-            <div class="panel-head">
-              <h2>Numbers</h2>
-            </div>
-            <div class="metrics-grid">
-              <button type="button" class="metric-card metric-card-btn" data-metric-target="meters"><p>Meters</p><strong id="metric-meters">-</strong></button>
-              <button type="button" class="metric-card metric-card-btn" data-metric-target="users"><p>Tenants</p><strong id="metric-users">-</strong></button>
-              <button type="button" class="metric-card metric-card-btn" data-metric-target="posted-bills"><p>Posted Bills</p><strong id="metric-bills">-</strong></button>
-              <button type="button" class="metric-card metric-card-btn" data-metric-target="unpaid-bills"><p>Unpaid Bills</p><strong id="metric-unpaid">-</strong></button>
-              <button type="button" class="metric-card metric-card-btn" data-metric-target="overdue-bills"><p>Overdue</p><strong id="metric-overdue">-</strong></button>
-              <button type="button" class="metric-card metric-card-btn" data-metric-target="payments"><p>Collected</p><strong id="metric-payments">-</strong></button>
-              <button type="button" class="metric-card metric-card-btn" data-metric-target="outstanding"><p>Outstanding</p><strong id="metric-balance">-</strong></button>
-            </div>
-          </section>
         </aside>
         <section class="layout landlord-content">
         <section
@@ -277,36 +262,36 @@
 
           <section class="daily-dashboard" aria-live="polite">
             <div class="daily-dashboard-cards">
-              <article class="daily-card daily-card-primary">
+              <button type="button" class="daily-card daily-card-primary daily-card-btn" data-dashboard-action="payments">
                 <span>Collected This Month</span>
                 <strong id="overview-daily-collected">-</strong>
                 <small>Rent and utility payments</small>
-              </article>
-              <article class="daily-card">
+              </button>
+              <button type="button" class="daily-card daily-card-btn" data-dashboard-action="outstanding">
                 <span>Total Outstanding</span>
                 <strong id="overview-daily-outstanding">-</strong>
                 <small>Rooms needing follow-up</small>
-              </article>
-              <article class="daily-card">
+              </button>
+              <button type="button" class="daily-card daily-card-btn" data-dashboard-action="unpaid-rooms">
                 <span>Unpaid Rooms</span>
                 <strong id="overview-daily-unpaid">-</strong>
                 <small>Rent or utilities open</small>
-              </article>
-              <article class="daily-card">
+              </button>
+              <button type="button" class="daily-card daily-card-btn" data-dashboard-action="issues">
                 <span>Open Issues</span>
                 <strong id="overview-daily-issues">-</strong>
                 <small>Resident reports not resolved</small>
-              </article>
-              <article class="daily-card">
+              </button>
+              <button type="button" class="daily-card daily-card-btn" data-dashboard-action="requests">
                 <span>Tenant Requests</span>
                 <strong id="overview-daily-requests">-</strong>
                 <small>Applications waiting</small>
-              </article>
-              <article class="daily-card">
+              </button>
+              <button type="button" class="daily-card daily-card-btn" data-dashboard-action="vacant-rooms">
                 <span>Vacant Rooms</span>
                 <strong id="overview-daily-vacant">-</strong>
                 <small>Rooms ready for assignment</small>
-              </article>
+              </button>
             </div>
             <div class="daily-action-grid">
               <button type="button" data-dashboard-action="rooms">Room Ledger</button>
@@ -2225,6 +2210,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260722b"></script>
+    <script type="module" src="/landlord.js?v=20260726a"></script>
   </body>
 </html>

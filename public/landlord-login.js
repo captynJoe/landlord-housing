@@ -98,7 +98,7 @@ function setManagerMode(nextMode) {
 
   const statusMessages = {
     landlord:
-      "Landlord sign-in accepts email, phone, or the recovery username for legacy manager access.",
+      "Landlord sign-in accepts email, phone, or the recovery username for recovery access.",
     staff: "Staff sign-in uses the email or phone number issued by the landlord."
   };
   setStatus(statusMessages[managerMode] ?? "Choose Landlord or Staff to continue.");
@@ -113,15 +113,15 @@ function normalizeLandlordSignInError(error) {
   const message = error.message || "";
 
   if (/invalid email/i.test(message)) {
-    return "Manager sign-in accepts email, phone, or username. Check the identifier and password.";
+    return "Landlord sign-in accepts email, phone, or username. Check the identifier and password.";
   }
 
   if (/incorrect password/i.test(message)) {
-    return "Incorrect password for this manager account. Try again or request reset.";
+    return "Incorrect password for this landlord account. Try again or request reset.";
   }
 
   if (/no account found/i.test(message)) {
-    return "No manager account found for that email, phone, or username.";
+    return "No landlord account found for that email, phone, or username.";
   }
 
   if (error.status === 401) {
@@ -201,20 +201,6 @@ function isOwnerStaffPortalRole(role) {
   );
 }
 
-) {
-  const payload = {
-    phoneNumber: String(caretakerPhoneEl?.value || "").trim(),
-    houseNumber: normalizeHouseNumber(caretakerHouseNumberEl?.value),
-    ...extra
-  };
-
-  const buildingId = String(caretakerBuildingEl?.value || "").trim();
-  if (buildingId) {
-    payload.buildingId = buildingId;
-  }
-
-  return payload;
-}
 
 async function requestJson(url, options = {}) {
   const response = await fetch(url, {
@@ -236,7 +222,7 @@ async function requestJson(url, options = {}) {
   return payload;
 }
 
-async async function handleSignedInRole(role, identity = {}) {
+async function handleSignedInRole(role, identity = {}) {
   if (isManagementPortalRole(role)) {
     if (identity?.mustChangePassword) {
       showPermanentPasswordForm(role, identity);
@@ -273,7 +259,7 @@ function showPermanentPasswordForm(role, identity = {}) {
   const label =
     identity.fullName ||
     identity.email ||
-    (role === "caretaker" ? "house manager account" : "manager account");
+    (role === "staff" ? "staff account" : "landlord account");
   setStatus(
     `Temporary password accepted for ${label}. Set a permanent password to continue.`
   );
@@ -294,7 +280,7 @@ async function checkSession() {
       const role = payload.data?.role;
       return handleSignedInRole(role, payload.data ?? {});
     } catch (_userSessionError) {
-      // no active manager/user session
+      // no active landlord, staff, or user session
     }
     return false;
   }
@@ -450,7 +436,7 @@ async function signInStaff() {
   }
 }
 
-async async function requestPasswordReset(event) {
+async function requestPasswordReset(event) {
   event.preventDefault();
   clearAllErrors();
 
@@ -535,7 +521,7 @@ async function submitPermanentPasswordChange(event) {
     setStatus("Password updated. Redirecting...");
     const handled = await handleSignedInRole(payload.data?.role, payload.data ?? {});
     if (!handled) {
-      throw new Error("Password updated, but this account cannot open the manager portal.");
+      throw new Error("Password updated, but this account cannot open the landlord portal.");
     }
   } catch (error) {
     const message =
@@ -570,5 +556,5 @@ managerModeButtons.forEach((button) => {
 });
 
 initPasswordVisibilityToggles();
-setManagerMode("");
+setManagerMode("landlord");
 void checkSession();

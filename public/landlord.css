@@ -1850,6 +1850,7 @@ body.landlord-rooms-route #overview-payment-routing-section,
 body.landlord-rooms-route #overview-payment-instructions-section,
 body.landlord-rooms-route #overview-payment-access-section,
 body.landlord-rooms-route #overview-wifi-packages-section,
+body.landlord-rooms-route #overview-rent-status-section,
 body.landlord-rooms-route #utilities-registry-section,
 body.landlord-rooms-route #utilities-bills-section,
 body.landlord-rooms-route #utilities-payments-section {
@@ -3034,6 +3035,7 @@ body.landlord-rooms-route #residents-section {
 
 .daily-card {
   display: grid;
+  appearance: none;
   gap: 7px;
   min-width: 0;
   padding: 14px;
@@ -3043,13 +3045,36 @@ body.landlord-rooms-route #residents-section {
   box-shadow: 0 10px 24px rgba(16, 35, 49, 0.05);
 }
 
+button.daily-card {
+  color: #102331;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+button.daily-card:hover,
+button.daily-card:focus-visible {
+  border-color: rgba(212, 163, 90, 0.55);
+  box-shadow: 0 14px 30px rgba(16, 35, 49, 0.1);
+}
+
+button.daily-card:focus-visible {
+  outline: 3px solid rgba(212, 163, 90, 0.32);
+  outline-offset: 2px;
+}
+
 .daily-card-primary {
   background: #102331;
   color: #ffffff;
 }
 
+button.daily-card-primary {
+  color: #ffffff;
+}
+
 .daily-card span {
-  color: rgba(16, 35, 49, 0.65);
+  color: #32485a;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -3059,7 +3084,7 @@ body.landlord-rooms-route #residents-section {
 
 .daily-card-primary span,
 .daily-card-primary small {
-  color: rgba(255, 255, 255, 0.72);
+  color: #f4f7fa;
 }
 
 .daily-card strong {
@@ -3073,7 +3098,7 @@ body.landlord-rooms-route #residents-section {
 }
 
 .daily-card small {
-  color: rgba(16, 35, 49, 0.58);
+  color: #4d6172;
   line-height: 1.35;
 }
 
