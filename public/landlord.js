@@ -904,18 +904,29 @@ function clearError() {
   landlordErrorEl.classList.add("hidden");
 }
 
-function formatHouseManagerText(message) {
+function formatWorkspaceText(message) {
   return String(message ?? "")
-    .replace(/\bcaretakers\b/gi, (match) =>
-      match[0] === "C" ? "House managers" : "house managers"
-    )
-    .replace(/\bcaretaker\b/gi, (match) =>
-      match[0] === "C" ? "House manager" : "house manager"
-    );
+    .replace(/House manager access has been retired\. Use a staff account instead\./gi, "Staff access has replaced the old access type. Sign in with a staff or landlord account.")
+    .replace(/House manager accounts cannot [^.]+\./gi, "This retired access type cannot complete that action. Sign in as landlord or staff.")
+    .replace(/house manager accounts cannot [^.]+\./gi, "This retired access type cannot complete that action. Sign in as landlord or staff.")
+    .replace(/Caretaker accounts cannot [^.]+\./gi, "This retired access type cannot complete that action. Sign in as landlord or staff.")
+    .replace(/caretaker accounts cannot [^.]+\./gi, "This retired access type cannot complete that action. Sign in as landlord or staff.")
+    .replace(/Only landlord or staff accounts can (review|approve|revoke) house manager[^.]*\./gi, "Only landlord or staff accounts can manage staff access.")
+    .replace(/house manager request/gi, "staff access request")
+    .replace(/house managers/gi, "staff")
+    .replace(/house manager/gi, "retired access")
+    .replace(/caretakers/gi, "retired access")
+    .replace(/caretaker/gi, "retired access")
+    .replace(/database-backed landlord or staff account/gi, "active landlord or staff login")
+    .replace(/database-backed user accounts/gi, "active user accounts")
+    .replace(/database-backed building configuration/gi, "saved building configuration")
+    .replace(/database-backed repository/gi, "saved account storage");
 }
 
+const formatHouseManagerText = formatWorkspaceText;
+
 function formatRoleLabel(role) {
-  return role === "caretaker" ? "retired house manager" : role;
+  return role === "caretaker" ? "retired staff access" : role;
 }
 
 function isCaretakerRole() {
@@ -6300,6 +6311,11 @@ function renderGlobalSearchBuildingOptions() {
 function handleLandlordError(error, fallback) {
   if (error && error.status === 401) {
     redirectToLogin();
+    return;
+  }
+
+  if (error && error.status === 403 && /sign in|login|active landlord or staff/i.test(String(error.message || ""))) {
+    showError("Your session needs refresh. Sign in again as landlord or staff, then retry this action.");
     return;
   }
 

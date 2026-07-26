@@ -223,7 +223,7 @@ function shouldNotifyStatus(message, force) {
 }
 
 function titleForTone(tone) {
-  if (tone === "error") return "Action needs attention";
+  if (tone === "error") return "Could not complete action";
   if (tone === "warning") return "Review complete";
   return "Done";
 }
@@ -250,7 +250,7 @@ export function notifyError(message, options = {}) {
   showNotificationModal({
     message: text,
     tone: "error",
-    title: options.title ?? "Action needs attention"
+    title: options.title ?? "Could not complete action"
   });
 }
 

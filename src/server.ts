@@ -1336,7 +1336,7 @@ async function bootstrap() {
         /^\/api\/landlord\/buildings\/[^/]+\/caretakers(?:\/|$)/.test(req.path))
     ) {
       return res.status(410).json({
-        error: "House manager access has been retired. Use a staff account instead."
+        error: "Staff access has replaced the old access type. Sign in with a staff or landlord account."
       });
     }
 
@@ -12330,7 +12330,7 @@ async function bootstrap() {
             data.status === "approved"
               ? "Resident Request Approved"
               : "Resident Request Rejected",
-          message: `${actorFromLandlordContext(context).name || "House manager"} ${data.status === "approved" ? "approved" : "rejected"} ${data.tenant?.fullName ?? "a resident"} for ${data.building.name} house ${data.houseNumber}.`,
+          message: `${actorFromLandlordContext(context).name || "Landlord or staff"} ${data.status === "approved" ? "approved" : "rejected"} ${data.tenant?.fullName ?? "a resident"} for ${data.building.name} house ${data.houseNumber}.`,
           level: data.status === "approved" ? "success" : "warning",
           action:
             data.status === "approved"
@@ -16213,7 +16213,7 @@ async function bootstrap() {
         context.role === "caretaker" ? await store.getBuilding(buildingId) : null;
       await enqueueOwnerNotificationForManagerAction(context, {
         title: "Rent Payment Recorded",
-        message: `${actorFromLandlordContext(context).name || "House manager"} recorded ${providerLabel} rent of KSh ${outcome.event.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber}.`,
+        message: `${actorFromLandlordContext(context).name || "Landlord or staff"} recorded ${providerLabel} rent of KSh ${outcome.event.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber}.`,
         level: "success",
         action: "rent.payment.recorded",
         buildingId,
@@ -17149,6 +17149,17 @@ async function bootstrap() {
             });
           }
 
+          const onboardingMetadata = {
+            residentUserId: data.tenant.userId,
+            residentPhone: data.tenant.phone,
+            applicationId: data.application.id,
+            temporaryPasswordSource: data.temporaryPassword.source,
+            billingStartDate,
+            billingStartMonth,
+            releasedBillingHoldIds: releasedBillingHolds.map((item) => item.id),
+            deferredBillingHoldId: deferredBillingHold?.id
+          };
+
           await recordRoomAccountAuditEvent({
             buildingId: building.id,
             houseNumber: data.houseNumber,
@@ -17156,16 +17167,19 @@ async function bootstrap() {
             action: "resident.direct_onboarded",
             summary: `${data.tenant.fullName} added as resident. Billing starts ${billingStartDate}. Password change required on first sign-in.`,
             actor,
-            metadata: {
-              residentUserId: data.tenant.userId,
-              residentPhone: data.tenant.phone,
-              applicationId: data.application.id,
-              temporaryPasswordSource: data.temporaryPassword.source,
-              billingStartDate,
-              billingStartMonth,
-              releasedBillingHoldIds: releasedBillingHolds.map((item) => item.id),
-              deferredBillingHoldId: deferredBillingHold?.id
-            }
+            metadata: onboardingMetadata
+          });
+
+          await enqueueLandlordWorkspaceNotification(context, {
+            title: "Resident Added",
+            message: `${actor.name || "Landlord or staff"} added ${data.tenant.fullName} to ${building.name} house ${data.houseNumber}. Billing starts ${billingStartDate}.`,
+            level: "success",
+            action: "resident.direct_onboarded",
+            buildingId: building.id,
+            buildingName: building.name,
+            houseNumber: data.houseNumber,
+            dedupeKey: `resident-direct-onboarded-${data.tenancyId}`,
+            metadata: onboardingMetadata
           });
 
           let sms: {
@@ -17891,7 +17905,7 @@ async function bootstrap() {
           context.role === "caretaker" ? await store.getBuilding(buildingId) : null;
         await enqueueOwnerNotificationForManagerAction(context, {
           title: `${utilityLabel} Bill Posted`,
-          message: `${actorFromLandlordContext(context).name || "House manager"} posted ${utilityLabel.toLowerCase()} bill of KSh ${data.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber} (${data.billingMonth}).`,
+          message: `${actorFromLandlordContext(context).name || "Landlord or staff"} posted ${utilityLabel.toLowerCase()} bill of KSh ${data.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber} (${data.billingMonth}).`,
           level: "info",
           action: "utility.bill.posted",
           buildingId,
@@ -18092,7 +18106,7 @@ async function bootstrap() {
           context.role === "caretaker" ? await store.getBuilding(buildingId) : null;
         await enqueueOwnerNotificationForManagerAction(context, {
           title: `${utilityLabel} Payment Recorded`,
-          message: `${actorFromLandlordContext(context).name || "House manager"} recorded ${utilityLabel.toLowerCase()} payment of KSh ${data.event.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber}.`,
+          message: `${actorFromLandlordContext(context).name || "Landlord or staff"} recorded ${utilityLabel.toLowerCase()} payment of KSh ${data.event.amountKsh.toLocaleString("en-US")} for ${notificationBuilding?.name ?? buildingId} house ${houseNumber}.`,
           level: "success",
           action: "utility.payment.recorded",
           buildingId,
@@ -18796,7 +18810,7 @@ async function bootstrap() {
         context.role === "caretaker" ? await store.getBuilding(current.buildingId) : null;
       await enqueueOwnerNotificationForManagerAction(context, {
         title: "Support Ticket Updated",
-        message: `${actorFromLandlordContext(context).name || "House manager"} moved ticket ${current.id.slice(0, 8)} for ${notificationBuilding?.name ?? current.buildingId} house ${current.houseNumber} to ${updated.report.status.replace(/_/g, " ")}.`,
+        message: `${actorFromLandlordContext(context).name || "Landlord or staff"} moved ticket ${current.id.slice(0, 8)} for ${notificationBuilding?.name ?? current.buildingId} house ${current.houseNumber} to ${updated.report.status.replace(/_/g, " ")}.`,
         level: updated.report.status === "resolved" ? "success" : "info",
         action: "support_ticket.status_updated",
         buildingId: current.buildingId,

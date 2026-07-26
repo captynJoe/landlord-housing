@@ -1,6 +1,6 @@
 const DEFAULT_RESIDENT_BRAND = "JK Flats Resident";
 const DEFAULT_RESIDENT_PROFILE = "JK Flats Profile";
-const DEFAULT_LANDLORD_BRAND = "JK Flats Manager";
+const DEFAULT_LANDLORD_BRAND = "JK Flats Landlord Workspace";
 const DEFAULT_PUBLIC_HOME = "JK Flats Resident";
 const DEFAULT_PORTFOLIO_BRAND = "JK Flats";
 
@@ -29,7 +29,7 @@ export function getLandlordShellBrand(buildingName) {
 
 export function getLandlordPortalTitle(buildingName) {
   const brand = normalizeBuildingBrand(buildingName);
-  return brand ? `${brand} Manager` : DEFAULT_LANDLORD_BRAND;
+  return brand ? `${brand} Landlord Workspace` : DEFAULT_LANDLORD_BRAND;
 }
 
 export function getPublicHomeTitle(buildingName) {
