@@ -594,6 +594,15 @@ const state = {
 
 const BUILDING_PHOTO_LIMIT = 1;
 const APPLICATION_REFRESH_INTERVAL_MS = 30_000;
+const NEGLIGIBLE_RENT_RESIDUE_KSH = 5;
+
+function normalizeRentLedgerAmountKsh(value) {
+  const amount = Math.max(0, Math.round(Number(value ?? 0)));
+  if (!Number.isFinite(amount)) {
+    return 0;
+  }
+  return amount > NEGLIGIBLE_RENT_RESIDUE_KSH ? amount : 0;
+}
 const UTILITY_BALANCE_VISIBILITY_WINDOW_DAYS = 7;
 const buildingLabelCollator = new Intl.Collator(undefined, {
   numeric: true,
@@ -3604,10 +3613,10 @@ function getResidentOutstandingBalanceKsh(resident) {
 
   const roomBalance = Number(resident?.roomBalanceKsh);
   if (Number.isFinite(roomBalance)) {
-    return Math.max(0, roomBalance);
+    return normalizeRentLedgerAmountKsh(roomBalance);
   }
 
-  const rentBalance = Number(resident?.rentBalanceKsh);
+  const rentBalance = normalizeRentLedgerAmountKsh(resident?.rentBalanceKsh);
   const utilityBalance = Number(resident?.utilityBalanceKsh);
   const expenseBalance = Number(resident?.expenseBalanceKsh ?? resident?.expenseArrearsKsh);
   if (
@@ -3617,7 +3626,7 @@ function getResidentOutstandingBalanceKsh(resident) {
   ) {
     return Math.max(
       0,
-      (Number.isFinite(rentBalance) ? rentBalance : 0) +
+      rentBalance +
         (Number.isFinite(utilityBalance) ? utilityBalance : 0) +
         (Number.isFinite(expenseBalance) ? expenseBalance : 0)
     );
@@ -3644,7 +3653,7 @@ function getResidentUtilityBalanceKsh(resident) {
   }
 
   const outstandingBalanceKsh = getResidentOutstandingBalanceKsh(resident);
-  const rentBalanceKsh = Math.max(0, Number(resident?.rentBalanceKsh ?? 0));
+  const rentBalanceKsh = normalizeRentLedgerAmountKsh(resident?.rentBalanceKsh);
   const expenseBalanceKsh = getResidentExpenseBalanceKsh(resident);
   return Math.max(0, outstandingBalanceKsh - rentBalanceKsh - expenseBalanceKsh);
 }
@@ -3652,12 +3661,12 @@ function getResidentUtilityBalanceKsh(resident) {
 function getResidentMonthlyRentKsh(resident, agreement) {
   const agreementRent = Number(agreement?.monthlyRentKsh);
   if (Number.isFinite(agreementRent) && agreementRent >= 0) {
-    return agreementRent;
+    return normalizeRentLedgerAmountKsh(agreementRent);
   }
 
   const residentRent = Number(resident?.monthlyRentKsh);
   if (Number.isFinite(residentRent) && residentRent >= 0) {
-    return residentRent;
+    return normalizeRentLedgerAmountKsh(residentRent);
   }
 
   return 0;
@@ -3670,10 +3679,10 @@ function getResidentCurrentRentDueKsh(resident, agreement) {
 
   const explicitCurrentDue = Number(resident?.currentRentDueKsh);
   if (Number.isFinite(explicitCurrentDue)) {
-    return Math.max(0, explicitCurrentDue);
+    return normalizeRentLedgerAmountKsh(explicitCurrentDue);
   }
 
-  const rentBalanceKsh = Math.max(0, Number(resident?.rentBalanceKsh ?? 0));
+  const rentBalanceKsh = normalizeRentLedgerAmountKsh(resident?.rentBalanceKsh);
   const monthlyRentKsh = getResidentMonthlyRentKsh(resident, agreement);
   if (monthlyRentKsh > 0) {
     return Math.min(rentBalanceKsh, monthlyRentKsh);
@@ -3689,10 +3698,10 @@ function getResidentRentArrearsKsh(resident, agreement) {
 
   const explicitArrears = Number(resident?.rentArrearsKsh);
   if (Number.isFinite(explicitArrears)) {
-    return Math.max(0, explicitArrears);
+    return normalizeRentLedgerAmountKsh(explicitArrears);
   }
 
-  const rentBalanceKsh = Math.max(0, Number(resident?.rentBalanceKsh ?? 0));
+  const rentBalanceKsh = normalizeRentLedgerAmountKsh(resident?.rentBalanceKsh);
   const currentRentDueKsh = getResidentCurrentRentDueKsh(resident, agreement);
   return Math.max(0, rentBalanceKsh - currentRentDueKsh);
 }
@@ -9147,7 +9156,7 @@ function renderRoomLedger(rows) {
     const rentArrearsKsh = getResidentRentArrearsKsh(resident);
     const rentBalanceKsh = Math.max(
       rentCurrentDueKsh + rentArrearsKsh,
-      Math.max(0, utilityAmount(resident.rentBalanceKsh))
+      normalizeRentLedgerAmountKsh(resident.rentBalanceKsh)
     );
     const monthlyRentKsh = getResidentMonthlyRentKsh(resident);
     const utilityOpenKsh = Math.max(
@@ -10102,7 +10111,7 @@ function renderResidentDrawer(resident) {
           <div><span>Overdue Starts</span><strong>${escapeHtml(overdueStartSummary)}</strong></div>
           <div><span>Grace Days</span><strong>${escapeHtml(String(rentGraceDays))}</strong></div>
           <div><span>Current Balance</span><strong>${escapeHtml(
-            formatCurrency(Number(resident.rentBalanceKsh ?? 0))
+            formatCurrency(normalizeRentLedgerAmountKsh(resident.rentBalanceKsh))
           )}</strong></div>
         </div>
         ${

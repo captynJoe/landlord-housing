@@ -211,6 +211,25 @@ const RESIDENT_ID_GRACE_PERIOD_HOURS = 48;
 const RESIDENT_ID_GRACE_PERIOD_MS =
   RESIDENT_ID_GRACE_PERIOD_HOURS * 60 * 60 * 1000;
 const EMPTY_ROOM_ONBOARDING_BALANCE_TOLERANCE_KSH = 5;
+const NEGLIGIBLE_RENT_RESIDUE_KSH = EMPTY_ROOM_ONBOARDING_BALANCE_TOLERANCE_KSH;
+
+function normalizeBillableRentAmountKsh(value: unknown): number {
+  const amount = Math.max(0, Math.round(Number(value ?? 0)));
+  return Number.isFinite(amount) && amount > NEGLIGIBLE_RENT_RESIDUE_KSH ? amount : 0;
+}
+
+function normalizeOptionalBillableRentAmountKsh(value: unknown): number | null {
+  if (value == null) {
+    return null;
+  }
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  return normalizeBillableRentAmountKsh(amount);
+}
 const HOUSING_DIAGNOSTIC_LOGS_ENABLED =
   process.env.HOUSING_DIAGNOSTIC_LOGS_ENABLED !== "false";
 const LOCAL_MEDIA_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
@@ -5207,7 +5226,7 @@ async function bootstrap() {
       const roomRentDefault = roomRentDefaultsByHouse.get(houseNumber);
       const roomDefaultActive = roomRentDefault?.active ?? true;
       const roomDefaultMonthlyRentKsh = roomDefaultActive
-        ? normalizeOptionalNonNegativeInteger(roomRentDefault?.monthlyRentKsh)
+        ? normalizeOptionalBillableRentAmountKsh(roomRentDefault?.monthlyRentKsh)
         : null;
       const roomDefaultRentDueDay = roomDefaultActive
         ? normalizeOptionalRentDueDay(roomRentDefault?.paymentDueDay)
@@ -5216,7 +5235,7 @@ async function bootstrap() {
         ? normalizeOptionalGraceDays(roomRentDefault?.graceDays)
         : undefined;
       const buildingDefaultMonthlyRentKsh =
-        normalizeOptionalNonNegativeInteger(buildingConfiguration?.defaultMonthlyRentKsh) ??
+        normalizeOptionalBillableRentAmountKsh(buildingConfiguration?.defaultMonthlyRentKsh) ??
         undefined;
       const buildingDefaultRentDueDay = normalizeOptionalRentDueDay(
         buildingConfiguration?.defaultRentDueDay
@@ -5225,7 +5244,7 @@ async function bootstrap() {
         0,
         Number(buildingConfiguration?.rentGraceDays ?? rentLatePenaltyPolicy.graceDays ?? 0)
       );
-      const legacyAgreementMonthlyRentKsh = normalizeOptionalNonNegativeInteger(
+      const legacyAgreementMonthlyRentKsh = normalizeOptionalBillableRentAmountKsh(
         agreement?.monthlyRentKsh
       );
       const legacyAgreementPaymentDueDay = normalizeOptionalRentDueDay(
@@ -5273,10 +5292,10 @@ async function bootstrap() {
             )
           : undefined;
       const monthlyRentKsh = paymentAccess.rentEnabled
-        ? Math.max(0, Number(rent?.monthlyRentKsh ?? configuredMonthlyRentKsh))
+        ? normalizeBillableRentAmountKsh(rent?.monthlyRentKsh ?? configuredMonthlyRentKsh)
         : 0;
       const rentBalanceKsh = paymentAccess.rentEnabled
-        ? Math.max(0, Number(rent?.balanceKsh ?? fallbackRentBalanceKsh))
+        ? normalizeBillableRentAmountKsh(rent?.balanceKsh ?? fallbackRentBalanceKsh)
         : 0;
       const currentRentDueKsh = paymentAccess.rentEnabled
         ? Math.max(
@@ -6700,7 +6719,7 @@ async function bootstrap() {
           continue;
         }
 
-        const monthlyRentKsh = Math.max(0, Number(agreement.monthlyRentKsh ?? 0));
+        const monthlyRentKsh = normalizeBillableRentAmountKsh(agreement.monthlyRentKsh);
         if (monthlyRentKsh <= 0) {
           continue;
         }
@@ -6769,16 +6788,11 @@ async function bootstrap() {
       registryRows.find(
         (item) => normalizeHouseNumber(item.houseNumber) === normalizedHouseNumber
       ) ?? null;
-    const configuredMonthlyRentKsh = Math.max(
-      0,
-      Math.round(
-        Number(
-          registryRow?.configuredMonthlyRentKsh ??
-            registryRow?.monthlyRentKsh ??
-            ledgerRentDue?.monthlyRentKsh ??
-            0
-        )
-      )
+    const configuredMonthlyRentKsh = normalizeBillableRentAmountKsh(
+      registryRow?.configuredMonthlyRentKsh ??
+        registryRow?.monthlyRentKsh ??
+        ledgerRentDue?.monthlyRentKsh ??
+        0
     );
     const configuredPaymentDueDay =
       registryRow?.configuredPaymentDueDay ?? normalizeOptionalRentDueDay(undefined);
@@ -6822,9 +6836,8 @@ async function bootstrap() {
       ledgerRentDue?.dueDate ??
       registryRow?.rentDueDate ??
       buildAgreementFallbackRentDueDate(configuredPaymentDueDay);
-    const balanceKsh = Math.max(
-      0,
-      Math.round(Number(ledgerRentDue?.balanceKsh ?? configuredMonthlyRentKsh))
+    const balanceKsh = normalizeBillableRentAmountKsh(
+      ledgerRentDue?.balanceKsh ?? configuredMonthlyRentKsh
     );
     const currentMonthLatePenaltyKsh = Math.max(
       0,
@@ -15495,7 +15508,7 @@ async function bootstrap() {
 
           rentSetupRowsByHouse.set(houseNumber, row);
           const active = row.active !== false;
-          const monthlyRentKsh = normalizeOptionalNonNegativeInteger(row.monthlyRentKsh);
+          const monthlyRentKsh = normalizeOptionalBillableRentAmountKsh(row.monthlyRentKsh);
           const paymentDueDay = normalizeOptionalRentDueDay(row.paymentDueDay) ?? null;
           const graceDays = normalizeOptionalGraceDays(row.graceDays) ?? null;
           const note = row.note?.trim() || null;
@@ -15563,9 +15576,8 @@ async function bootstrap() {
             continue;
           }
 
-          const monthlyRentKsh = Math.max(
-            0,
-            Math.round(Number(refreshed.configuredMonthlyRentKsh ?? 0))
+          const monthlyRentKsh = normalizeBillableRentAmountKsh(
+            refreshed.configuredMonthlyRentKsh ?? 0
           );
           const sourceRow = rentSetupRowsByHouse.get(houseNumber);
           const currentMonthPaidKsh = normalizeOptionalNonNegativeInteger(
@@ -15847,15 +15859,16 @@ async function bootstrap() {
           }
 
           const existing = rentLedgerService.getRentDue(building.id, houseNumber);
+          const normalizedMonthlyRentKsh = normalizeBillableRentAmountKsh(row.monthlyRentKsh);
           const balanceKsh =
             row.balanceKsh == null
-              ? Math.max(
-                  0,
-                  Number(existing?.balanceKsh ?? (row.monthlyRentKsh > 0 ? row.monthlyRentKsh : 0))
+              ? normalizeBillableRentAmountKsh(
+                  existing?.balanceKsh ??
+                    (normalizedMonthlyRentKsh > 0 ? normalizedMonthlyRentKsh : 0)
                 )
-              : Math.max(0, Math.round(row.balanceKsh));
+              : normalizeBillableRentAmountKsh(row.balanceKsh);
           const snapshot = rentLedgerService.upsertRentDue(building.id, houseNumber, {
-            monthlyRentKsh: Math.max(0, Math.round(row.monthlyRentKsh)),
+            monthlyRentKsh: normalizedMonthlyRentKsh,
             balanceKsh,
             dueDate: parsed.dueDate,
             note:
@@ -15889,7 +15902,7 @@ async function bootstrap() {
                   emergencyContactPhone: currentAgreement?.emergencyContactPhone,
                   leaseStartDate: currentAgreement?.leaseStartDate,
                   leaseEndDate: currentAgreement?.leaseEndDate,
-                  monthlyRentKsh: Math.max(0, Math.round(row.monthlyRentKsh)),
+                  monthlyRentKsh: normalizedMonthlyRentKsh,
                   depositKsh: Math.max(0, Math.round(row.depositKsh)),
                   depositPaidKsh: Math.min(
                     Math.max(0, Number(currentAgreement?.depositPaidKsh ?? 0)),
@@ -16112,7 +16125,7 @@ async function bootstrap() {
           houseNumber
         });
         const agreement = agreementState.agreement;
-        const monthlyRentKsh = Math.max(0, Number(agreement?.monthlyRentKsh ?? 0));
+        const monthlyRentKsh = normalizeBillableRentAmountKsh(agreement?.monthlyRentKsh);
 
         if (agreementState.hasActiveResident && agreement && monthlyRentKsh > 0) {
           const now = new Date();
@@ -17127,7 +17140,7 @@ async function bootstrap() {
                 emergencyContactPhone: agreement.emergencyContactPhone,
                 leaseStartDate: billingStartDate,
                 leaseEndDate: agreement.leaseEndDate,
-                monthlyRentKsh: agreement.monthlyRentKsh,
+                monthlyRentKsh: normalizeBillableRentAmountKsh(agreement.monthlyRentKsh),
                 depositKsh: agreement.depositKsh,
                 depositPaidKsh: agreement.depositPaidKsh,
                 paymentDueDay: agreement.paymentDueDay,
@@ -19293,6 +19306,13 @@ async function bootstrap() {
           return res.status(403).json({ error: "Building access denied" });
         }
 
+        const backedSession = await requireBackedLandlordSession(req, res, context);
+        if (!backedSession) {
+          return res.status(403).json({
+            error: "Sign in as a landlord or staff account before reviewing move-out settlement."
+          });
+        }
+
         const data = await buildResidentMoveOutSettlementSummary(buildingId, userId);
         return res.json({ data, role: context.role });
       } catch (error) {
@@ -19325,14 +19345,10 @@ async function bootstrap() {
         });
       }
 
-      const actorSession = context.userSession ?? {
-        role: context.role as UserRole,
-        userId: context.userId
-      };
-
-      if (!userAccountService) {
-        return res.status(503).json({
-          error: "User account service unavailable. Database connection is required."
+      const actorSession = await requireBackedLandlordSession(req, res, context);
+      if (!actorSession) {
+        return res.status(403).json({
+          error: "Sign in as a landlord or staff account before clearing a resident."
         });
       }
 
@@ -19549,7 +19565,7 @@ async function bootstrap() {
         });
         await enqueueOwnerNotificationForManagerAction(context, {
           title: "Resident Cleared",
-          message: `${actor.name || "House manager"} cleared ${data.user.fullName} from ${data.building.name} house ${data.houseNumber}. Settlement: ${parsed.settlementAction.replace(/_/g, " ")}.`,
+          message: `${actor.name || "Landlord or staff"} cleared ${data.user.fullName} from ${data.building.name} house ${data.houseNumber}. Settlement: ${parsed.settlementAction.replace(/_/g, " ")}.`,
           level:
             billingSettlement.totalSettledKsh > 0 ||
             Math.max(0, Number(settlementSummary.depositRefundKsh ?? 0)) > 0 ||
