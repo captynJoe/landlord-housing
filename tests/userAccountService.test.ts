@@ -486,43 +486,26 @@ test("caretaker resident removal is limited to assigned buildings", async () => 
   });
 });
 
-test("dedicated landlord staff can see and manage all buildings", async () => {
-  const findUniqueCalls: unknown[] = [];
-  const service = new UserAccountService({
-    building: {
-      findUnique: async (args: unknown) => {
-        findUniqueCalls.push(args);
-        return { id: "BLDG-B" };
-      }
-    }
-  } as never);
-
+test("staff can only see and manage the assigned building", async () => {
+  const service = new UserAccountService({} as never);
   const session = {
-    token: "session-token",
-    userId: "staff-a",
-    role: "staff" as const,
-    fullName: "Staff Member",
-    email: "staff@example.test",
-    phone: "+254700000003",
-    expiresAt: "2026-05-16T12:00:00.000Z",
-    mustChangePassword: false
+    token: "session-token", userId: "staff-a", role: "staff" as const,
+    fullName: "Staff Member", email: "staff.test", phone: "+254700000003",
+    expiresAt: "2026-05-16T12:00:00.000Z", mustChangePassword: false,
+    assignedBuildingId: "BLDG-A"
   };
-
   const visibleBuildingIds = await service.listVisibleBuildingIds(session);
-  const canAccess = await service.canAccessBuilding(session, "BLDG-B");
-
-  assert.equal(visibleBuildingIds, null);
-  assert.equal(canAccess, true);
-  assert.deepEqual(findUniqueCalls[0], {
-    where: { id: "BLDG-B" },
-    select: { id: true }
-  });
+  assert.deepEqual([...(visibleBuildingIds ?? [])], ["BLDG-A"]);
+  assert.equal(await service.canAccessBuilding(session, "BLDG-A"), true);
+  assert.equal(await service.canAccessBuilding(session, "BLDG-B"), false);
 });
 
 test("staff creation normalizes credentials and requires password change", async () => {
   const createdAt = new Date("2026-05-18T09:00:00.000Z");
   let createArgs: any;
   const service = new UserAccountService({
+    building: { findUnique: async () => ({ id: "BLDG-A", name: "Rosa Flats" }) },
+    staffBuildingAssignment: { create: async () => ({ id: "assignment-1" }) },
     userSession: {
       deleteMany: async () => ({ count: 0 })
     },
@@ -542,6 +525,7 @@ test("staff creation normalizes credentials and requires password change", async
   } as never);
 
   const result = await service.createOwnerStaffUser({
+    buildingId: "BLDG-A",
     fullName: "  Staff Two  ",
     email: "  Owner.Two@Example.Test ",
     phoneNumber: "0711 111 111",
@@ -564,6 +548,7 @@ test("staff creation normalizes credentials and requires password change", async
 
 test("staff creation enforces the active account limit", async () => {
   const service = new UserAccountService({
+    building: { findUnique: async () => ({ id: "BLDG-A", name: "Rosa Flats" }) },
     userSession: {
       deleteMany: async () => ({ count: 0 })
     },
@@ -575,6 +560,7 @@ test("staff creation enforces the active account limit", async () => {
   await assert.rejects(
     () =>
       service.createOwnerStaffUser({
+        buildingId: "BLDG-A",
         fullName: "Extra Owner",
         email: "extra.owner@example.test",
         phoneNumber: "+254722222222",

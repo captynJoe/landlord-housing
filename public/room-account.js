@@ -1215,8 +1215,8 @@ function renderManagementForms(payload) {
 
   setManagementStatus(
     hasActiveResident
-      ? "Edit the resident profile and rent setup from this room account."
-      : "This room has no active resident. Rent setup can be prepared, but tenant details unlock after assignment."
+      ? "Complete lease details, resident documents, and room billing terms from this workspace."
+      : "This room has no active resident. Billing terms can be prepared, and lease details unlock after assignment."
   );
   setPillText(
     roomAgreementStateEl,

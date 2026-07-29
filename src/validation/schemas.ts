@@ -642,7 +642,17 @@ export const residentAdminPasswordResetSchema = z.object({
   temporaryPassword: z.string().min(8).max(128)
 });
 
-export const landlordDirectTenantCreateSchema = z.object({
+export const landlordTenantIntakeCreateSchema = z.object({
+  buildingId: nonEmptyString.max(120),
+  houseNumber: nonEmptyString.max(24),
+  fullName: nonEmptyString.max(120),
+  phoneNumber: kenyaPhoneSchema,
+  leaseStartDate: z.string().trim().min(10).max(10),
+  note: optionalTenantTextSchema(280)
+});
+
+export const landlordDirectTenantCreateSchema = z
+  .object({
   buildingId: nonEmptyString.max(120),
   houseNumber: nonEmptyString.max(24),
   fullName: nonEmptyString.max(120),
@@ -650,14 +660,37 @@ export const landlordDirectTenantCreateSchema = z.object({
   identityType: tenantIdentityTypeSchema.default("national_id"),
   identityNumber: nonEmptyString.min(4).max(80),
   identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
-  billingStartDate: z
+  leaseStartDate: z
     .string()
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/, {
       message: "Use YYYY-MM-DD format."
-    })
-    .optional(),
+    }),
+  acceptanceMethod: z.enum(["resident_portal", "staff_on_behalf"]).default("resident_portal"),
+  staffAcceptanceConfirmed: z.boolean().default(false),
+  acceptanceNote: optionalTenantTextSchema(500),
   note: optionalTenantTextSchema(280)
+  })
+  .superRefine((value, context) => {
+    if (value.acceptanceMethod === "staff_on_behalf" && !value.staffAcceptanceConfirmed) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["staffAcceptanceConfirmed"],
+        message: "Confirm that the resident accepted the agreement before staff signs on their behalf."
+      });
+    }
+    if (value.acceptanceMethod === "staff_on_behalf" && !value.acceptanceNote) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["acceptanceNote"],
+        message: "Record how consent was confirmed when staff accepts on behalf of the resident."
+      });
+    }
+  });
+
+export const residentAgreementAcceptSchema = z.object({
+  confirmed: z.literal(true),
+  acceptanceNote: optionalTenantTextSchema(500)
 });
 
 export const residentPasswordRecoveryRequestSchema = z.object({
@@ -754,6 +787,7 @@ export const userRegisterSchema = z.object({
 });
 
 export const ownerStaffCreateSchema = z.object({
+  buildingId: nonEmptyString.max(120),
   fullName: nonEmptyString.max(120),
   email: z.string().trim().email().max(160),
   phoneNumber: kenyaPhoneSchema,
@@ -1397,8 +1431,12 @@ export type UserRoleInput = z.infer<typeof userRoleSchema>;
 export type UserRegisterInput = z.infer<typeof userRegisterSchema>;
 export type UserLoginInput = z.infer<typeof userLoginSchema>;
 export type OwnerStaffCreateInput = z.infer<typeof ownerStaffCreateSchema>;
+export type ResidentAgreementAcceptInput = z.infer<typeof residentAgreementAcceptSchema>;
 export type OwnerStaffDisableInput = z.infer<typeof ownerStaffDisableSchema>;
 export type TenantApplicationInput = z.infer<typeof tenantApplicationSchema>;
+export type LandlordTenantIntakeCreateInput = z.infer<
+  typeof landlordTenantIntakeCreateSchema
+>;
 export type LandlordDirectTenantCreateInput = z.infer<
   typeof landlordDirectTenantCreateSchema
 >;

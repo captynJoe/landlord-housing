@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260726a" />
+    <link rel="stylesheet" href="/landlord.css?v=20260729a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260716b" />
   </head>
   <body>
@@ -504,6 +504,10 @@
             </p>
             <form id="owner-staff-form" class="inline-fields compact-fields">
               <label>
+                Assigned Building
+                <select id="owner-staff-building" required></select>
+              </label>
+              <label>
                 Full Name
                 <input
                   id="owner-staff-name"
@@ -554,6 +558,7 @@
                 <thead>
                   <tr>
                     <th>Name</th>
+                    <th>Building</th>
                     <th>Phone</th>
                     <th>Email</th>
                     <th>Password</th>
@@ -1766,7 +1771,7 @@
           </div>
 
           <div class="action-row">
-            <button id="rent-sheet-submit-btn" type="submit">Save Rent Setup</button>
+            <button id="rent-sheet-submit-btn" type="submit">Save Billing Terms</button>
             <button id="rent-sheet-reload-btn" type="button" class="ghost-btn">Reload Rooms</button>
           </div>
           <p id="rent-sheet-status" class="status-text">
@@ -2097,10 +2102,10 @@
       <aside
         id="direct-tenant-drawer"
         class="landlord-drawer hidden"
-        aria-label="Add tenant"
+        aria-label="Create tenant agreement"
       >
         <header class="landlord-drawer-head">
-          <h2>Add Tenant</h2>
+          <h2>Create Tenant Agreement</h2>
           <button id="close-direct-tenant-drawer-btn" type="button" class="ghost-btn">
             Close
           </button>
@@ -2117,10 +2122,12 @@
               <input
                 id="direct-tenant-house"
                 type="text"
+                list="direct-tenant-room-options"
                 maxlength="24"
                 placeholder="A10"
                 required
               />
+              <datalist id="direct-tenant-room-options"></datalist>
             </label>
             <label>
               Tenant Name
@@ -2180,14 +2187,26 @@
             />
           </label>
           <div id="direct-tenant-document-preview" class="upload-preview"></div>
-          <label>
-            Agreement Document Links
-            <textarea
-              id="direct-tenant-document-urls"
-              rows="3"
-              maxlength="4096"
-              placeholder="Optional: one signed agreement or ID photo URL per line"
-            ></textarea>
+          <div class="inline-fields compact-fields">
+            <label>
+              <span id="direct-tenant-lease-start-label">Lease Start Date</span>
+              <input id="direct-tenant-lease-start" type="date" required />
+            </label>
+            <label>
+              Agreement Acceptance
+              <select id="direct-tenant-acceptance-method" required>
+                <option value="resident_portal">Resident accepts in portal</option>
+                <option value="staff_on_behalf">Staff records acceptance on behalf</option>
+              </select>
+            </label>
+          </div>
+          <label id="direct-tenant-staff-confirm-wrap" class="hidden">
+            <input id="direct-tenant-staff-confirm" type="checkbox" />
+            I confirm the resident reviewed and accepted this agreement.
+          </label>
+          <label id="direct-tenant-acceptance-note-wrap" class="hidden">
+            Consent Record
+            <textarea id="direct-tenant-acceptance-note" rows="3" maxlength="500" placeholder="How and when the resident gave consent"></textarea>
           </label>
 
           <label>
@@ -2201,15 +2220,15 @@
           </label>
 
           <p id="direct-tenant-status" class="status-text">
-            Temporary password: ID number. Password change required at first sign-in.
+            Upload ID evidence, set the lease date, and choose how the agreement will be accepted.
           </p>
-          <button id="direct-tenant-submit-btn" type="submit">Add Tenant</button>
+          <button id="direct-tenant-submit-btn" type="submit">Create Tenant Agreement</button>
         </form>
       </aside>
 
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260726a"></script>
+    <script type="module" src="/landlord.js?v=20260726b"></script>
   </body>
 </html>

@@ -11,7 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
-    <link rel="stylesheet" href="/landlord.css?v=20260529d" />
+    <link rel="stylesheet" href="/landlord.css?v=20260729a" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
   </head>
   <body>
@@ -57,15 +57,15 @@
 
       <section class="panel wide-panel room-management-panel">
         <div class="panel-head">
-          <h2>Room Management</h2>
+          <h2>Lease & Room Operations</h2>
         </div>
         <p id="room-management-status" class="status-text">
-          Tenant and rent setup will load here.
+          Lease details and room billing terms will load here.
         </p>
         <div class="room-management-grid">
           <form id="room-agreement-form" class="room-management-form">
             <div class="room-management-form-head">
-              <h3>Tenant Details</h3>
+              <h3>Lease Form</h3>
               <span id="room-agreement-state" class="status-pill">Loading</span>
             </div>
             <div class="room-management-fields">
@@ -84,7 +84,7 @@
                 <input name="identityNumber" type="text" maxlength="80" placeholder="ID / passport number" />
               </label>
               <label>
-                ID Photo
+                ID & Agreement Photos
                 <input
                   id="room-identity-document"
                   name="identityDocument"
@@ -151,24 +151,24 @@
                   name="specialTerms"
                   rows="3"
                   maxlength="1200"
-                  placeholder="Move-out notice, visitor rules, utility arrangements."
+                  placeholder="Move-out notice, visitor rules, utility arrangements, tenant acceptance notes."
                 ></textarea>
               </label>
             </div>
             <div id="room-identity-document-preview" class="room-management-preview"></div>
             <div class="action-row">
-              <button id="room-agreement-submit" type="submit">Save Tenant Details</button>
+              <button id="room-agreement-submit" type="submit">Save Lease Form</button>
             </div>
           </form>
 
           <form id="room-rent-setup-form" class="room-management-form">
             <div class="room-management-form-head">
-              <h3>Rent Setup</h3>
+              <h3>Billing Terms</h3>
               <span id="room-rent-setup-state" class="status-pill">Loading</span>
             </div>
             <div class="room-management-fields">
               <label>
-                Room Default Rent (KSh)
+                Monthly Rent (KSh)
                 <input
                   name="monthlyRentKsh"
                   type="number"
@@ -179,7 +179,7 @@
                 />
               </label>
               <label>
-                Current Balance (KSh)
+                Opening Balance (KSh)
                 <input name="balanceKsh" type="number" min="0" max="5000000" step="1" />
               </label>
               <label>
@@ -232,11 +232,11 @@
               </label>
               <label class="room-management-span">
                 Note
-                <input name="note" type="text" maxlength="280" placeholder="Optional rent setup note" />
+                <input name="note" type="text" maxlength="280" placeholder="Optional billing note" />
               </label>
             </div>
             <div class="action-row">
-              <button id="room-rent-setup-submit" type="submit">Save Rent Setup</button>
+              <button id="room-rent-setup-submit" type="submit">Save Billing Terms</button>
             </div>
           </form>
         </div>

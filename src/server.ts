@@ -140,6 +140,7 @@ import {
   ownerNotificationReadSchema,
   landlordMessageSendSchema,
   landlordDirectTenantCreateSchema,
+  landlordTenantIntakeCreateSchema,
   landlordAutomaticMessageRulesUpdateSchema,
   updateResidentNotificationPreferencesSchema,
   upsertUtilityMeterSchema,
@@ -174,6 +175,7 @@ import {
   ticketStatusSchema,
   tenantResolveSchema,
   residentTenantProfileUpsertSchema,
+  residentAgreementAcceptSchema,
   updateWifiPackageSchema,
   ownerStaffCreateSchema,
   ownerStaffDisableSchema,
@@ -566,6 +568,7 @@ interface LandlordUtilityRegistryRow {
   organizationLocation?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+        agreementStatus?: string;
   agreementUpdatedAt?: string;
   hasActiveResident: boolean;
   rentEnabled: boolean;
@@ -4231,7 +4234,8 @@ async function bootstrap() {
       return null;
     }
 
-    const tenantApplication = await repositoryContext.prisma.tenantApplication.findFirst({
+    const [tenantApplication, tenantAgreement] = await Promise.all([
+      repositoryContext.prisma.tenantApplication.findFirst({
       where: {
         userId: userSession.userId,
         buildingId: activeTenancy.buildingId,
@@ -4241,8 +4245,17 @@ async function bootstrap() {
         status: true
       },
       orderBy: { updatedAt: "desc" }
-    });
-    const verificationStatus = toResidentVerificationStatus(tenantApplication?.status);
+      }),
+      repositoryContext.prisma.tenantAgreement.findUnique({
+        where: { tenancyId: activeTenancy.id },
+        select: { status: true }
+      })
+    ]);
+    const applicationVerificationStatus = toResidentVerificationStatus(tenantApplication?.status);
+    const verificationStatus =
+      applicationVerificationStatus === "verified" && tenantAgreement?.status !== "verified"
+        ? "pending_review"
+        : applicationVerificationStatus;
 
     if (verificationStatus === "rejected") {
       res.status(403).json({
@@ -5023,6 +5036,7 @@ async function bootstrap() {
         depositPaidKsh?: number;
         paymentDueDay?: number;
         leaseStartDate?: string;
+        agreementStatus?: string;
         agreementUpdatedAt?: string;
       }
     >();
@@ -5076,6 +5090,7 @@ async function bootstrap() {
             identityType: true,
             identityNumber: true,
             identityDocumentUrls: true,
+            status: true,
             occupationStatus: true,
             occupationLabel: true,
             organizationName: true,
@@ -5154,6 +5169,7 @@ async function bootstrap() {
           identityType: agreement.identityType ?? undefined,
           identityNumber: agreement.identityNumber ?? undefined,
           identityDocumentUrls: listResidentIdentityDocumentUrls(agreement.identityDocumentUrls),
+          agreementStatus: agreement.status,
           occupationStatus: agreement.occupationStatus ?? undefined,
           occupationLabel: agreement.occupationLabel ?? undefined,
           organizationName: agreement.organizationName ?? undefined,
@@ -5234,9 +5250,12 @@ async function bootstrap() {
       const meter = meterMap.get(houseNumber);
       const resident = residentByHouse.get(houseNumber);
       const agreement = agreementByHouse.get(houseNumber);
-      const verificationStatus = resident
+      const applicationVerificationStatus = resident
         ? verificationByHouse.get(houseNumber) ?? "verified"
         : undefined;
+      const verificationStatus = resident && applicationVerificationStatus === "verified" && agreement?.agreementStatus !== "verified"
+        ? "pending_review"
+        : applicationVerificationStatus;
       const billingVisible = Boolean(resident) && verificationStatus !== "pending_review";
       const registryRecord = memberRegistryByHouse.get(houseNumber);
       const utilityDefaults = utilityDefaultsByHouse.get(houseNumber);
@@ -7087,6 +7106,7 @@ async function bootstrap() {
     const ownerStaffPromise =
       quickStartup ||
       context.role === "caretaker" ||
+      context.role === "staff" ||
       !userAccountService
         ? Promise.resolve({
             users: [],
@@ -8923,7 +8943,8 @@ async function bootstrap() {
             buildingName: resolved.building.name,
             phoneMask: maskPhone(session.phone),
             expiresAt: session.expiresAt,
-            mustChangePassword: session.mustChangePassword
+            mustChangePassword: session.mustChangePassword,
+            assignedBuildingId: session.assignedBuildingId
           }
         });
       } catch (error) {
@@ -8975,6 +8996,9 @@ async function bootstrap() {
         return res.status(201).json({ data });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unable to register user";
+        if (message === "BUILDING_NOT_FOUND") {
+          return res.status(404).json({ error: "Assigned building not found." });
+        }
         if (message === "EMAIL_ALREADY_EXISTS") {
           return res.status(409).json({ error: "Email already registered" });
         }
@@ -9044,7 +9068,8 @@ async function bootstrap() {
             email: session.email,
             phoneMask: maskPhone(session.phone),
             expiresAt: session.expiresAt,
-            mustChangePassword: session.mustChangePassword
+            mustChangePassword: session.mustChangePassword,
+            assignedBuildingId: session.assignedBuildingId
           }
         });
       } catch (error) {
@@ -9183,7 +9208,8 @@ async function bootstrap() {
         email: session.email,
         phoneMask: maskPhone(session.phone),
         expiresAt: session.expiresAt,
-        mustChangePassword: session.mustChangePassword
+        mustChangePassword: session.mustChangePassword,
+        assignedBuildingId: session.assignedBuildingId
       }
     });
   });
@@ -9725,6 +9751,46 @@ async function bootstrap() {
     }
   });
 
+  app.post("/api/resident/agreement/accept", async (req, res, next) => {
+    try {
+      if (!userAccountService) return res.status(503).json({ error: "Resident agreement service is unavailable." });
+      const session = await getResidentSession(req, res);
+      if (!session) return;
+      const parsed = residentAgreementAcceptSchema.parse(req.body ?? {});
+      const agreementState = await userAccountService.getActiveTenantAgreement({ buildingId: session.buildingId, houseNumber: session.houseNumber });
+      if (!agreementState.resident || agreementState.resident.userId !== session.userId) {
+        return res.status(403).json({ error: "Agreement access denied for this tenancy." });
+      }
+      const result = await userAccountService.acceptResidentAgreement({
+        tenancyId: session.tenancyId, residentUserId: session.userId,
+        residentName: agreementState.resident.fullName, acceptanceNote: parsed.acceptanceNote
+      });
+      await recordRoomAccountAuditEvent({
+        buildingId: session.buildingId, houseNumber: session.houseNumber, tenancyId: session.tenancyId,
+        action: "tenant.agreement.accepted",
+        summary: agreementState.resident.fullName + " accepted the tenant agreement in the resident portal.",
+        actor: { userId: session.userId, role: "tenant", name: agreementState.resident.fullName },
+        metadata: { acceptanceMethod: "resident_portal", acceptedAt: result.acceptedAt }
+      });
+      const ownerUsers = await userAccountService.listLandlordAndStaffUsers();
+      const recipientUserIds = ownerUsers.users.filter((item) => item.role === "landlord").map((item) => item.id);
+      ownerNotificationService.enqueue({
+        title: "Tenant Agreement Accepted",
+        message: agreementState.resident.fullName + " accepted the agreement for house " + session.houseNumber + ".",
+        level: "success", action: "tenant.agreement.accepted",
+        buildingId: session.buildingId, houseNumber: session.houseNumber,
+        actorUserId: session.userId, actorName: agreementState.resident.fullName, actorRole: "tenant",
+        recipientUserIds, dedupeKey: "tenant-agreement-accepted-" + session.tenancyId
+      });
+      return res.json({ data: result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to accept agreement.";
+      if (message === "TENANT_AGREEMENT_NOT_FOUND") return res.status(404).json({ error: "Tenant agreement not found." });
+      if (message === "TENANT_AGREEMENT_INCOMPLETE") return res.status(409).json({ error: "ID documents and a lease start date are required before acceptance." });
+      return next(error);
+    }
+  });
+
   app.post("/api/auth/resident/change-password", async (req, res, next) => {
     try {
       if (!userAccountService || !repositoryContext.prisma) {
@@ -10224,7 +10290,8 @@ async function bootstrap() {
             fullName: userSession.fullName,
             email: userSession.email,
             expiresAt: userSession.expiresAt,
-            mustChangePassword: userSession.mustChangePassword
+            mustChangePassword: userSession.mustChangePassword,
+            assignedBuildingId: userSession.assignedBuildingId
           }
         });
       }
@@ -10861,10 +10928,10 @@ async function bootstrap() {
 
       const parsed = ownerStaffCreateSchema.parse(req.body ?? {});
       try {
-        const staff = await userAccountService.createOwnerStaffUser(parsed);
+        const staff = await userAccountService.createOwnerStaffUser(parsed, { assignedByUserId: context.userId });
         await enqueueLandlordWorkspaceNotification(context, {
           title: "Staff Account Added",
-          message: `${actorFromLandlordContext(context).name || "Landlord or staff"} added staff account ${staff.fullName}.`,
+          message: `${actorFromLandlordContext(context).name || "Landlord or staff"} added staff account ${staff.fullName} for ${staff.assignedBuildingName || parsed.buildingId}.`,
           level: "info",
           action: "staff.created",
           dedupeKey: `staff-created-${staff.id}`,
@@ -10872,7 +10939,9 @@ async function bootstrap() {
             staffUserId: staff.id,
             staffName: staff.fullName,
             staffEmail: staff.email,
-            staffPhone: staff.phone
+            staffPhone: staff.phone,
+            buildingId: staff.assignedBuildingId,
+            buildingName: staff.assignedBuildingName
           }
         });
         const data = await userAccountService.listOwnerStaffUsers();
@@ -10892,6 +10961,9 @@ async function bootstrap() {
           return res.status(409).json({
             error: `Staff limit reached. This dedicated app allows ${OWNER_STAFF_LIMIT} active staff accounts.`
           });
+        }
+        if (message === "BUILDING_NOT_FOUND") {
+          return res.status(404).json({ error: "Assigned building not found." });
         }
         if (message === "EMAIL_ALREADY_EXISTS") {
           return res.status(409).json({ error: "Email is already registered." });
@@ -12229,6 +12301,139 @@ async function bootstrap() {
       return res.status(410).json({
         error: "Public landlord access requests are disabled for this dedicated app."
       });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.post("/api/landlord/tenant-intakes", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (context.role === "staff") {
+        return res.status(403).json({
+          error: "Staff should complete the lease form from tenant intake, not create a landlord handoff."
+        });
+      }
+      if (context.role === "caretaker") {
+        return res.status(403).json({ error: "Staff access is required for tenant intake." });
+      }
+
+      if (!userAccountService) {
+        return res.status(503).json({
+          error: "User account service unavailable. Database connection is required."
+        });
+      }
+
+      const parsed = landlordTenantIntakeCreateSchema.parse(req.body ?? {});
+      const moveInDate = normalizeDateOnly(parsed.leaseStartDate);
+      if (!moveInDate) {
+        return res.status(400).json({ error: "Move-in date is required." });
+      }
+
+      const building = await store.getBuilding(parsed.buildingId);
+      if (!building) {
+        return res.status(404).json({ error: "Building not found" });
+      }
+
+      const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Building access denied" });
+      }
+
+      const actor = actorFromLandlordContext(context);
+      try {
+        const data = await userAccountService.createTenantIntake(
+          { ...parsed, buildingId: building.id, leaseStartDate: moveInDate },
+          { userId: actor.userId, fullName: actor.name, role: actor.role }
+        );
+
+        const ownerUsers = await userAccountService.listLandlordAndStaffUsers();
+        const recipientUserIds = [
+          ...new Set(
+            ownerUsers.users
+              .filter((item) => item.role === "landlord" || (item.role === "staff" && item.assignedBuildingId === building.id))
+              .map((item) => item.id)
+              .filter(Boolean)
+          )
+        ];
+        const notification = ownerNotificationService.enqueue({
+          title: "Tenant Intake Ready",
+          message:
+            (actor.name || "Landlord") +
+            " created tenant intake for " +
+            data.tenant.fullName +
+            " in " +
+            building.name +
+            " house " +
+            data.houseNumber +
+            ". Staff should complete the lease form.",
+          level: "info",
+          action: "tenant_intake.created",
+          buildingId: building.id,
+          buildingName: building.name,
+          houseNumber: data.houseNumber,
+          actorUserId: actor.userId,
+          actorName: actor.name,
+          actorRole: actor.role,
+          recipientUserIds,
+          url: "/landlord",
+          dedupeKey: "tenant-intake-" + data.id,
+          metadata: {
+            applicationId: data.id,
+            tenantUserId: data.tenant.id,
+            moveInDate
+          }
+        });
+
+        if (notification && recipientUserIds.length > 0) {
+          void pushNotificationService.notifyUserIds(recipientUserIds, {
+            title: notification.title,
+            body: notification.message,
+            level: notification.level,
+            tag: notification.dedupeKey ?? "tenant-intake-" + notification.id,
+            url: notification.url ?? "/landlord"
+          });
+        }
+
+        await recordRoomAccountAuditEvent({
+          buildingId: building.id,
+          houseNumber: data.houseNumber,
+          action: "tenant_intake.created",
+          summary:
+            (actor.name || "Landlord") +
+            " created tenant intake. Staff must complete lease details before resident verification.",
+          actor,
+          metadata: {
+            applicationId: data.id,
+            tenantUserId: data.tenant.id,
+            moveInDate
+          }
+        });
+
+        return res.status(201).json({ data, role: context.role });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to create tenant intake.";
+        if (message === "BUILDING_NOT_FOUND") {
+          return res.status(404).json({ error: "Building not found." });
+        }
+        if (message === "HOUSE_NUMBER_NOT_FOUND" || message === "HOUSE_NOT_FOUND") {
+          return res.status(404).json({ error: "House number not found in this building." });
+        }
+        if (message === "HOUSE_OCCUPIED") {
+          return res.status(409).json({ error: "This room already has an active resident." });
+        }
+        if (message === "ACCOUNT_DISABLED") {
+          return res.status(403).json({ error: "This resident account is disabled. Reactivate it before onboarding." });
+        }
+        if (message === "RESIDENT_SIGNUP_ROLE_CONFLICT") {
+          return res.status(409).json({ error: "This phone belongs to a landlord, staff, or admin account. Use a tenant phone number." });
+        }
+        throw error;
+      }
     } catch (error) {
       return next(error);
     }
@@ -16957,8 +17162,19 @@ async function bootstrap() {
         }
 
         const parsed = landlordDirectTenantCreateSchema.parse(req.body ?? {});
-        const billingStartDate =
-          normalizeDateOnly(parsed.billingStartDate) ?? new Date().toISOString().slice(0, 10);
+        const billingStartDate = normalizeDateOnly(parsed.leaseStartDate);
+        if (!billingStartDate) {
+          return res.status(400).json({ error: "Lease start date is required." });
+        }
+        const internalIdentityDocuments = (parsed.identityDocumentUrls ?? []).filter((item) =>
+          String(item).includes("/uploads/identity/")
+        );
+        if (internalIdentityDocuments.length === 0 || internalIdentityDocuments.length !== (parsed.identityDocumentUrls ?? []).length) {
+          return res.status(400).json({
+            error: "Upload at least one ID document through the housing document system. External document links are not accepted."
+          });
+        }
+        parsed.identityDocumentUrls = internalIdentityDocuments;
         const billingStartAt = new Date(`${billingStartDate}T00:00:00.000Z`);
         const billingStartMonth = billingMonthFromDate(billingStartAt);
         const currentBillingMonth = billingMonthFromDate(new Date());
@@ -17065,7 +17281,9 @@ async function bootstrap() {
           }
 
           const data = await userAccountService.createDirectTenant(parsed, {
-            userId: actor.userId
+            userId: actor.userId,
+            fullName: actor.name,
+            role: actor.role
           });
           const releasedBillingHolds = await cancelAutoRoomBillingHolds({
             buildingId: building.id,
@@ -17283,6 +17501,14 @@ async function bootstrap() {
               error:
                 "This phone belongs to a landlord, staff, or admin account. Use a tenant phone number."
             });
+          }
+          if (message === "IDENTITY_DOCUMENT_REQUIRED") {
+            return res.status(400).json({
+              error: "Upload at least one ID document before creating the tenant agreement."
+            });
+          }
+          if (message === "IDENTITY_DOCUMENT_REQUIRED") {
+            return res.status(400).json({ error: "Upload at least one ID document before creating the tenant agreement." });
           }
           if (message === "IDENTITY_NUMBER_REQUIRED") {
             return res.status(400).json({

@@ -42,7 +42,8 @@ test("landlord direct tenant onboarding defaults to national ID", () => {
     fullName: "Jane Wanjiku",
     phoneNumber: "0712345678",
     identityNumber: "12345678",
-    identityDocumentUrls: ["https://example.test/agreement.jpg"]
+    identityDocumentUrls: ["https://example.test/agreement.jpg"],
+    leaseStartDate: "2026-07-27"
   });
 
   assert.equal(parsed.identityType, "national_id");

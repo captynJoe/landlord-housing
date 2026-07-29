@@ -70,3 +70,7 @@ body.app-loading #user-layout {
     grid-template-columns: 1fr;
   }
 }
+.agreement-accept-card { margin-top: 18px; display: grid; gap: 12px; padding: 16px; border: 1px solid rgba(30, 131, 95, 0.28); border-radius: 10px; background: rgba(30, 131, 95, 0.07); }
+.agreement-accept-card.hidden { display: none; }
+.agreement-accept-card label { display: flex; align-items: flex-start; gap: 10px; font-weight: 700; }
+.agreement-accept-card input[type="checkbox"] { width: auto; margin-top: 3px; }

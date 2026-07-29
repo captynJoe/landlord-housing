@@ -68,6 +68,10 @@ const agreementDepositEl = document.getElementById("agreement-deposit");
 const agreementDueDayEl = document.getElementById("agreement-due-day");
 const agreementUpdatedAtEl = document.getElementById("agreement-updated-at");
 const agreementSpecialTermsEl = document.getElementById("agreement-special-terms");
+const agreementAcceptFormEl = document.getElementById("agreement-accept-form");
+const agreementAcceptConfirmEl = document.getElementById("agreement-accept-confirm");
+const agreementAcceptNoteEl = document.getElementById("agreement-accept-note");
+const agreementAcceptBtnEl = document.getElementById("agreement-accept-btn");
 
 const state = {
   profile: null
@@ -375,6 +379,10 @@ function renderProfile(profile) {
   agreementUpdatedAtEl.textContent = formatDateTime(agreement?.updatedAt);
   agreementSpecialTermsEl.textContent =
     agreement?.specialTerms || "No special terms have been added yet.";
+  const needsAcceptance = agreement?.status === "awaiting_resident";
+  agreementAcceptFormEl?.classList.toggle("hidden", !needsAcceptance);
+  if (agreementAcceptConfirmEl instanceof HTMLInputElement) agreementAcceptConfirmEl.checked = false;
+  if (agreementAcceptNoteEl instanceof HTMLTextAreaElement) agreementAcceptNoteEl.value = "";
 }
 
 async function loadProfile() {
@@ -456,6 +464,27 @@ async function handleSave(event) {
   }
 }
 
+async function handleAgreementAccept(event) {
+  event.preventDefault();
+  if (!(agreementAcceptConfirmEl instanceof HTMLInputElement) || !agreementAcceptConfirmEl.checked) {
+    showFeedback("Confirm that you accept the agreement.", "error");
+    return;
+  }
+  if (agreementAcceptBtnEl instanceof HTMLButtonElement) agreementAcceptBtnEl.disabled = true;
+  try {
+    await apiRequest("/api/resident/agreement/accept", {
+      method: "POST",
+      body: JSON.stringify({ confirmed: true, acceptanceNote: agreementAcceptNoteEl?.value.trim() || undefined })
+    });
+    await loadProfile();
+    showFeedback("Agreement accepted. Your tenancy is now verified.", "success");
+  } catch (error) {
+    showFeedback(error instanceof Error ? error.message : "Unable to accept agreement.", "error");
+  } finally {
+    if (agreementAcceptBtnEl instanceof HTMLButtonElement) agreementAcceptBtnEl.disabled = false;
+  }
+}
+
 async function handleLogout() {
   residentLogoutBtnEl.disabled = true;
 
@@ -533,6 +562,7 @@ profileIdentityDocumentEl?.addEventListener("change", () => {
     );
   }
 });
+agreementAcceptFormEl?.addEventListener("submit", handleAgreementAccept);
 residentLogoutBtnEl.addEventListener("click", handleLogout);
 
 void boot();

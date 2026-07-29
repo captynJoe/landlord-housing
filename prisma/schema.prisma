@@ -104,6 +104,7 @@ model Building {
   residentMoveOutSettlements ResidentMoveOutSettlement[]
   wifiPackages               BuildingWifiPackage[]
   householdMemberRegistries  HouseholdMemberRegistry[]
+  staffAssignments           StaffBuildingAssignment[]
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
 
@@ -154,27 +155,45 @@ model VacancySnapshot {
 }
 
 model HousingUser {
-  id                             String                  @id @default(uuid())
+  id                             String                    @id @default(uuid())
   fullName                       String
-  email                          String                  @unique
-  phone                          String                  @unique
+  email                          String                    @unique
+  phone                          String                    @unique
   passwordHash                   String
-  requirePasswordChange          Boolean                 @default(false)
-  role                           UserRole                @default(tenant)
-  status                         UserStatus              @default(active)
-  createdAt                      DateTime                @default(now())
-  updatedAt                      DateTime                @updatedAt
-  ownedBuildings                 Building[]              @relation("BuildingLandlord")
+  requirePasswordChange          Boolean                   @default(false)
+  role                           UserRole                  @default(tenant)
+  status                         UserStatus                @default(active)
+  createdAt                      DateTime                  @default(now())
+  updatedAt                      DateTime                  @updatedAt
+  ownedBuildings                 Building[]                @relation("BuildingLandlord")
   sessions                       UserSession[]
   tenantApplications             TenantApplication[]
   tenantAgreements               TenantAgreement[]
-  reviewedApplications           TenantApplication[]     @relation("TenantApplicationReviewer")
+  reviewedApplications           TenantApplication[]       @relation("TenantApplicationReviewer")
   tenancies                      Tenancy[]
-  roomAccountAuditEvents         RoomAccountAuditEvent[] @relation("RoomAccountAuditActor")
-  landlordAccessRequests         LandlordAccessRequest[] @relation("LandlordAccessRequester")
-  reviewedLandlordAccessRequests LandlordAccessRequest[] @relation("LandlordAccessReviewer")
+  roomAccountAuditEvents         RoomAccountAuditEvent[]   @relation("RoomAccountAuditActor")
+  landlordAccessRequests         LandlordAccessRequest[]   @relation("LandlordAccessRequester")
+  reviewedLandlordAccessRequests LandlordAccessRequest[]   @relation("LandlordAccessReviewer")
+  staffBuildingAssignment        StaffBuildingAssignment?  @relation("AssignedStaff")
+  staffAssignmentsCreated        StaffBuildingAssignment[] @relation("StaffAssignmentCreator")
 
   @@index([role])
+}
+
+model StaffBuildingAssignment {
+  id               String       @id @default(uuid())
+  staffUserId      String       @unique
+  buildingId       String
+  assignedByUserId String?
+  note             String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  staff            HousingUser  @relation("AssignedStaff", fields: [staffUserId], references: [id], onDelete: Cascade)
+  building         Building     @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  assignedBy       HousingUser? @relation("StaffAssignmentCreator", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([buildingId])
+  @@index([assignedByUserId])
 }
 
 model LandlordAccessRequest {
@@ -371,6 +390,15 @@ model TenantAgreement {
   depositPaidKsh            Int?
   paymentDueDay             Int?
   specialTerms              String?
+  status                    String                  @default("draft")
+  acceptanceMethod          String?
+  acceptedAt                DateTime?
+  acceptedByUserId          String?
+  acceptedByName            String?
+  acceptanceNote            String?
+  verifiedAt                DateTime?
+  verifiedByUserId          String?
+  verifiedByName            String?
   createdAt                 DateTime                @default(now())
   updatedAt                 DateTime                @updatedAt
   building                  Building                @relation(fields: [buildingId], references: [id], onDelete: Cascade)
@@ -379,6 +407,7 @@ model TenantAgreement {
 
   @@index([buildingId, houseNumber, updatedAt])
   @@index([residentUserId])
+  @@index([status, updatedAt])
 }
 
 model HouseholdMemberRegistry {

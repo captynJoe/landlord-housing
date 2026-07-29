@@ -153,13 +153,20 @@ const closeDirectTenantDrawerBtnEl = document.getElementById(
 const directTenantFormEl = document.getElementById("direct-tenant-form");
 const directTenantBuildingEl = document.getElementById("direct-tenant-building");
 const directTenantHouseEl = document.getElementById("direct-tenant-house");
+const directTenantRoomOptionsEl = document.getElementById("direct-tenant-room-options");
 const directTenantNameEl = document.getElementById("direct-tenant-name");
 const directTenantPhoneEl = document.getElementById("direct-tenant-phone");
 const directTenantIdTypeEl = document.getElementById("direct-tenant-id-type");
 const directTenantIdNumberEl = document.getElementById("direct-tenant-id-number");
 const directTenantDocumentsEl = document.getElementById("direct-tenant-documents");
 const directTenantDocumentPreviewEl = document.getElementById("direct-tenant-document-preview");
-const directTenantDocumentUrlsEl = document.getElementById("direct-tenant-document-urls");
+const directTenantLeaseStartEl = document.getElementById("direct-tenant-lease-start");
+const directTenantLeaseStartLabelEl = document.getElementById("direct-tenant-lease-start-label");
+const directTenantAcceptanceMethodEl = document.getElementById("direct-tenant-acceptance-method");
+const directTenantStaffConfirmEl = document.getElementById("direct-tenant-staff-confirm");
+const directTenantStaffConfirmWrapEl = document.getElementById("direct-tenant-staff-confirm-wrap");
+const directTenantAcceptanceNoteEl = document.getElementById("direct-tenant-acceptance-note");
+const directTenantAcceptanceNoteWrapEl = document.getElementById("direct-tenant-acceptance-note-wrap");
 const directTenantNoteEl = document.getElementById("direct-tenant-note");
 const directTenantStatusEl = document.getElementById("direct-tenant-status");
 const directTenantSubmitBtnEl = document.getElementById("direct-tenant-submit-btn");
@@ -212,6 +219,7 @@ const ownerStaffManagementPanelEl = document.getElementById(
 );
 const ownerStaffSummaryEl = document.getElementById("owner-staff-summary");
 const ownerStaffFormEl = document.getElementById("owner-staff-form");
+const ownerStaffBuildingEl = document.getElementById("owner-staff-building");
 const ownerStaffNameEl = document.getElementById("owner-staff-name");
 const ownerStaffEmailEl = document.getElementById("owner-staff-email");
 const ownerStaffPhoneEl = document.getElementById("owner-staff-phone");
@@ -965,7 +973,7 @@ function isLandlordViewAvailableForRole(view) {
 }
 
 function getDefaultLandlordViewForRole() {
-  return "overview";
+  return isStaffRole() ? "documents" : "overview";
 }
 
 function syncRoleScopedNavigation() {
@@ -1359,12 +1367,19 @@ function applyRoleCapabilities() {
   document.body.classList.toggle("landlord-caretaker-role", caretaker);
   document.body.classList.toggle("landlord-simple-manager-role", staff || caretaker);
   syncRoleScopedNavigation();
+  landlordNavButtons.forEach((button) => {
+    const view = button.dataset.landlordView;
+    const label = button.querySelector(".landlord-nav-label") || button;
+    if (view === "overview") label.childNodes[0].textContent = staff ? "Work Desk" : "Dashboard";
+    if (view === "documents") label.childNodes[0].textContent = staff ? "Agreements" : "Documents";
+    if (view === "applications") label.childNodes[0].textContent = staff ? "Intake" : "Requests";
+  });
   if (!isLandlordViewAvailableForRole(state.activeLandlordView)) {
     setActiveLandlordView(getDefaultLandlordViewForRole());
   }
 
   if (ownerStaffManagementPanelEl instanceof HTMLElement) {
-    ownerStaffManagementPanelEl.classList.toggle("hidden", !ownerAccess);
+    ownerStaffManagementPanelEl.classList.toggle("hidden", !ownerAccess || staff);
   }
 
   if (caretakerManagementPanelEl instanceof HTMLElement) {
@@ -1790,6 +1805,65 @@ function syncDirectTenantBuildingOptions(preferredBuildingId = "") {
     }
     directTenantBuildingEl.append(option);
   });
+  syncDirectTenantRoomOptions();
+}
+
+function getDirectTenantRoomOptions(buildingId) {
+  const normalizedBuildingId = normalizeLookupBuildingId(buildingId);
+  const building = getBuildingRecord(normalizedBuildingId);
+  const fromBuilding = Array.isArray(building?.houseNumbers) ? building.houseNumbers : [];
+  const fromRegistry = state.registryRows
+    .filter((item) => normalizeLookupBuildingId(item.buildingId) === normalizedBuildingId)
+    .map((item) => item.houseNumber);
+  const fromDirectory = state.residentDirectory
+    .filter((item) => normalizeLookupBuildingId(item.buildingId) === normalizedBuildingId)
+    .map((item) => item.houseNumber);
+
+  return [
+    ...new Set([...fromBuilding, ...fromRegistry, ...fromDirectory].map((item) => normalizeHouse(item)))
+  ]
+    .filter(Boolean)
+    .sort(compareHouseNumber);
+}
+
+function syncDirectTenantRoomOptions() {
+  const buildingId = String(directTenantBuildingEl?.value || "").trim();
+  const roomOptions = getDirectTenantRoomOptions(buildingId);
+
+  if (directTenantRoomOptionsEl instanceof HTMLDataListElement) {
+    directTenantRoomOptionsEl.replaceChildren();
+    roomOptions.forEach((houseNumber) => {
+      const option = document.createElement("option");
+      option.value = houseNumber;
+      directTenantRoomOptionsEl.append(option);
+    });
+  }
+
+  if (directTenantHouseEl instanceof HTMLInputElement) {
+    directTenantHouseEl.placeholder = roomOptions.length ? "Choose room" : "A10";
+  }
+}
+
+function getDirectTenantHouseNumber(buildingId) {
+  const typedHouseNumber = normalizeHouse(directTenantHouseEl?.value || "");
+  if (typedHouseNumber) {
+    return typedHouseNumber;
+  }
+
+  const roomOptions = getDirectTenantRoomOptions(buildingId);
+  if (roomOptions.length === 1) {
+    if (directTenantHouseEl instanceof HTMLInputElement) {
+      directTenantHouseEl.value = roomOptions[0];
+    }
+    return roomOptions[0];
+  }
+
+  return "";
+}
+
+function isDirectTenantRoomInSelectedBuilding(buildingId, houseNumber) {
+  const roomOptions = getDirectTenantRoomOptions(buildingId);
+  return roomOptions.length === 0 || roomOptions.includes(normalizeHouse(houseNumber));
 }
 
 function openDirectTenantDrawer(prefill = {}) {
@@ -1805,17 +1879,31 @@ function openDirectTenantDrawer(prefill = {}) {
   if (directTenantBuildingEl instanceof HTMLSelectElement) {
     directTenantBuildingEl.value = getDefaultDirectTenantBuildingId(prefill.buildingId);
   }
+  syncDirectTenantRoomOptions();
   if (directTenantHouseEl instanceof HTMLInputElement) {
     directTenantHouseEl.value = prefill.houseNumber
       ? normalizeHouse(prefill.houseNumber)
       : "";
   }
   if (directTenantNameEl instanceof HTMLInputElement && !prefill.keepTenantFields) {
-    directTenantNameEl.value = "";
+    directTenantNameEl.value = prefill.fullName ? String(prefill.fullName).trim() : "";
   }
   if (directTenantPhoneEl instanceof HTMLInputElement && !prefill.keepTenantFields) {
-    directTenantPhoneEl.value = "";
+    directTenantPhoneEl.value = prefill.phoneNumber ? String(prefill.phoneNumber).trim() : "";
   }
+  if (directTenantLeaseStartEl instanceof HTMLInputElement && !prefill.keepTenantFields) {
+    directTenantLeaseStartEl.value = new Date().toISOString().slice(0, 10);
+  }
+  if (directTenantAcceptanceMethodEl instanceof HTMLSelectElement) {
+    directTenantAcceptanceMethodEl.value = "resident_portal";
+  }
+  if (directTenantStaffConfirmEl instanceof HTMLInputElement) {
+    directTenantStaffConfirmEl.checked = false;
+  }
+  if (directTenantAcceptanceNoteEl instanceof HTMLTextAreaElement) {
+    directTenantAcceptanceNoteEl.value = "";
+  }
+  syncDirectTenantDrawerMode();
   if (directTenantIdTypeEl instanceof HTMLSelectElement) {
     directTenantIdTypeEl.value = "national_id";
   }
@@ -1826,11 +1914,13 @@ function openDirectTenantDrawer(prefill = {}) {
     directTenantIdNumberEl.value = "";
   }
   if (directTenantNoteEl instanceof HTMLInputElement && !prefill.keepTenantFields) {
-    directTenantNoteEl.value = "";
+    directTenantNoteEl.value = prefill.note ? String(prefill.note).trim() : "";
   }
 
   setDirectTenantStatus(
-    "Temporary password: ID number. Password change required at first sign-in."
+    isStaffRole()
+      ? "Upload ID evidence, set the lease date, and choose how the agreement will be accepted."
+      : "Create a tenant intake for staff to complete lease details and documents."
   );
   clearError();
   directTenantDrawerEl.classList.remove("hidden");
@@ -6457,10 +6547,14 @@ function renderDailyDashboard() {
   const openIssues = getOpenIssueRowsForFocusedBuilding().length;
   const pendingRequests = getPendingApplicationRowsForFocusedBuilding().length;
 
-  overviewDailyHeadingEl.textContent = `${buildingLabel} Dashboard`;
-  overviewDailySubtitleEl.textContent = focusedBuildingId
-    ? "Daily collection, issue, request, and room signals for the focused building."
-    : "Daily collection, issue, request, and room signals across the portfolio.";
+  overviewDailyHeadingEl.textContent = isStaffRole()
+    ? buildingLabel + " Staff Work Desk"
+    : buildingLabel + " Dashboard";
+  overviewDailySubtitleEl.textContent = isStaffRole()
+    ? "Agreement intake, resident documents, room assignment, requests, and daily follow-up for your building."
+    : focusedBuildingId
+      ? "Daily collection, issue, request, and room signals for the focused building."
+      : "Daily collection, issue, request, and room signals across the portfolio.";
   overviewDailyCollectedEl.textContent = formatCurrency(rentCollectedThisMonth + utilityCollectedThisMonth);
   overviewDailyOutstandingEl.textContent = formatCurrency(outstanding);
   overviewDailyUnpaidEl.textContent = String(unpaidRoomKeys.size);
@@ -7727,6 +7821,22 @@ function syncCaretakerBuildingOptions() {
   renderCaretakerRequests(state.caretakerRequests);
 }
 
+function syncOwnerStaffBuildingOptions() {
+  if (!(ownerStaffBuildingEl instanceof HTMLSelectElement)) return;
+  const selected = ownerStaffBuildingEl.value;
+  ownerStaffBuildingEl.replaceChildren();
+  state.buildings.forEach((building) => {
+    const option = document.createElement("option");
+    option.value = building.id;
+    option.textContent = getBuildingDisplayName(building);
+    ownerStaffBuildingEl.append(option);
+  });
+  ownerStaffBuildingEl.value = state.buildings.some((item) => item.id === selected)
+    ? selected
+    : state.buildings[0]?.id || "";
+  ownerStaffBuildingEl.disabled = state.buildings.length === 0;
+}
+
 function setOwnerStaffData(record) {
   const payload = record && typeof record === "object" ? record : {};
   const users = Array.isArray(payload.users) ? payload.users : [];
@@ -7742,10 +7852,11 @@ function setOwnerStaffData(record) {
 }
 
 function renderOwnerStaff() {
+  syncOwnerStaffBuildingOptions();
   const activeCount = Array.isArray(state.ownerStaff) ? state.ownerStaff.length : 0;
   const limit = Number(state.ownerStaffLimit || 3);
   const remaining = Math.max(0, Number(state.ownerStaffRemaining || 0));
-  const ownerAccess = isOwnerAccessRole();
+  const ownerAccess = state.role !== "staff" && isOwnerAccessRole();
 
   if (ownerStaffSummaryEl instanceof HTMLElement) {
     const slotText = remaining === 1 ? "slot" : "slots";
@@ -7763,7 +7874,7 @@ function renderOwnerStaff() {
   ownerStaffBodyEl.replaceChildren();
   if (!Array.isArray(state.ownerStaff) || state.ownerStaff.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="6">No staff accounts found.</td>';
+    row.innerHTML = '<td colspan="7">No staff accounts found.</td>';
     ownerStaffBodyEl.append(row);
     return;
   }
@@ -7773,6 +7884,7 @@ function renderOwnerStaff() {
     const passwordState = item.mustChangePassword ? "Temporary" : "Changed";
     row.innerHTML = `
       <td>${escapeHtml(item.fullName ?? "-")}</td>
+      <td>${escapeHtml(item.assignedBuildingName ?? item.assignedBuildingId ?? "Unassigned")}</td>
       <td>${escapeHtml(item.phone ?? "-")}</td>
       <td>${escapeHtml(item.email ?? "-")}</td>
       <td>${escapeHtml(passwordState)}</td>
@@ -8824,6 +8936,31 @@ function renderApplications(rows) {
     const canReview = item.status === "pending";
     const identitySummary = summarizeResidentIdentity(item);
     const occupationSummary = summarizeResidentOccupation(item);
+    const applicationActions = canReview
+      ? isStaffRole()
+        ? `<div class="decision-actions">
+                <button type="button" data-action="complete-lease" data-id="${escapeHtml(
+                  item.id
+                )}" data-building-id="${escapeHtml(
+                  item.building?.id ?? ""
+                )}" data-house-number="${escapeHtml(
+                  item.houseNumber ?? ""
+                )}" data-full-name="${escapeHtml(
+                  item.tenant?.fullName ?? ""
+                )}" data-phone="${escapeHtml(
+                  item.tenant?.phone ?? ""
+                )}" data-note="${escapeHtml(item.note ?? "")}">Complete Lease</button>
+                <button type="button" data-action="reject" data-id="${escapeHtml(
+                  item.id
+                )}" class="btn-danger">Reject</button>
+              </div>`
+        : `<div class="decision-actions">
+                <small>Waiting for assigned staff</small>
+                <button type="button" data-action="reject" data-id="${escapeHtml(
+                  item.id
+                )}" class="btn-danger">Cancel Intake</button>
+              </div>`
+      : "-";
     row.innerHTML = `
       <td>${formatDateTime(item.createdAt)}</td>
       <td>${item.building?.name ?? item.building?.id ?? "-"}</td>
@@ -8839,14 +8976,7 @@ function renderApplications(rows) {
       <td>${item.status}</td>
       <td>${item.note ?? "-"}</td>
       <td>
-        ${
-          canReview
-            ? `<div class="decision-actions">
-                <button type="button" data-action="approve" data-id="${item.id}">Approve</button>
-                <button type="button" data-action="reject" data-id="${item.id}" class="btn-danger">Reject</button>
-              </div>`
-            : "-"
-        }
+        ${applicationActions}
       </td>
     `;
     applicationsBodyEl.append(row);
@@ -9785,678 +9915,6 @@ function renderResidentDrawer(resident) {
       </summary>
       <div class="resident-drawer-panel-body">
         ${roomIssuesSummary}
-      </div>
-    </details>
-  `;
-  return;
-
-  residentDrawerBodyEl.innerHTML = `
-    <div class="resident-summary">
-      <p class="status-text">${escapeHtml(buildingLabel)} • House ${escapeHtml(
-        resident.houseNumber
-      )}</p>
-      <h3>${escapeHtml(residentName)}</h3>
-      <p class="status-text">Phone ${escapeHtml(residentPhone)}</p>
-      <div class="resident-row-actions resident-drawer-actions">
-        <button
-          type="button"
-          data-action="open-room-account"
-          data-building-id="${escapeHtml(resident.buildingId)}"
-          data-house-number="${escapeHtml(resident.houseNumber)}"
-        >
-          Open Full Room Account
-        </button>
-      </div>
-    </div>
-    <div class="resident-grid resident-grid-primary">
-      <div><span>Occupancy</span><strong>${escapeHtml(occupancyLabel)}</strong></div>
-      <div><span>Household Members</span><strong>${members}</strong></div>
-      <div><span>Billing Mode</span><strong>${escapeHtml(billingMode)}</strong></div>
-      ${
-        rentEnabled
-          ? `<div class="resident-grid-card-highlight"><span>Monthly Rent</span><strong>${escapeHtml(
-              monthlyRent
-            )}</strong></div>
-      <div class="resident-grid-card-highlight"><span>Current Rent Due</span><strong>${escapeHtml(
-        currentRentDue
-      )}</strong></div>
-      <div class="resident-grid-card-highlight"><span>Rent Arrears</span><strong>${escapeHtml(
-        rentArrears
-      )}</strong></div>
-      <div><span>Utility Balance</span><strong>${escapeHtml(utilityBalance)}</strong></div>`
-          : `<div class="resident-grid-card-highlight"><span>Current Utility Due</span><strong>${escapeHtml(
-              currentUtilityDue
-            )}</strong></div>
-      <div class="resident-grid-card-highlight"><span>Utility Arrears</span><strong>${escapeHtml(
-        utilityArrears
-      )}</strong></div>
-      <div><span>Utility Balance</span><strong>${escapeHtml(utilityBalance)}</strong></div>`
-      }
-      <div><span>Charge Overdue</span><strong>${escapeHtml(expenseBalance)}</strong></div>
-      <div><span>Outstanding</span><strong>${escapeHtml(totalOutstanding)}</strong></div>
-      <div><span>Billing Status</span><strong>${escapeHtml(billingStatus)}</strong></div>
-      <div><span>Next Due</span><strong>${escapeHtml(nextDue)}</strong></div>
-    </div>
-    <details class="resident-drawer-panel" ${roomProfileOpenAttr}>
-      <summary>
-        <span>Room Profile</span>
-        <small>meters, billing context, identity</small>
-      </summary>
-      <div class="resident-drawer-panel-body">
-        <div class="resident-grid resident-grid-secondary">
-          ${
-            rentEnabled
-              ? `<div><span>Latest Receipt</span><strong>${escapeHtml(latestReceipt)}</strong></div>
-          <div><span>Latest Payment</span><strong>${escapeHtml(latestPaidAt)}</strong></div>
-          <div><span>This Month Paid</span><strong>${escapeHtml(currentMonthRentPaid)}</strong></div>
-          <div><span>All-Time Paid</span><strong>${escapeHtml(totalRentPaid)}</strong></div>`
-              : `<div><span>Current Utility Due</span><strong>${escapeHtml(currentUtilityDue)}</strong></div>
-          <div><span>Utility Arrears</span><strong>${escapeHtml(utilityArrears)}</strong></div>
-          <div><span>Charge Overdue</span><strong>${escapeHtml(expenseBalance)}</strong></div>`
-          }
-          <div><span>Water Meter</span><strong>${escapeHtml(waterMeter)}</strong></div>
-          <div><span>Electric Meter</span><strong>${escapeHtml(electricityMeter)}</strong></div>
-          <div><span>ID / Passport</span><strong>${escapeHtml(identitySummary)}</strong></div>
-          <div><span>Occupation</span><strong>${escapeHtml(
-            agreement?.occupationLabel ||
-              formatAgreementOccupationStatus(agreement?.occupationStatus)
-          )}</strong></div>
-          <div><span>Work / School</span><strong>${escapeHtml(workSchoolSummary)}</strong></div>
-          <div><span>Emergency Contact</span><strong>${escapeHtml(
-            agreement?.emergencyContactName
-              ? `${agreement.emergencyContactName}${
-                  agreement?.emergencyContactPhone ? ` • ${agreement.emergencyContactPhone}` : ""
-                }`
-              : "Not recorded"
-          )}</strong></div>
-        </div>
-      </div>
-    </details>
-    <details class="resident-drawer-panel" ${roomIssuesOpenAttr}>
-      <summary>
-        <span>Room Issues</span>
-        <small>${roomIssues.length} total</small>
-      </summary>
-      <div class="resident-drawer-panel-body">
-        ${roomIssuesSummary}
-      </div>
-    </details>
-    <details class="resident-drawer-panel" ${roomLedgerOpenAttr}>
-      <summary>
-        <span>Room Ledger</span>
-        <small>${escapeHtml(roomLedgerSummary)}</small>
-      </summary>
-      <div class="resident-drawer-panel-body">
-        <p class="status-text resident-agreement-note">
-          One place for room utility bills, utility payments, and room-specific charges.
-        </p>
-        <div class="resident-agreement-overview resident-ledger-overview">
-          <div><span>Utility Outstanding</span><strong>${escapeHtml(utilityBalance)}</strong></div>
-          <div><span>Utility Paid</span><strong>${escapeHtml(
-            formatCurrency(roomUtilityPaidKsh)
-          )}</strong></div>
-          <div><span>Room Charges</span><strong>${escapeHtml(
-            formatCurrency(roomExpenditureTotalKsh)
-          )}</strong></div>
-          <div><span>Latest Bill Month</span><strong>${escapeHtml(
-            latestLedgerBillingLabel
-          )}</strong></div>
-        </div>
-        ${
-          roomLedgerFlags.length > 0
-            ? `<div class="resident-ledger-flags">${roomLedgerFlags
-                .map(
-                  (message) =>
-                    `<p class="status-text resident-ledger-flag">${escapeHtml(message)}</p>`
-                )
-                .join("")}</div>`
-            : ""
-        }
-        <div class="resident-ledger-columns">
-          <section class="resident-ledger-section">
-            <div class="resident-ledger-head">
-              <h4>Utility Bills</h4>
-              <small>${roomUtilityBills.length} item(s)</small>
-            </div>
-            ${
-              roomUtilityBills.length > 0
-                ? `<div class="stack-list">${roomUtilityBills
-                    .slice(0, 8)
-                    .map((bill) => {
-                      const billAmountKsh = Number(bill?.amountKsh ?? 0);
-                      const billBalanceKsh = Number(bill?.balanceKsh ?? 0);
-                      const paidAmountKsh = Array.isArray(bill?.payments)
-                        ? bill.payments.reduce(
-                            (sum, payment) => sum + Number(payment?.amountKsh ?? 0),
-                            0
-                          )
-                        : 0;
-                      const dueLabel = bill?.dueDate ? formatDateOnly(bill.dueDate) : "-";
-                      const billStatus = String(bill?.status ?? "open").trim() || "open";
-                      return `
-                        <article class="package-card resident-ledger-card">
-                          <p class="status-text">${escapeHtml(
-                            utilityTypeLabel(bill?.utilityType)
-                          )} • ${escapeHtml(formatBillingMonth(bill?.billingMonth))} • Due ${escapeHtml(
-                            dueLabel
-                          )}</p>
-                          <h4>${escapeHtml(formatCurrency(billBalanceKsh))} open of ${escapeHtml(
-                            formatCurrency(billAmountKsh)
-                          )}</h4>
-                          <p class="status-text">Status ${escapeHtml(
-                            billStatus
-                          )} • Paid ${escapeHtml(formatCurrency(paidAmountKsh))}</p>
-                          ${
-                            bill?.note
-                              ? `<p class="status-text">${escapeHtml(bill.note)}</p>`
-                              : ""
-                          }
-                        </article>
-                      `;
-                    })
-                    .join("")}</div>
-                  ${
-                    roomUtilityBills.length > 8
-                      ? `<p class="status-text">Showing 8 of ${roomUtilityBills.length} utility bill entries.</p>`
-                      : ""
-                  }`
-                : '<p class="status-text">No utility bills loaded for this room yet.</p>'
-            }
-          </section>
-          <section class="resident-ledger-section">
-            <div class="resident-ledger-head">
-              <h4>Utility Payments</h4>
-              <small>${roomUtilityPayments.length} item(s)</small>
-            </div>
-            ${
-              roomUtilityPayments.length > 0
-                ? `<div class="stack-list">${roomUtilityPayments
-                    .slice(0, 8)
-                    .map(
-                      (payment) => `
-                        <article class="package-card resident-ledger-card">
-                          <p class="status-text">${escapeHtml(
-                            formatPaymentProvider(payment?.provider)
-                          )} • ${escapeHtml(
-                        payment?.paidAt ? formatDateTime(payment.paidAt) : "-"
-                      )}</p>
-                          <h4>${escapeHtml(
-                            formatCurrency(Number(payment?.amountKsh ?? 0))
-                          )}</h4>
-                          <p class="status-text">${escapeHtml(
-                            utilityTypeLabel(payment?.utilityType)
-                          )} • ${escapeHtml(
-                        formatUtilityPaymentCoverage(payment, payment?.billingMonth) || "-"
-                      )}</p>
-                          <p class="status-text">${escapeHtml(
-                            payment?.providerReference || payment?.note || "No reference recorded."
-                          )}</p>
-                        </article>
-                      `
-                    )
-                    .join("")}</div>
-                  ${
-                    roomUtilityPayments.length > 8
-                      ? `<p class="status-text">Showing 8 of ${roomUtilityPayments.length} utility payment entries.</p>`
-                      : ""
-                  }`
-                : '<p class="status-text">No utility payments recorded for this room yet.</p>'
-            }
-          </section>
-          <section class="resident-ledger-section">
-            <div class="resident-ledger-head">
-              <h4>Room Charges</h4>
-              <small>${roomExpenditures.length} item(s)</small>
-            </div>
-            ${
-              roomExpenditures.length > 0
-                ? `<div class="stack-list">${roomExpenditures
-                    .slice(0, 8)
-                    .map(
-                      (item) => `
-                        <article class="package-card resident-ledger-card">
-                          <p class="status-text">${escapeHtml(
-                            formatExpenditureCategory(item?.category)
-                          )} • ${escapeHtml(
-                        item?.createdAt ? formatDateTime(item.createdAt) : "-"
-                      )}</p>
-                          <h4>${escapeHtml(
-                            formatCurrency(Number(item?.amountKsh ?? 0))
-                          )}</h4>
-                          <p class="status-text">${escapeHtml(item?.title || "Room charge")}</p>
-                          ${
-                            item?.note
-                              ? `<p class="status-text">${escapeHtml(item.note)}</p>`
-                              : ""
-                          }
-                        </article>
-                      `
-                    )
-                    .join("")}</div>
-                  ${
-                    roomExpenditures.length > 8
-                      ? `<p class="status-text">Showing 8 of ${roomExpenditures.length} room-charge entries.</p>`
-                      : ""
-                  }`
-                : '<p class="status-text">No room-specific charges posted for this room.</p>'
-            }
-          </section>
-        </div>
-      </div>
-    </details>
-    ${
-      rentEnabled
-        ? `<details class="resident-drawer-panel" ${rentPaymentsOpenAttr}>
-      <summary>
-        <span>Cash Rent Payment</span>
-        <small>${
-          canRecordCashPayment
-            ? "Posts to this room immediately"
-            : hasResident
-              ? "Read only"
-              : "No active resident"
-        }</small>
-      </summary>
-      <div class="resident-drawer-panel-body">
-        <div class="resident-grid resident-grid-secondary">
-          <div><span>Current Rent Due</span><strong>${escapeHtml(currentRentDue)}</strong></div>
-          <div><span>Late Fee</span><strong>${escapeHtml(currentLatePenalty)}</strong></div>
-          <div><span>Rent Arrears</span><strong>${escapeHtml(rentArrears)}</strong></div>
-          <div><span>Total Rent Paid</span><strong>${escapeHtml(totalRentPaid)}</strong></div>
-          <div><span>Latest Receipt</span><strong>${escapeHtml(latestReceipt)}</strong></div>
-        </div>
-        ${
-          canRecordCashPayment
-            ? `<p class="status-text resident-agreement-note">
-                Record a landlord-side cash collection for this resident. The room balance,
-                arrears, and total paid update after save.
-              </p>
-              <form id="resident-rent-payment-form" class="resident-agreement-form">
-                <div class="inline-fields compact-fields resident-agreement-grid">
-                  <label>
-                    Amount Paid (KSh)
-                    <input name="amountKsh" type="number" min="1" step="1" required />
-                  </label>
-                  <label>
-                    Payment Month
-                    <input
-                      name="billingMonth"
-                      type="month"
-                      value="${escapeHtml(residentPaymentMonth)}"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Paid At (optional)
-                    <input name="paidAt" type="datetime-local" />
-                  </label>
-                </div>
-                <label>
-                  Receipt / Note (optional)
-                  <input
-                    name="providerReference"
-                    type="text"
-                    maxlength="120"
-                    placeholder="Optional for cash"
-                  />
-                </label>
-                <div class="action-row">
-                  <button type="submit">Record Cash Payment</button>
-                </div>
-              </form>`
-            : `<p class="status-text">
-                ${
-                  hasResident
-                    ? "Only manager and root-level accounts can record rent payments here."
-                    : "Assign an active resident before recording a rent payment."
-                }
-              </p>`
-        }
-      </div>
-    </details>`
-        : ""
-    }
-    ${
-      rentEnabled
-        ? `<details class="resident-drawer-panel" ${rentProfileOpenAttr}>
-      <summary>
-        <span>Rent Overdue Settings</span>
-        <small>${canEditRentProfile ? "Manager can edit" : "Read only"}</small>
-      </summary>
-      <div class="resident-drawer-panel-body">
-        <div class="resident-grid resident-grid-secondary">
-          <div><span>Current Due Date</span><strong>${escapeHtml(
-            resident.rentDueDate ? formatDateTime(resident.rentDueDate) : "-"
-          )}</strong></div>
-          <div><span>Overdue Starts</span><strong>${escapeHtml(overdueStartSummary)}</strong></div>
-          <div><span>Grace Days</span><strong>${escapeHtml(String(rentGraceDays))}</strong></div>
-          <div><span>Current Balance</span><strong>${escapeHtml(
-            formatCurrency(normalizeRentLedgerAmountKsh(resident.rentBalanceKsh))
-          )}</strong></div>
-        </div>
-        ${
-          canEditRentProfile
-            ? `<p class="status-text resident-agreement-note">
-                Set the room due date and when this balance should flip to overdue. Leave
-                overdue start blank to begin overdue on the due date itself.
-              </p>
-              <form id="resident-rent-profile-form" class="resident-agreement-form">
-                <div class="inline-fields compact-fields resident-agreement-grid">
-                  <label>
-                    Due Date
-                    <input
-                      name="dueDate"
-                      type="datetime-local"
-                      value="${escapeHtml(rentDueDateInputValue)}"
-                      required
-                    />
-                  </label>
-                  <label>
-                    Overdue Starts
-                    <input
-                      name="overdueStartsAt"
-                      type="datetime-local"
-                      value="${escapeHtml(rentOverdueStartInputValue)}"
-                    />
-                  </label>
-                </div>
-                <div class="action-row">
-                  <button type="submit">Save Rent Overdue Settings</button>
-                </div>
-              </form>`
-            : `<p class="status-text">
-                ${
-                  isCaretakerRole()
-                    ? "House manager accounts cannot update rent overdue settings."
-                    : !canDisplayResidentBilling(resident)
-                      ? "Billing is hidden until resident verification is complete."
-                    : "Set monthly rent first before adjusting overdue settings."
-                }
-              </p>`
-        }
-      </div>
-    </details>`
-        : ""
-    }
-    <details class="resident-drawer-panel resident-agreement-card" ${agreementOpenAttr}>
-      <summary>
-        <span>Tenant Agreement</span>
-        <small>${
-          canEditAgreement ? "Manager can edit" : hasResident ? "Read only" : "No active resident"
-        }</small>
-      </summary>
-      <div class="resident-drawer-panel-body">
-        <p class="status-text">${escapeHtml(agreementStatusText)}</p>
-      <div class="resident-agreement-overview">
-        <div><span>ID</span><strong>${escapeHtml(identitySummary)}</strong></div>
-        <div><span>Verification</span><strong>${renderResidentVerificationBadge(resident)}</strong></div>
-        <div><span>Occupation</span><strong>${escapeHtml(
-          formatAgreementOccupationStatus(agreement?.occupationStatus)
-        )}</strong></div>
-        <div><span>Work / School</span><strong>${escapeHtml(workSchoolSummary)}</strong></div>
-        <div><span>Lease</span><strong>${escapeHtml(leaseSummary)}</strong></div>
-        <div><span>Documents</span><strong>${renderDocumentLinksHtml(agreement?.identityDocumentUrls, { emptyText: "Not uploaded" })}</strong></div>
-      </div>
-      <div class="action-row">
-        <button type="button" data-action="print-tenant-agreement">Print Agreement</button>
-      </div>
-      ${
-        agreementResident
-          ? `<p class="status-text resident-agreement-note">Active resident on this agreement: ${escapeHtml(
-              agreementResident.fullName ?? residentName
-            )} • ${escapeHtml(agreementResident.phone ?? residentPhone)}</p>`
-          : ""
-      }
-      ${
-        agreementError
-          ? `<p class="status-text resident-agreement-error">${escapeHtml(agreementError)}</p>`
-          : ""
-      }
-      <p class="status-text resident-agreement-note">
-        Capture ID, work or school information, sponsor contacts for students, emergency contact,
-        and core lease terms in one place.
-      </p>
-      <form id="resident-agreement-form" class="resident-agreement-form">
-        <div class="inline-fields compact-fields resident-agreement-grid">
-          <label>
-            ID Type
-            <select name="identityType" ${disabledAttr}>
-              <option value="">Select</option>
-              <option value="national_id" ${
-                agreement?.identityType === "national_id" ? "selected" : ""
-              }>National ID</option>
-              <option value="passport" ${
-                agreement?.identityType === "passport" ? "selected" : ""
-              }>Passport</option>
-              <option value="alien_id" ${
-                agreement?.identityType === "alien_id" ? "selected" : ""
-              }>Alien ID</option>
-              <option value="other" ${agreement?.identityType === "other" ? "selected" : ""}>Other</option>
-            </select>
-          </label>
-          <label>
-            ID Number
-            <input
-              name="identityNumber"
-              type="text"
-              maxlength="80"
-              placeholder="ID / passport number"
-              value="${escapeHtml(agreement?.identityNumber ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Agreement / ID Document Links
-            <textarea
-              name="identityDocumentUrls"
-              rows="3"
-              maxlength="4096"
-              placeholder="One document URL per line"
-              ${disabledAttr}
-            >${escapeHtml(normalizeDocumentUrls(agreement?.identityDocumentUrls).join("\n"))}</textarea>
-          </label>
-          <label>
-            Upload Agreement / ID Photos
-            <input
-              name="identityDocumentFiles"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Occupation Status
-            <select name="occupationStatus" ${disabledAttr}>
-              <option value="">Select</option>
-              <option value="employed" ${
-                agreement?.occupationStatus === "employed" ? "selected" : ""
-              }>Employed</option>
-              <option value="self_employed" ${
-                agreement?.occupationStatus === "self_employed" ? "selected" : ""
-              }>Self-employed</option>
-              <option value="student" ${
-                agreement?.occupationStatus === "student" ? "selected" : ""
-              }>Student</option>
-              <option value="sponsored" ${
-                agreement?.occupationStatus === "sponsored" ? "selected" : ""
-              }>Sponsored</option>
-              <option value="unemployed" ${
-                agreement?.occupationStatus === "unemployed" ? "selected" : ""
-              }>Unemployed</option>
-              <option value="other" ${
-                agreement?.occupationStatus === "other" ? "selected" : ""
-              }>Other</option>
-            </select>
-          </label>
-          <label>
-            Role / Course / Trade
-            <input
-              name="occupationLabel"
-              type="text"
-              maxlength="120"
-              placeholder="Teacher, Nursing, Online business"
-              value="${escapeHtml(agreement?.occupationLabel ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-        </div>
-        <div class="inline-fields compact-fields resident-agreement-grid">
-          <label>
-            Employer / Business / School
-            <input
-              name="organizationName"
-              type="text"
-              maxlength="160"
-              placeholder="ABC School or Riverside Ltd"
-              value="${escapeHtml(agreement?.organizationName ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Place of Work / School
-            <input
-              name="organizationLocation"
-              type="text"
-              maxlength="160"
-              placeholder="Westlands, Nairobi"
-              value="${escapeHtml(agreement?.organizationLocation ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Student / Admission No.
-            <input
-              name="studentRegistrationNumber"
-              type="text"
-              maxlength="80"
-              placeholder="ADM-2026-0042"
-              value="${escapeHtml(agreement?.studentRegistrationNumber ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-        </div>
-        <div class="inline-fields compact-fields resident-agreement-grid">
-          <label>
-            Sponsor / Guardian Name
-            <input
-              name="sponsorName"
-              type="text"
-              maxlength="120"
-              placeholder="Parent or sponsor name"
-              value="${escapeHtml(agreement?.sponsorName ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Sponsor / Guardian Phone
-            <input
-              name="sponsorPhone"
-              type="tel"
-              inputmode="tel"
-              maxlength="20"
-              placeholder="07XXXXXXXX"
-              value="${escapeHtml(agreement?.sponsorPhone ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Emergency Contact Name
-            <input
-              name="emergencyContactName"
-              type="text"
-              maxlength="120"
-              placeholder="Next of kin"
-              value="${escapeHtml(agreement?.emergencyContactName ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Emergency Contact Phone
-            <input
-              name="emergencyContactPhone"
-              type="tel"
-              inputmode="tel"
-              maxlength="20"
-              placeholder="07XXXXXXXX"
-              value="${escapeHtml(agreement?.emergencyContactPhone ?? "")}"
-              ${disabledAttr}
-            />
-          </label>
-        </div>
-        <div class="inline-fields compact-fields resident-agreement-grid">
-          <label>
-            Lease Start
-            <input
-              name="leaseStartDate"
-              type="date"
-              value="${escapeHtml(toDateInputValue(agreement?.leaseStartDate))}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Lease End
-            <input
-              name="leaseEndDate"
-              type="date"
-              value="${escapeHtml(toDateInputValue(agreement?.leaseEndDate))}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Monthly Rent (KSh)
-            <input
-              name="monthlyRentKsh"
-              type="number"
-              min="0"
-              step="1"
-              value="${escapeHtml(numberToInputString(agreement?.monthlyRentKsh))}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Deposit (KSh)
-            <input
-              name="depositKsh"
-              type="number"
-              min="0"
-              step="1"
-              value="${escapeHtml(numberToInputString(agreement?.depositKsh))}"
-              ${disabledAttr}
-            />
-          </label>
-          <label>
-            Due Day
-            <input
-              name="paymentDueDay"
-              type="number"
-              min="1"
-              max="31"
-              step="1"
-              placeholder="5"
-              value="${escapeHtml(numberToInputString(agreement?.paymentDueDay))}"
-              ${disabledAttr}
-            />
-          </label>
-        </div>
-        <label>
-          Special Terms
-          <textarea
-            name="specialTerms"
-            rows="4"
-            maxlength="1200"
-            placeholder="Quiet hours, visitor rules, move-out notice period, utility arrangements."
-            ${disabledAttr}
-          >${escapeHtml(agreement?.specialTerms ?? "")}</textarea>
-        </label>
-        ${
-          canEditAgreement
-            ? `<div class="action-row">
-                <button type="submit">Save Agreement</button>
-              </div>`
-            : ""
-        }
-      </form>
       </div>
     </details>
   `;
@@ -12130,6 +11588,13 @@ directTenantDrawerBackdropEl?.addEventListener("click", () => {
   closeDirectTenantDrawer();
 });
 
+directTenantBuildingEl?.addEventListener("change", () => {
+  if (directTenantHouseEl instanceof HTMLInputElement) {
+    directTenantHouseEl.value = "";
+  }
+  syncDirectTenantRoomOptions();
+});
+
 openUtilitySetupBtnEl?.addEventListener("click", () => {
   void openUtilitySetupModal().catch((error) => {
     handleLandlordError(error, "Unable to open utility setup.");
@@ -12225,6 +11690,52 @@ directTenantDocumentsEl?.addEventListener("change", () => {
   syncDirectTenantDocumentPreview();
 });
 
+function getDirectTenantLeaseCompletionElements() {
+  return [
+    directTenantIdTypeEl?.closest("label"),
+    directTenantIdNumberEl?.closest("label"),
+    directTenantDocumentsEl?.closest("label"),
+    directTenantDocumentPreviewEl,
+    directTenantAcceptanceMethodEl?.closest("label"),
+    directTenantStaffConfirmWrapEl,
+    directTenantAcceptanceNoteWrapEl
+  ].filter((item) => item instanceof HTMLElement);
+}
+
+function syncDirectTenantDrawerMode() {
+  const staffMode = isStaffRole();
+  getDirectTenantLeaseCompletionElements().forEach((element) => {
+    element.classList.toggle("hidden", !staffMode);
+  });
+  if (directTenantLeaseStartLabelEl instanceof HTMLElement) {
+    directTenantLeaseStartLabelEl.textContent = staffMode ? "Lease Start Date" : "Move-in Date";
+  }
+  if (directTenantSubmitBtnEl instanceof HTMLButtonElement) {
+    directTenantSubmitBtnEl.textContent = staffMode ? "Create Tenant Agreement" : "Send To Staff Intake";
+  }
+  if (directTenantIdTypeEl instanceof HTMLSelectElement) {
+    directTenantIdTypeEl.required = staffMode;
+  }
+  if (directTenantIdNumberEl instanceof HTMLInputElement) {
+    directTenantIdNumberEl.required = staffMode;
+  }
+  if (directTenantAcceptanceMethodEl instanceof HTMLSelectElement) {
+    directTenantAcceptanceMethodEl.required = staffMode;
+  }
+  syncDirectTenantAcceptanceFields();
+}
+
+function syncDirectTenantAcceptanceFields() {
+  const staffMode = isStaffRole();
+  const onBehalf = staffMode && directTenantAcceptanceMethodEl?.value === "staff_on_behalf";
+  directTenantStaffConfirmWrapEl?.classList.toggle("hidden", !onBehalf);
+  directTenantAcceptanceNoteWrapEl?.classList.toggle("hidden", !onBehalf);
+  if (directTenantStaffConfirmEl instanceof HTMLInputElement) directTenantStaffConfirmEl.required = onBehalf;
+  if (directTenantAcceptanceNoteEl instanceof HTMLTextAreaElement) directTenantAcceptanceNoteEl.required = onBehalf;
+}
+
+directTenantAcceptanceMethodEl?.addEventListener("change", syncDirectTenantAcceptanceFields);
+
 refreshDocumentsBtnEl?.addEventListener("click", () => {
   void loadResidents().catch((error) => {
     handleLandlordError(error, "Unable to refresh tenant documents.");
@@ -12264,38 +11775,92 @@ directTenantFormEl?.addEventListener("submit", (event) => {
   }
 
   const buildingId = String(directTenantBuildingEl?.value || "").trim();
-  const houseNumber = normalizeHouse(directTenantHouseEl?.value || "");
+  const houseNumber = getDirectTenantHouseNumber(buildingId);
   const fullName = String(directTenantNameEl?.value || "").trim();
   const phoneNumber = String(directTenantPhoneEl?.value || "").trim();
   const identityType = String(directTenantIdTypeEl?.value || "national_id").trim();
   const identityNumber = String(directTenantIdNumberEl?.value || "").trim();
-  const providedDocumentUrls = normalizeDocumentUrls(directTenantDocumentUrlsEl?.value || "");
+  const leaseStartDate = String(directTenantLeaseStartEl?.value || "").trim();
+  const acceptanceMethod = String(directTenantAcceptanceMethodEl?.value || "resident_portal").trim();
+  const staffAcceptanceConfirmed = Boolean(directTenantStaffConfirmEl?.checked);
+  const acceptanceNote = String(directTenantAcceptanceNoteEl?.value || "").trim() || undefined;
   const note = String(directTenantNoteEl?.value || "").trim() || undefined;
+  const staffMode = isStaffRole();
 
-  if (!buildingId || !houseNumber || !fullName || !phoneNumber || !identityNumber) {
-    showError("Tenant onboarding requires building, room, name, phone, and ID number.");
+  if (!buildingId || !houseNumber || !fullName || !phoneNumber || !leaseStartDate) {
+    showError(staffMode ? "Agreement onboarding requires building, room, name, phone, ID number, and lease start date." : "Tenant intake requires building, room, name, phone, and move-in date.");
     return;
   }
-
-  const defaultBillingStartDate = "2026-07-16";
-  const buildingLabel = getBuildingDisplayNameById(buildingId, "selected building");
-  const billingStartInput = window.prompt(
-    `Billing start date for ${buildingLabel} ${houseNumber} (YYYY-MM-DD). Billing stays paused until this date if it falls in a future month.`,
-    defaultBillingStartDate
-  );
-  if (billingStartInput == null) {
+  if (!isDirectTenantRoomInSelectedBuilding(buildingId, houseNumber)) {
+    showError("Choose a room that belongs to the selected building.");
     return;
   }
-
-  const billingStartDate = String(billingStartInput || "").trim();
-  const billingStartAt = new Date(`${billingStartDate}T00:00:00.000Z`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(billingStartDate) || Number.isNaN(billingStartAt.getTime())) {
-    showError("Enter the billing start date in YYYY-MM-DD format.");
+  if (staffMode && !identityNumber) {
+    showError("Agreement onboarding requires the tenant ID number.");
+    return;
+  }
+  if (staffMode && acceptanceMethod === "staff_on_behalf" && (!staffAcceptanceConfirmed || !acceptanceNote)) {
+    showError("Confirm resident acceptance and record how consent was given.");
     return;
   }
 
   setDirectTenantSubmitting(true);
-  setDirectTenantStatus(`Adding tenant. Billing starts ${billingStartDate}...`);
+  setDirectTenantStatus(staffMode ? "Creating tenant agreement and secure resident access..." : "Sending tenant intake to assigned staff...");
+
+  if (!staffMode) {
+    void (async () => {
+      try {
+        const payload = await requestJson("/api/landlord/tenant-intakes", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            buildingId,
+            houseNumber,
+            fullName,
+            phoneNumber,
+            leaseStartDate,
+            note
+          })
+        });
+
+        const data = payload.data ?? {};
+        const buildingName = data.building?.name || getBuildingDisplayNameById(buildingId, "selected building");
+        const residentName = data.tenant?.fullName || fullName;
+
+        if (directTenantFormEl instanceof HTMLFormElement) {
+          directTenantFormEl.reset();
+        }
+        if (directTenantBuildingEl instanceof HTMLSelectElement) {
+          syncDirectTenantBuildingOptions(buildingId);
+          directTenantBuildingEl.value = buildingId;
+        }
+        syncDirectTenantRoomOptions();
+        if (directTenantLeaseStartEl instanceof HTMLInputElement) {
+          directTenantLeaseStartEl.value = new Date().toISOString().slice(0, 10);
+        }
+        syncDirectTenantDrawerMode();
+
+        closeDirectTenantDrawer();
+        setStatus(
+          residentName +
+            " intake sent to staff for " +
+            buildingName +
+            " " +
+            (data.houseNumber || houseNumber) +
+            ". Staff must complete the lease form before the tenant is verified."
+        );
+        await Promise.all([loadApplications(), loadBuildings(), loadResidents()]);
+      } catch (error) {
+        setDirectTenantStatus("Tenant intake needs building, room, tenant details, and move-in date.");
+        handleLandlordError(error, "Failed to send tenant intake to staff.");
+      } finally {
+        setDirectTenantSubmitting(false);
+      }
+    })();
+    return;
+  }
 
   void (async () => {
     try {
@@ -12303,15 +11868,15 @@ directTenantFormEl?.addEventListener("submit", (event) => {
         maxFiles: 6,
         maxSizeMb: 10
       });
+      if (selectedDocumentFiles.length === 0) {
+        throw new Error("Upload at least one ID document before creating the agreement.");
+      }
       const uploadedDocumentUrls = selectedDocumentFiles.length
         ? await uploadImageFiles(selectedDocumentFiles, {
             createUploadRequest: () => createResidentDocumentUploadRequest(buildingId, houseNumber)
           })
         : [];
-      const identityDocumentUrls = normalizeDocumentUrls([
-        ...providedDocumentUrls,
-        ...uploadedDocumentUrls
-      ]);
+      const identityDocumentUrls = normalizeDocumentUrls(uploadedDocumentUrls);
 
       const payload = await requestJson("/api/landlord/residents/direct", {
         method: "POST",
@@ -12326,7 +11891,10 @@ directTenantFormEl?.addEventListener("submit", (event) => {
           identityType,
           identityNumber,
           identityDocumentUrls,
-          billingStartDate,
+          leaseStartDate,
+          acceptanceMethod,
+          staffAcceptanceConfirmed,
+          acceptanceNote,
           note
         })
       });
@@ -12342,7 +11910,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
       const buildingName =
         data.building?.name || getBuildingDisplayNameById(buildingId, "selected building");
       const residentName = data.tenant?.fullName || fullName;
-      const resolvedBillingStartDate = String(data.billingStartDate || billingStartDate || "").trim();
+      const resolvedBillingStartDate = String(data.billingStartDate || leaseStartDate || "").trim();
       const billingPauseText = data.billingHold?.active
         ? ` Billing is paused until ${resolvedBillingStartDate}.`
         : ` Billing starts ${resolvedBillingStartDate}.`;
@@ -12359,14 +11927,25 @@ directTenantFormEl?.addEventListener("submit", (event) => {
         syncDirectTenantBuildingOptions(buildingId);
         directTenantBuildingEl.value = buildingId;
       }
+      syncDirectTenantRoomOptions();
+      if (directTenantLeaseStartEl instanceof HTMLInputElement) {
+        directTenantLeaseStartEl.value = new Date().toISOString().slice(0, 10);
+      }
+      if (directTenantAcceptanceMethodEl instanceof HTMLSelectElement) {
+        directTenantAcceptanceMethodEl.value = "resident_portal";
+      }
+      if (directTenantStaffConfirmEl instanceof HTMLInputElement) {
+        directTenantStaffConfirmEl.checked = false;
+      }
+      if (directTenantAcceptanceNoteEl instanceof HTMLTextAreaElement) {
+        directTenantAcceptanceNoteEl.value = "";
+      }
+      syncDirectTenantDrawerMode();
       if (directTenantIdTypeEl instanceof HTMLSelectElement) {
         directTenantIdTypeEl.value = "national_id";
       }
       if (directTenantDocumentsEl instanceof HTMLInputElement) {
         directTenantDocumentsEl.value = "";
-      }
-      if (directTenantDocumentUrlsEl instanceof HTMLTextAreaElement) {
-        directTenantDocumentUrlsEl.value = "";
       }
       syncDirectTenantDocumentPreview();
 
@@ -12384,9 +11963,11 @@ directTenantFormEl?.addEventListener("submit", (event) => {
       await loadResidents();
     } catch (error) {
       setDirectTenantStatus(
-        "Temporary password: ID number. Password change required at first sign-in."
+        isStaffRole()
+          ? "Upload ID evidence, set the lease date, and choose how the agreement will be accepted."
+          : "Create a tenant intake for staff to complete lease details and documents."
       );
-      handleLandlordError(error, "Failed to add tenant.");
+      handleLandlordError(error, "Failed to create tenant agreement.");
     } finally {
       setDirectTenantSubmitting(false);
     }
@@ -12403,12 +11984,13 @@ ownerStaffFormEl?.addEventListener("submit", (event) => {
   }
 
   const fullName = String(ownerStaffNameEl?.value || "").trim();
+  const buildingId = String(ownerStaffBuildingEl?.value || "").trim();
   const email = String(ownerStaffEmailEl?.value || "").trim();
   const phoneNumber = String(ownerStaffPhoneEl?.value || "").trim();
   const temporaryPassword = String(ownerStaffPasswordEl?.value || "");
   const note = String(ownerStaffNoteEl?.value || "").trim() || undefined;
-  if (!fullName || !email || !phoneNumber || !temporaryPassword) {
-    showError("Staff access requires name, email, phone, and password.");
+  if (!buildingId || !fullName || !email || !phoneNumber || !temporaryPassword) {
+    showError("Staff access requires a building, name, email, phone, and password.");
     return;
   }
 
@@ -12424,6 +12006,7 @@ ownerStaffFormEl?.addEventListener("submit", (event) => {
           "content-type": "application/json"
         },
         body: JSON.stringify({
+          buildingId,
           fullName,
           email,
           phoneNumber,
@@ -13871,7 +13454,7 @@ residentDrawerBodyEl?.addEventListener("submit", (event) => {
           })
         : [];
       const identityDocumentUrls = normalizeDocumentUrls([
-        ...normalizeDocumentUrls(value("identityDocumentUrls")),
+        ...normalizeDocumentUrls(state.selectedResidentAgreement?.agreement?.identityDocumentUrls),
         ...uploadedUrls
       ]);
       const payload = {
@@ -13930,6 +13513,18 @@ applicationsBodyEl.addEventListener("click", (event) => {
   const action = target.dataset.action;
   const applicationId = target.dataset.id;
   if (!action || !applicationId) {
+    return;
+  }
+
+  if (action === "complete-lease") {
+    openDirectTenantDrawer({
+      buildingId: target.dataset.buildingId,
+      houseNumber: target.dataset.houseNumber,
+      fullName: target.dataset.fullName,
+      phoneNumber: target.dataset.phone,
+      note: target.dataset.note
+    });
+    setDirectTenantStatus("Complete the lease form, upload ID evidence, then send the agreement to the resident portal.");
     return;
   }
 
