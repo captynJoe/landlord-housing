@@ -9149,7 +9149,7 @@ function formatRoomLedgerSettlement(settlement) {
   return "";
 }
 
-function renderRoomLedgerActions(resident, totalBalanceKsh) {
+function renderRoomLedgerActions(resident, totalBalanceKsh, options = {}) {
   const buildingId = String(resident?.buildingId ?? "").trim();
   const houseNumber = normalizeHouse(resident?.houseNumber);
   const residentUserId = String(resident?.residentUserId ?? "").trim();
@@ -9173,7 +9173,21 @@ function renderRoomLedgerActions(resident, totalBalanceKsh) {
     );
   }
 
-  if (hasResident && residentUserId) {
+  const rentBalanceKsh = Math.max(0, Number(options.rentBalanceKsh ?? 0));
+  const billingMonth =
+    String(options.billingMonth ?? "").trim() ||
+    monthKeyFromValue(options.dueDate) ||
+    currentBillingMonth();
+
+  if (hasResident && residentUserId && rentBalanceKsh > 0) {
+    buttons.push(
+      `<button type="button" data-action="prefill-rent-payment" data-building-id="${escapeHtml(
+        buildingId
+      )}" data-house-number="${escapeHtml(houseNumber)}" data-billing-month="${escapeHtml(
+        billingMonth
+      )}" data-amount-ksh="${escapeHtml(rentBalanceKsh)}">Record Payment</button>`
+    );
+  } else if (hasResident && residentUserId) {
     buttons.push(
       `<button type="button" class="btn-danger" data-action="remove-resident" data-building-id="${escapeHtml(
         buildingId
@@ -9360,7 +9374,10 @@ function renderRoomLedger(rows) {
       <td>${escapeHtml(formatCurrency(chargeBalanceKsh))}</td>
       <td><strong>${escapeHtml(formatCurrency(totalBalanceKsh))}</strong></td>
       <td>${escapeHtml(dueOrRefund)}</td>
-      <td>${renderRoomLedgerActions(resident, totalBalanceKsh)}</td>
+      <td>${renderRoomLedgerActions(resident, totalBalanceKsh, {
+        rentBalanceKsh,
+        dueDate: nextDueDate
+      })}</td>
     `;
 
     roomLedgerBodyEl.append(row);
