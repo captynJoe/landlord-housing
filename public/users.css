@@ -476,6 +476,35 @@ body {
   color: var(--ink-950);
 }
 
+.agreement-required-card {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(133, 82, 10, 0.26);
+  background: var(--warn-bg);
+  color: var(--ink-950);
+}
+
+.agreement-required-card.hidden {
+  display: none;
+}
+
+.agreement-required-card strong {
+  color: var(--warn-700);
+}
+
+.agreement-required-card p {
+  margin: 0;
+  color: var(--ink-800);
+}
+
+.agreement-required-action {
+  justify-self: start;
+  text-decoration: none;
+}
+
 .section-head {
   margin: 0 0 12px;
   display: flex;

@@ -50,6 +50,7 @@ const residentViewPanels = [...document.querySelectorAll("[data-resident-view-pa
 const overviewBuildingEl = document.getElementById("overview-building");
 const overviewHouseNumberEl = document.getElementById("overview-house-number");
 const overviewSessionExpiryEl = document.getElementById("overview-session-expiry");
+const overviewAgreementPromptEl = document.getElementById("overview-agreement-prompt");
 const openSupportViewBtnEl = document.getElementById("open-support-view-btn");
 const openPaymentsViewBtnEl = document.getElementById("open-payments-view-btn");
 const openNoticesViewBtnEl = document.getElementById("open-notices-view-btn");
@@ -270,6 +271,7 @@ const REQUIRED_DOM_BINDINGS = Object.freeze([
   ["overview-building", overviewBuildingEl],
   ["overview-house-number", overviewHouseNumberEl],
   ["overview-session-expiry", overviewSessionExpiryEl],
+  ["overview-agreement-prompt", overviewAgreementPromptEl],
   ["resident-auth-form", residentAuthFormEl],
   ["auth-building-id", authBuildingIdEl],
   ["auth-house-number", authHouseNumberEl],
@@ -2395,6 +2397,10 @@ function renderOverviewSession() {
     overviewBuildingEl.textContent = "-";
     overviewHouseNumberEl.textContent = "-";
     overviewSessionExpiryEl.textContent = "";
+    if (overviewAgreementPromptEl instanceof HTMLElement) {
+      overviewAgreementPromptEl.replaceChildren();
+      overviewAgreementPromptEl.classList.add("hidden");
+    }
     return;
   }
 
@@ -2404,6 +2410,28 @@ function renderOverviewSession() {
   overviewSessionExpiryEl.textContent = `${formatResidentVerificationLabel(
     session.verificationStatus
   )} account • Expires ${formatDateTime(session.expiresAt)}.`;
+
+  if (!(overviewAgreementPromptEl instanceof HTMLElement)) {
+    return;
+  }
+
+  if (!isResidentAgreementAwaitingAcceptance()) {
+    overviewAgreementPromptEl.replaceChildren();
+    overviewAgreementPromptEl.classList.add("hidden");
+    return;
+  }
+
+  const title = document.createElement("strong");
+  title.textContent = "Rental agreement needs your acceptance";
+  const copy = document.createElement("p");
+  copy.textContent =
+    "Staff has completed your tenant agreement. Review the room details and rental terms, then accept online to activate payments and support.";
+  const action = document.createElement("a");
+  action.className = "btn btn-primary agreement-required-action";
+  action.href = "/user#agreement-accept-form";
+  action.textContent = "Accept rental agreement";
+  overviewAgreementPromptEl.replaceChildren(title, copy, action);
+  overviewAgreementPromptEl.classList.remove("hidden");
 }
 
 function hasRequiredDomBindings() {
