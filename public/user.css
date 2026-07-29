@@ -60,6 +60,22 @@ body.app-loading #user-layout {
   min-height: 48px;
 }
 
+.agreement-default-terms {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.agreement-default-terms li {
+  line-height: 1.45;
+}
+
+.agreement-terms strong {
+  margin-top: 8px;
+  color: #162231;
+}
+
 .user-auth-actions {
   display: flex;
   justify-content: flex-start;

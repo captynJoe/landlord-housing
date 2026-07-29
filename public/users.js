@@ -2054,6 +2054,13 @@ function isResidentPendingReview() {
   return getResidentVerificationStatus() === "pending_review";
 }
 
+function isResidentAgreementAwaitingAcceptance() {
+  return (
+    isResidentPendingReview() &&
+    state.residentSession?.agreementStatus === "awaiting_resident"
+  );
+}
+
 function canResidentAccessBilling() {
   return Boolean(state.residentSession) && getResidentVerificationStatus() === "verified";
 }
@@ -2063,15 +2070,52 @@ function canResidentAccessSupport() {
 }
 
 function getPendingReviewBillingMessage() {
-  return "Payments and balances unlock after landlord verification.";
+  return isResidentAgreementAwaitingAcceptance()
+    ? "Payments unlock after you accept the tenant agreement."
+    : "Payments and balances unlock after landlord verification.";
 }
 
 function getPendingReviewSupportMessage() {
-  return "Support unlocks after landlord verification.";
+  return isResidentAgreementAwaitingAcceptance()
+    ? "Support unlocks after you accept the tenant agreement."
+    : "Support unlocks after landlord verification.";
 }
 
 function formatResidentVerificationLabel(status) {
-  return status === "pending_review" ? "Pending review" : "Verified";
+  if (status === "pending_review") {
+    return isResidentAgreementAwaitingAcceptance() ? "Agreement required" : "Pending review";
+  }
+  return "Verified";
+}
+
+function renderResidentSessionStatus() {
+  const session = state.residentSession;
+  if (!session) {
+    return;
+  }
+
+  const mustChangePassword = isPasswordChangeRequired();
+  authStateEl.textContent = mustChangePassword
+    ? "Action required"
+    : isResidentAgreementAwaitingAcceptance()
+      ? "Agreement required"
+      : isResidentPendingReview()
+        ? "Pending review"
+        : "Signed in";
+
+  residentSessionSummaryEl.replaceChildren();
+  residentSessionSummaryEl.append(
+    `House ${session.houseNumber} (${session.phoneMask}) • ${formatResidentVerificationLabel(
+      session.verificationStatus
+    )} • Expires ${formatDateTime(session.expiresAt)}`
+  );
+  if (isResidentAgreementAwaitingAcceptance()) {
+    residentSessionSummaryEl.append(document.createTextNode(" "));
+    const reviewLink = document.createElement("a");
+    reviewLink.href = "/user#agreement-accept-form";
+    reviewLink.textContent = "Review and accept agreement";
+    residentSessionSummaryEl.append(reviewLink);
+  }
 }
 
 function setSectionInteractive(sectionEl, enabled) {
@@ -3780,11 +3824,7 @@ function showSignedInState() {
   state.identityRequirement = state.identityRequirement ?? session.identityRequirement ?? null;
   const mustChangePassword = isPasswordChangeRequired();
   clearResidentAuthFeedback();
-  authStateEl.textContent = mustChangePassword
-    ? "Action required"
-    : isResidentPendingReview()
-      ? "Pending review"
-      : "Signed in";
+  renderResidentSessionStatus();
   residentAuthPanelEl.classList.add("hidden");
   residentSessionPanelEl.classList.remove("hidden");
   residentPasswordChangePanelEl.classList.toggle("hidden", !mustChangePassword);
@@ -3794,9 +3834,7 @@ function showSignedInState() {
   boundBuildingEl.value = getPublicBuildingLabel(building);
   boundHouseNumberEl.value = session.houseNumber;
 
-  residentSessionSummaryEl.textContent = `House ${session.houseNumber} (${session.phoneMask}) • ${formatResidentVerificationLabel(
-    session.verificationStatus
-  )} • Expires ${formatDateTime(session.expiresAt)}`;
+  renderResidentSessionStatus();
   renderOverviewSession();
   renderResidentIdentityNotice();
   if (mustChangePassword) {
@@ -3862,6 +3900,13 @@ async function loadTenantData() {
     state.rentDue = data.rentDue ?? null;
     state.identityRequirement =
       data.identityRequirement ?? state.residentSession?.identityRequirement ?? null;
+    if (state.residentSession && data.agreementStatus) {
+      state.residentSession = {
+        ...state.residentSession,
+        agreementStatus: data.agreementStatus
+      };
+      renderResidentSessionStatus();
+    }
 
     renderReports(state.reports);
     renderNotifications(state.notifications);

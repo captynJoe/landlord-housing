@@ -283,8 +283,32 @@ function isPendingReview(session) {
   return session?.verificationStatus === "pending_review";
 }
 
-function formatVerificationLabel(session) {
-  return isPendingReview(session) ? "Pending review" : "Verified";
+function isAgreementAwaitingAcceptance(profile = state.profile) {
+  return (
+    profile?.agreement?.status === "awaiting_resident" ||
+    profile?.session?.agreementStatus === "awaiting_resident"
+  );
+}
+
+function formatVerificationLabel(session, profile = state.profile) {
+  if (isPendingReview(session)) {
+    return isAgreementAwaitingAcceptance(profile) ? "Agreement required" : "Pending review";
+  }
+  return "Verified";
+}
+
+function getDefaultRentalTerms(profile = state.profile) {
+  const buildingName = profile?.building?.name || "the building";
+  const houseNumber = profile?.session?.houseNumber || "your assigned room";
+  return [
+    `The tenant occupies ${houseNumber} at ${buildingName} and must use the room for lawful residential purposes only.`,
+    "Rent, deposits, utilities, and other approved charges must be paid on or before the due dates shown in this agreement or communicated by management.",
+    "The tenant must keep the room and shared areas clean, avoid damage, and report maintenance issues promptly through the resident portal or management contacts.",
+    "Noise, visitor activity, waste disposal, and shared-facility use must follow building rules and reasonable instructions from landlord or authorized staff.",
+    "The tenant must not sublet, transfer occupation, or make structural changes without written landlord approval.",
+    "Management may issue lawful notices for arrears, breach of building rules, inspection, repairs, or move-out procedures.",
+    "By accepting, the tenant confirms the personal details, room assignment, lease dates, rent setup, and terms shown here are correct or will be corrected with management immediately."
+  ];
 }
 
 function setSignedOutState(apiStatus = "Online") {
@@ -316,7 +340,13 @@ function renderProfile(profile) {
   userAuthPanelEl.classList.add("hidden");
   userLayoutEl.classList.remove("hidden");
   residentSessionPanelEl.classList.remove("hidden");
-  setAuthState(isPendingReview(profile.session) ? "Pending review" : "Signed in");
+  setAuthState(
+    isAgreementAwaitingAcceptance(profile)
+      ? "Agreement required"
+      : isPendingReview(profile.session)
+        ? "Pending review"
+        : "Signed in"
+  );
 
   const session = profile.session;
   const resident = profile.resident;
@@ -325,17 +355,20 @@ function renderProfile(profile) {
   updateProfileBranding(building?.name);
 
   residentSessionSummaryEl.textContent = `House ${session.houseNumber} (${session.phoneMask}) • ${formatVerificationLabel(
-    session
+    session,
+    profile
   )} • Expires ${formatDateTime(session.expiresAt)}`;
 
   profileTenantNameEl.textContent = resident.fullName || "Resident";
   profileSessionCopyEl.textContent = session.mustChangePassword
     ? "Update your password in the resident workspace before continuing."
-    : isPendingReview(session)
-      ? `Unverified account for house ${session.houseNumber}. You can still complete your profile, view balances, and make payments while landlord review is pending.`
-      : `Signed in for house ${session.houseNumber}. Session expires ${formatDateTime(
-          session.expiresAt
-        )}.`;
+    : isAgreementAwaitingAcceptance(profile)
+      ? `Review and accept the rental agreement for house ${session.houseNumber} to finish account activation.`
+      : isPendingReview(session)
+        ? `Management is reviewing account access for house ${session.houseNumber}.`
+        : `Signed in for house ${session.houseNumber}. Session expires ${formatDateTime(
+            session.expiresAt
+          )}.`;
   profileBuildingNameEl.textContent = building.name || "Assigned building";
   profileBuildingAddressEl.textContent = [building.address, building.county]
     .filter(Boolean)
@@ -362,11 +395,13 @@ function renderProfile(profile) {
   profileEmergencyContactPhoneEl.value = agreement?.emergencyContactPhone || "";
 
   agreementStatusCopyEl.textContent = agreement
-    ? isPendingReview(session)
-      ? "Agreement details are loaded from your tenancy record. Support features stay locked until landlord verification is completed."
-      : "Agreement details are loaded from your active tenancy record."
+    ? isAgreementAwaitingAcceptance(profile)
+      ? "Review the rental terms below and accept them online to activate your resident account."
+      : isPendingReview(session)
+        ? "Agreement details are loaded. Management is reviewing account access."
+        : "Agreement details are loaded from your active tenancy record."
     : isPendingReview(session)
-      ? "Your account is pending landlord review. You can still save your ID and emergency-contact details now."
+      ? "Management is reviewing account access. Agreement details will appear here when staff completes the lease form."
       : "No tenant agreement has been completed yet. You can still save your ID and emergency-contact details.";
   agreementLeaseStartEl.textContent = formatDate(agreement?.leaseStartDate);
   agreementLeaseEndEl.textContent = formatDate(agreement?.leaseEndDate);
@@ -377,8 +412,23 @@ function renderProfile(profile) {
       ? `Day ${agreement.paymentDueDay}`
       : "Not set";
   agreementUpdatedAtEl.textContent = formatDateTime(agreement?.updatedAt);
-  agreementSpecialTermsEl.textContent =
-    agreement?.specialTerms || "No special terms have been added yet.";
+  const defaultTerms = getDefaultRentalTerms(profile);
+  agreementSpecialTermsEl.replaceChildren();
+  const defaultList = document.createElement("ol");
+  defaultList.className = "agreement-default-terms";
+  defaultTerms.forEach((term) => {
+    const item = document.createElement("li");
+    item.textContent = term;
+    defaultList.append(item);
+  });
+  agreementSpecialTermsEl.append(defaultList);
+  if (agreement?.specialTerms) {
+    const customHeading = document.createElement("strong");
+    customHeading.textContent = "Additional building/room terms";
+    const customTerms = document.createElement("p");
+    customTerms.textContent = agreement.specialTerms;
+    agreementSpecialTermsEl.append(customHeading, customTerms);
+  }
   const needsAcceptance = agreement?.status === "awaiting_resident";
   agreementAcceptFormEl?.classList.toggle("hidden", !needsAcceptance);
   if (agreementAcceptConfirmEl instanceof HTMLInputElement) agreementAcceptConfirmEl.checked = false;
@@ -477,7 +527,7 @@ async function handleAgreementAccept(event) {
       body: JSON.stringify({ confirmed: true, acceptanceNote: agreementAcceptNoteEl?.value.trim() || undefined })
     });
     await loadProfile();
-    showFeedback("Agreement accepted. Your tenancy is now verified.", "success");
+    showFeedback("Agreement accepted. Your resident account is now active.", "success");
   } catch (error) {
     showFeedback(error instanceof Error ? error.message : "Unable to accept agreement.", "error");
   } finally {

@@ -4251,6 +4251,7 @@ async function bootstrap() {
         select: { status: true }
       })
     ]);
+    const agreementStatus = tenantAgreement?.status ?? null;
     const applicationVerificationStatus = toResidentVerificationStatus(tenantApplication?.status);
     const verificationStatus =
       applicationVerificationStatus === "verified" && tenantAgreement?.status !== "verified"
@@ -4273,6 +4274,7 @@ async function bootstrap() {
       houseNumber: activeTenancy.unit.houseNumber,
       phoneNumber: userSession.phone,
       verificationStatus,
+      agreementStatus,
       mustChangePassword: userSession.mustChangePassword,
       residentTenancyId: activeTenancy.id,
       tenancyCreatedAt: activeTenancy.createdAt.toISOString(),
@@ -9549,6 +9551,7 @@ async function bootstrap() {
         houseNumber: session.houseNumber,
         phoneMask: maskPhone(session.phoneNumber),
         verificationStatus: session.verificationStatus,
+        agreementStatus: session.agreementStatus ?? null,
         mustChangePassword: Boolean(session.mustChangePassword),
         tenancyCreatedAt: session.tenancyCreatedAt,
         identityRequirement,
@@ -9597,6 +9600,7 @@ async function bootstrap() {
             houseNumber: session.houseNumber,
             phoneMask: maskPhone(session.phoneNumber),
             verificationStatus: session.verificationStatus,
+            agreementStatus: data.agreement?.status ?? session.agreementStatus ?? null,
             mustChangePassword: Boolean(session.mustChangePassword),
             tenancyCreatedAt: session.tenancyCreatedAt,
             identityRequirement: buildResidentIdentityRequirement(
@@ -9717,6 +9721,7 @@ async function bootstrap() {
             houseNumber: session.houseNumber,
             phoneMask: maskPhone(session.phoneNumber),
             verificationStatus: session.verificationStatus,
+            agreementStatus: updated.agreement?.status ?? session.agreementStatus ?? null,
             mustChangePassword: Boolean(session.mustChangePassword),
             tenancyCreatedAt: session.tenancyCreatedAt,
             identityRequirement: buildResidentIdentityRequirement(
@@ -13477,7 +13482,8 @@ async function bootstrap() {
           utilityMeters,
           utilityLatestReadings,
           utilityPayments,
-          identityRequirement
+          identityRequirement,
+          agreementStatus: profileAgreementState?.agreement?.status ?? session.agreementStatus ?? null
         },
         messages: {
           rentDue: rentDueMessage,
