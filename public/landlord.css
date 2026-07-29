@@ -1878,6 +1878,10 @@ body.landlord-rooms-route #overview-rent-status-section {
   order: 5;
 }
 
+body.landlord-show-rent-payment #overview-rent-status-section {
+  display: block !important;
+}
+
 body.landlord-rooms-route #residents-section,
 body.landlord-room-ledger-focus #residents-section {
   order: 10;

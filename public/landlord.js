@@ -1593,6 +1593,7 @@ function openDashboardResidentFilter(filter) {
 }
 
 function openRoomLedgerWorkspace(filter = "all") {
+  document.body.classList.remove("landlord-show-rent-payment");
   const normalizedFilter = normalizeRoomLedgerRouteFilter(filter) || "all";
   const focusedBuildingId = getFocusedBuildingId();
   const buildingId = focusedBuildingId || state.selectedOverviewRoomBuildingId || state.selectedResidentsBuildingId || "all";
@@ -10769,6 +10770,11 @@ function prefillRentPaymentFromStatus(action) {
   }
   if (rentPaymentReferenceEl instanceof HTMLInputElement) {
     rentPaymentReferenceEl.value = "";
+  }
+  document.body.classList.add("landlord-show-rent-payment");
+  clearRoomLedgerWorkspace();
+  if (overviewRentStatusSectionEl instanceof HTMLDetailsElement) {
+    overviewRentStatusSectionEl.open = true;
   }
   if (rentPaymentDetailsEl instanceof HTMLDetailsElement) {
     rentPaymentDetailsEl.open = true;
