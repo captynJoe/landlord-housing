@@ -12987,7 +12987,10 @@ async function bootstrap() {
       const formData = await parseMultipartFormData(req);
       const parsed = mediaUploadSignatureRequestSchema.parse({
         category: formData.get("category"),
-        buildingId: String(formData.get("buildingId") ?? "").trim() || undefined
+        buildingId: String(formData.get("buildingId") ?? "").trim() || undefined,
+        houseNumber:
+          String(formData.get("houseNumber") ?? formData.get("roomNumber") ?? "").trim() ||
+          undefined
       });
       const fileEntry = formData.get("file");
 

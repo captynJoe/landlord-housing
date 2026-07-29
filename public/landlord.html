@@ -2192,22 +2192,10 @@
               <span id="direct-tenant-lease-start-label">Lease Start Date</span>
               <input id="direct-tenant-lease-start" type="date" required />
             </label>
-            <label>
-              Agreement Acceptance
-              <select id="direct-tenant-acceptance-method" required>
-                <option value="resident_portal">Resident accepts in portal</option>
-                <option value="staff_on_behalf">Staff records acceptance on behalf</option>
-              </select>
-            </label>
+            <p class="status-text agreement-online-note">
+              Resident acceptance happens online in the resident portal after staff saves this lease form.
+            </p>
           </div>
-          <label id="direct-tenant-staff-confirm-wrap" class="hidden">
-            <input id="direct-tenant-staff-confirm" type="checkbox" />
-            I confirm the resident reviewed and accepted this agreement.
-          </label>
-          <label id="direct-tenant-acceptance-note-wrap" class="hidden">
-            Consent Record
-            <textarea id="direct-tenant-acceptance-note" rows="3" maxlength="500" placeholder="How and when the resident gave consent"></textarea>
-          </label>
 
           <label>
             Note
@@ -2220,7 +2208,7 @@
           </label>
 
           <p id="direct-tenant-status" class="status-text">
-            Upload ID evidence, set the lease date, and choose how the agreement will be accepted.
+            Upload ID evidence and set the lease date. The resident accepts the agreement online in their portal.
           </p>
           <button id="direct-tenant-submit-btn" type="submit">Create Tenant Agreement</button>
         </form>
@@ -2229,6 +2217,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260726b"></script>
+    <script type="module" src="/landlord.js?v=20260729b"></script>
   </body>
 </html>

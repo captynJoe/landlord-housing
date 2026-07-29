@@ -1919,7 +1919,7 @@ function openDirectTenantDrawer(prefill = {}) {
 
   setDirectTenantStatus(
     isStaffRole()
-      ? "Upload ID evidence, set the lease date, and choose how the agreement will be accepted."
+      ? "Upload ID evidence and set the lease date. The resident accepts the agreement online in their portal."
       : "Create a tenant intake for staff to complete lease details and documents."
   );
   clearError();
@@ -11726,12 +11726,20 @@ function syncDirectTenantDrawerMode() {
 }
 
 function syncDirectTenantAcceptanceFields() {
-  const staffMode = isStaffRole();
-  const onBehalf = staffMode && directTenantAcceptanceMethodEl?.value === "staff_on_behalf";
-  directTenantStaffConfirmWrapEl?.classList.toggle("hidden", !onBehalf);
-  directTenantAcceptanceNoteWrapEl?.classList.toggle("hidden", !onBehalf);
-  if (directTenantStaffConfirmEl instanceof HTMLInputElement) directTenantStaffConfirmEl.required = onBehalf;
-  if (directTenantAcceptanceNoteEl instanceof HTMLTextAreaElement) directTenantAcceptanceNoteEl.required = onBehalf;
+  if (directTenantStaffConfirmWrapEl instanceof HTMLElement) {
+    directTenantStaffConfirmWrapEl.classList.add("hidden");
+  }
+  if (directTenantAcceptanceNoteWrapEl instanceof HTMLElement) {
+    directTenantAcceptanceNoteWrapEl.classList.add("hidden");
+  }
+  if (directTenantStaffConfirmEl instanceof HTMLInputElement) {
+    directTenantStaffConfirmEl.required = false;
+    directTenantStaffConfirmEl.checked = false;
+  }
+  if (directTenantAcceptanceNoteEl instanceof HTMLTextAreaElement) {
+    directTenantAcceptanceNoteEl.required = false;
+    directTenantAcceptanceNoteEl.value = "";
+  }
 }
 
 directTenantAcceptanceMethodEl?.addEventListener("change", syncDirectTenantAcceptanceFields);
@@ -11781,9 +11789,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
   const identityType = String(directTenantIdTypeEl?.value || "national_id").trim();
   const identityNumber = String(directTenantIdNumberEl?.value || "").trim();
   const leaseStartDate = String(directTenantLeaseStartEl?.value || "").trim();
-  const acceptanceMethod = String(directTenantAcceptanceMethodEl?.value || "resident_portal").trim();
-  const staffAcceptanceConfirmed = Boolean(directTenantStaffConfirmEl?.checked);
-  const acceptanceNote = String(directTenantAcceptanceNoteEl?.value || "").trim() || undefined;
+  const acceptanceMethod = "resident_portal";
   const note = String(directTenantNoteEl?.value || "").trim() || undefined;
   const staffMode = isStaffRole();
 
@@ -11799,11 +11805,6 @@ directTenantFormEl?.addEventListener("submit", (event) => {
     showError("Agreement onboarding requires the tenant ID number.");
     return;
   }
-  if (staffMode && acceptanceMethod === "staff_on_behalf" && (!staffAcceptanceConfirmed || !acceptanceNote)) {
-    showError("Confirm resident acceptance and record how consent was given.");
-    return;
-  }
-
   setDirectTenantSubmitting(true);
   setDirectTenantStatus(staffMode ? "Creating tenant agreement and secure resident access..." : "Sending tenant intake to assigned staff...");
 
@@ -11893,8 +11894,6 @@ directTenantFormEl?.addEventListener("submit", (event) => {
           identityDocumentUrls,
           leaseStartDate,
           acceptanceMethod,
-          staffAcceptanceConfirmed,
-          acceptanceNote,
           note
         })
       });
@@ -11964,7 +11963,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
     } catch (error) {
       setDirectTenantStatus(
         isStaffRole()
-          ? "Upload ID evidence, set the lease date, and choose how the agreement will be accepted."
+          ? "Upload ID evidence and set the lease date. The resident accepts the agreement online in their portal."
           : "Create a tenant intake for staff to complete lease details and documents."
       );
       handleLandlordError(error, "Failed to create tenant agreement.");
@@ -13524,7 +13523,7 @@ applicationsBodyEl.addEventListener("click", (event) => {
       phoneNumber: target.dataset.phone,
       note: target.dataset.note
     });
-    setDirectTenantStatus("Complete the lease form, upload ID evidence, then send the agreement to the resident portal.");
+    setDirectTenantStatus("Complete the lease form and upload ID evidence. The resident accepts the agreement online in their portal.");
     return;
   }
 

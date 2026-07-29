@@ -651,8 +651,7 @@ export const landlordTenantIntakeCreateSchema = z.object({
   note: optionalTenantTextSchema(280)
 });
 
-export const landlordDirectTenantCreateSchema = z
-  .object({
+export const landlordDirectTenantCreateSchema = z.object({
   buildingId: nonEmptyString.max(120),
   houseNumber: nonEmptyString.max(24),
   fullName: nonEmptyString.max(120),
@@ -666,27 +665,9 @@ export const landlordDirectTenantCreateSchema = z
     .regex(/^\d{4}-\d{2}-\d{2}$/, {
       message: "Use YYYY-MM-DD format."
     }),
-  acceptanceMethod: z.enum(["resident_portal", "staff_on_behalf"]).default("resident_portal"),
-  staffAcceptanceConfirmed: z.boolean().default(false),
-  acceptanceNote: optionalTenantTextSchema(500),
+  acceptanceMethod: z.literal("resident_portal").default("resident_portal"),
   note: optionalTenantTextSchema(280)
-  })
-  .superRefine((value, context) => {
-    if (value.acceptanceMethod === "staff_on_behalf" && !value.staffAcceptanceConfirmed) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["staffAcceptanceConfirmed"],
-        message: "Confirm that the resident accepted the agreement before staff signs on their behalf."
-      });
-    }
-    if (value.acceptanceMethod === "staff_on_behalf" && !value.acceptanceNote) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["acceptanceNote"],
-        message: "Record how consent was confirmed when staff accepts on behalf of the resident."
-      });
-    }
-  });
+});
 
 export const residentAgreementAcceptSchema = z.object({
   confirmed: z.literal(true),

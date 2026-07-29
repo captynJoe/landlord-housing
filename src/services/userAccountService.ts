@@ -2047,17 +2047,16 @@ export class UserAccountService {
       throw new Error("IDENTITY_DOCUMENT_REQUIRED");
     }
     const leaseStartDate = new Date(`${input.leaseStartDate}T00:00:00.000Z`);
-    const acceptedOnBehalf = input.acceptanceMethod === "staff_on_behalf";
     const lifecycle = {
-      status: acceptedOnBehalf ? "verified" : "awaiting_resident",
-      acceptanceMethod: input.acceptanceMethod,
-      acceptedAt: acceptedOnBehalf ? new Date() : null,
-      acceptedByUserId: acceptedOnBehalf ? normalizeOptionalText(actor?.userId) ?? null : null,
-      acceptedByName: acceptedOnBehalf ? normalizeOptionalText(actor?.fullName) ?? "Landlord or staff" : null,
-      acceptanceNote: acceptedOnBehalf ? normalizeOptionalText(input.acceptanceNote) ?? null : null,
-      verifiedAt: acceptedOnBehalf ? new Date() : null,
-      verifiedByUserId: acceptedOnBehalf ? normalizeOptionalText(actor?.userId) ?? null : null,
-      verifiedByName: acceptedOnBehalf ? normalizeOptionalText(actor?.fullName) ?? "Landlord or staff" : null
+      status: "awaiting_resident",
+      acceptanceMethod: "resident_portal",
+      acceptedAt: null,
+      acceptedByUserId: null,
+      acceptedByName: null,
+      acceptanceNote: null,
+      verifiedAt: null,
+      verifiedByUserId: null,
+      verifiedByName: null
     };
 
     if (!identityNumber) {
