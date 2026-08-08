@@ -1,4 +1,4 @@
-# CAPTYN Housing MVP Roadmap
+# RUMINJO Housing MVP Roadmap
 
 ## Phase 1: Data Integrity Foundation
 
@@ -8,7 +8,7 @@
 
 ## Phase 2: Identity + Verification
 
-- Add user accounts for tenants, landlords, and CAPTYN reviewers.
+- Add user accounts for tenants, landlords, and RUMINJO reviewers.
 - Add role-based access control.
 - Add media verification workflow and verification evidence.
 
@@ -22,7 +22,7 @@
 
 - CCTV checklist audit model.
 - Verification badge issuance and expiry.
-- Incident escalation workflow (tenant > property manager > CAPTYN).
+- Incident escalation workflow (tenant > property manager > RUMINJO).
 
 ## Phase 5: Launch Readiness
 

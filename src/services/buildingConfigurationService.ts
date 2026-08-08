@@ -73,6 +73,7 @@ export interface UpdateBuildingConfigurationInput {
   allowManualUtilityPosting?: boolean;
   wifiAccessMode?: WifiAccessMode;
   metadata?: Prisma.InputJsonValue;
+  agreementPolicy?: Prisma.InputJsonValue;
   note?: string;
 }
 

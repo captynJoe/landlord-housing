@@ -5,7 +5,7 @@ Last updated: 2026-05-29
 ## Target Shape
 
 Deploy JK Flats as its own service, database, uploads volume, and public domain.
-CAPTYN Housing remains separate and keeps its current deployment.
+RUMINJO Housing remains separate and keeps its current deployment.
 
 Recommended production topology:
 
@@ -18,7 +18,7 @@ Recommended production topology:
 - Memory fallback: disabled.
 
 Port `4110` is intentional so this service does not collide with the existing
-CAPTYN Housing backend on `4100`.
+RUMINJO Housing backend on `4100`.
 
 ## Deployment Files
 
@@ -191,7 +191,7 @@ curl -fsS https://<customer-domain>/health
 ## DNS And Cloudflare
 
 Point the customer domain or subdomain at VPS1. The public Nginx template
-matches the current CAPTYN pattern and rejects traffic without Cloudflare's
+matches the current RUMINJO pattern and rejects traffic without Cloudflare's
 `CF-Ray` header, so the domain should be proxied through Cloudflare unless that
 guard is intentionally removed.
 
@@ -208,7 +208,7 @@ ESTATEDESK_MPESA_PAYMENT_PROFILES_JSON=[]
 
 Switch `ESTATEDESK_MPESA_STK_ENABLED=true` only after sandbox STK and callback
 verification pass. Use customer-specific callback tokens and M-PESA credentials;
-do not reuse CAPTYN Housing production payment secrets.
+do not reuse RUMINJO Housing production payment secrets.
 
 For building-level payment routing, keep the default `ESTATEDESK_MPESA_*`
 credentials as the fallback account and add extra building-selectable profiles

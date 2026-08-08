@@ -1,6 +1,6 @@
 # Housing VPS1/VPS2 Deploy Runbook
 
-> Legacy CAPTYN Housing reference. For this dedicated landlord app, use
+> Legacy RUMINJO Housing reference. For this dedicated landlord app, use
 > `docs/production-deployment-runbook.md` and `docs/branch-and-release-policy.md`.
 
 ## Topology
@@ -41,7 +41,7 @@ Relevant files:
 - API:
   `curl -fsS http://${CORE_PRIVATE_HOST}:4100/health`
 - Expected API health shape:
-  `{"status":"ok","service":"captyn-housing-api","storage":"prisma"}`
+  `{"status":"ok","service":"ruminjo-housing-api","storage":"prisma"}`
 
 ## Repair Command
 

@@ -41,12 +41,12 @@ test("creates pending payment and normalizes phone", () => {
 
   const payment = service.createPayment(
     {
-      buildingId: "CAPTYN-BLDG-00001",
+      buildingId: "RUMINJO-BLDG-00001",
       packageId: "hour_3",
       phoneNumber: "0712345678"
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights"
     }
   );
@@ -75,12 +75,12 @@ test("updates package hours and pricing", () => {
 
   const payment = service.createPayment(
     {
-      buildingId: "CAPTYN-BLDG-00001",
+      buildingId: "RUMINJO-BLDG-00001",
       packageId: "hour_3",
       phoneNumber: "0712345678"
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights"
     }
   );
@@ -97,12 +97,12 @@ test("uses building-scoped package snapshot when provided", () => {
 
   const payment = service.createPayment(
     {
-      buildingId: "CAPTYN-BLDG-00002",
+      buildingId: "RUMINJO-BLDG-00002",
       packageId: "hour_3",
       phoneNumber: "0712345678"
     },
     {
-      id: "CAPTYN-BLDG-00002",
+      id: "RUMINJO-BLDG-00002",
       name: "Bahari Court"
     },
     {
@@ -128,12 +128,12 @@ test("confirms payment and provisions voucher in mock mode", async () => {
 
   const payment = service.createPayment(
     {
-      buildingId: "CAPTYN-BLDG-00001",
+      buildingId: "RUMINJO-BLDG-00001",
       packageId: "hour_1",
       phoneNumber: "+254712345678"
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights"
     }
   );
@@ -159,24 +159,24 @@ test("lists all payments for admin monitoring", () => {
 
   const first = service.createPayment(
     {
-      buildingId: "CAPTYN-BLDG-00001",
+      buildingId: "RUMINJO-BLDG-00001",
       packageId: "hour_1",
       phoneNumber: "0712345678"
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights"
     }
   );
 
   const second = service.createPayment(
     {
-      buildingId: "CAPTYN-BLDG-00001",
+      buildingId: "RUMINJO-BLDG-00001",
       packageId: "hour_3",
       phoneNumber: "0712345678"
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights"
     }
   );

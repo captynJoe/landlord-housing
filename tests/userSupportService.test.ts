@@ -13,7 +13,7 @@ test("creates room issue ticket and starter notifications", () => {
       evidenceAttachments: []
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights",
       cctvStatus: "verified"
     },
@@ -47,7 +47,7 @@ test("creates theft ticket with CCTV workflow fields", () => {
       evidenceAttachments: ["https://example.com/cctv-frame-1.jpg"]
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights",
       cctvStatus: "none"
     },
@@ -74,7 +74,7 @@ test("updates ticket lifecycle and emits notification", () => {
       evidenceAttachments: []
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights",
       cctvStatus: "partial"
     },
@@ -107,7 +107,7 @@ test("lists tenant-scoped reports by normalized house number", () => {
       evidenceAttachments: []
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Nyota Heights",
       cctvStatus: "partial"
     },
@@ -129,7 +129,7 @@ test("emits inserted system notifications through the notification handler", asy
     insertedBatches.push(notifications);
   });
 
-  const inserted = service.enqueueSystemNotifications("captyn-bldg-00001", "e-3", [
+  const inserted = service.enqueueSystemNotifications("ruminjo-bldg-00001", "e-3", [
     {
       title: "Rent Reminder",
       message: "Rent is due tomorrow.",
@@ -162,7 +162,7 @@ test("purges all reports and notifications for a deleted building", () => {
       evidenceAttachments: []
     },
     {
-      id: "CAPTYN-BLDG-00001",
+      id: "RUMINJO-BLDG-00001",
       name: "Smoke Block",
       cctvStatus: "partial"
     },
@@ -171,7 +171,7 @@ test("purges all reports and notifications for a deleted building", () => {
       phoneNumber: "+254711111111"
     }
   );
-  service.enqueueSystemNotifications("CAPTYN-BLDG-00002", "B1", [
+  service.enqueueSystemNotifications("RUMINJO-BLDG-00002", "B1", [
     {
       title: "Keep me",
       message: "Different building.",
@@ -181,11 +181,11 @@ test("purges all reports and notifications for a deleted building", () => {
     }
   ]);
 
-  assert.equal(service.purgeBuilding("CAPTYN-BLDG-00001"), true);
-  assert.equal(service.listReports("A1", "CAPTYN-BLDG-00001").length, 0);
-  assert.equal(service.listNotifications("A1", "CAPTYN-BLDG-00001").length, 0);
+  assert.equal(service.purgeBuilding("RUMINJO-BLDG-00001"), true);
+  assert.equal(service.listReports("A1", "RUMINJO-BLDG-00001").length, 0);
+  assert.equal(service.listNotifications("A1", "RUMINJO-BLDG-00001").length, 0);
   assert.equal(service.getReportById(report.id), undefined);
-  assert.equal(service.listNotifications("B1", "CAPTYN-BLDG-00002").length, 1);
+  assert.equal(service.listNotifications("B1", "RUMINJO-BLDG-00002").length, 1);
   assert.equal(persisted?.reports.length, 0);
   assert.equal(persisted?.notifications.length, 1);
 });

@@ -35,7 +35,7 @@ function ensureLayer() {
   }
 
   const style = document.createElement("style");
-  style.dataset.captynNotifications = "true";
+  style.dataset.ruminjoNotifications = "true";
   style.textContent = `
     .app-notification-region {
       position: fixed;

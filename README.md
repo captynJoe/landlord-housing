@@ -1,9 +1,9 @@
 # Dedicated Landlord Housing
 
-Dedicated landlord housing app copied from CAPTYN Housing.
+Dedicated landlord housing app copied from RUMINJO Housing.
 
 This project is intended to run independently from `/home/captyn/captyn-housing`.
-Keep the original CAPTYN Housing deployment untouched.
+Keep the original RUMINJO Housing deployment untouched.
 
 Current core modules:
 
@@ -68,10 +68,10 @@ npm run db:logs
 
 ## Split VPS Docker deploy
 
-JK Flats can deploy like CAPTYN Housing without sharing its runtime:
+JK Flats can deploy like RUMINJO Housing without sharing its runtime:
 
 - VPS2 runs `landlord_housing_api` and `landlord_housing_db` from `docker-compose.vps2.yml`.
-- VPS2 binds the API privately on `<vps2-private-ip>:4110`, leaving CAPTYN Housing's `4100` path alone.
+- VPS2 binds the API privately on `<vps2-private-ip>:4110`, leaving RUMINJO Housing's `4100` path alone.
 - VPS1 runs `estatedesk_web` from `deploy/vps1/docker-compose.estatedesk.yml`.
 - VPS1 public Nginx proxies `/api`, `/uploads`, and `/health` to the VPS2 API.
 

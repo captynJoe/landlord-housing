@@ -123,6 +123,7 @@ import {
   depositRefundRecordSchema,
   createBuildingSchema,
   buildingMediaUpdateSchema,
+  buildingDetailsUpdateSchema,
   deleteBuildingSchema,
   createIncidentSchema,
   createUserReportSchema,
@@ -156,6 +157,8 @@ import {
   adminRevokeLandlordSchema,
   adminAssignBuildingLandlordSchema,
   landlordBuildingConfigurationUpdateSchema,
+  landlordBuildingLeaseAgreementUpdateSchema,
+  landlordAgreementWitnessSchema,
   landlordPaymentAccessUpdateSchema,
   landlordPaymentProfileUpdateSchema,
   landlordPaymentInstructionsUpdateSchema,
@@ -241,6 +244,9 @@ const LOCAL_MEDIA_UPLOAD_EXTENSION_BY_TYPE = new Map<string, string>([
   ["image/png", "png"],
   ["image/webp", "webp"]
 ]);
+const LOCAL_LEASE_DOCUMENT_EXTENSION_BY_TYPE = new Map<string, string>([
+  ["application/pdf", "pdf"]
+]);
 const RESIDENT_BILLING_LOCKED_MESSAGE =
   "Payments and balances unlock after landlord verification.";
 const PLATFORM_LANDLORD_GOVERNANCE_DISABLED = true;
@@ -293,11 +299,15 @@ function isMultipartFileLike(value: unknown): value is MultipartFileLike {
   );
 }
 
-function resolveMediaUploadExtension(fileName: string | undefined, mimeType: string | undefined) {
+function resolveMediaUploadExtension(
+  fileName: string | undefined,
+  mimeType: string | undefined,
+  extensionByType: Map<string, string> = LOCAL_MEDIA_UPLOAD_EXTENSION_BY_TYPE
+) {
   const normalizedType = String(mimeType ?? "")
     .trim()
     .toLowerCase();
-  const mapped = LOCAL_MEDIA_UPLOAD_EXTENSION_BY_TYPE.get(normalizedType);
+  const mapped = extensionByType.get(normalizedType);
   if (mapped) {
     return mapped;
   }
@@ -306,7 +316,7 @@ function resolveMediaUploadExtension(fileName: string | undefined, mimeType: str
     .trim()
     .toLowerCase()
     .replace(/^\./, "");
-  return [...LOCAL_MEDIA_UPLOAD_EXTENSION_BY_TYPE.values()].includes(extension)
+  return [...extensionByType.values()].includes(extension)
     ? extension
     : null;
 }
@@ -5366,6 +5376,9 @@ async function bootstrap() {
         paymentAccess.rentEnabled && rent
           ? Math.max(0, Number(rent.totalLatePenaltyKsh ?? 0))
           : 0;
+      const rentPrepaidCreditKsh = paymentAccess.rentEnabled
+        ? Math.max(0, Number(rent?.prepaidCreditKsh ?? 0))
+        : 0;
       const rentArrearsKsh = Math.max(0, rentBalanceKsh - currentRentDueKsh);
       const utilitySummary = utilityBalanceByHouse.get(houseNumber);
       const utilityBalanceKsh = utilitySummary?.totalOpenKsh ?? 0;
@@ -5379,6 +5392,7 @@ async function bootstrap() {
       const visibleRentBalanceKsh = billingVisible ? rentBalanceKsh : 0;
       const visibleCurrentRentDueKsh = billingVisible ? currentRentDueKsh : 0;
       const visibleRentArrearsKsh = billingVisible ? rentArrearsKsh : 0;
+      const visibleRentPrepaidCreditKsh = billingVisible ? rentPrepaidCreditKsh : 0;
       const visibleCurrentMonthLatePenaltyKsh = billingVisible ? currentMonthLatePenaltyKsh : 0;
       const visibleTotalLatePenaltyKsh = billingVisible ? totalLatePenaltyKsh : 0;
       const visibleRentGraceDays = billingVisible ? configuredRentGraceDays : 0;
@@ -5448,6 +5462,8 @@ async function bootstrap() {
         lateRentPenaltyEnabled: billingVisible && rentLatePenaltyPolicy.enabled,
         lateRentPenaltyAmountKsh: visibleLateRentPenaltyAmountKsh,
         rentArrearsKsh: visibleRentArrearsKsh,
+        rentPrepaidCreditKsh: visibleRentPrepaidCreditKsh,
+        prepaidCreditKsh: visibleRentPrepaidCreditKsh,
         rentDueDate: visibleRentDueDate,
         currentMonthRentPaidKsh: visibleCurrentMonthRentPaidKsh,
         currentMonthRentOutstandingKsh: visibleCurrentRentDueKsh,
@@ -9534,14 +9550,33 @@ async function bootstrap() {
     if (!session) {
       return;
     }
-    const agreementState = await userAccountService?.getActiveTenantAgreement({
-      buildingId: session.buildingId,
-      houseNumber: session.houseNumber
-    });
+    const [agreementState, buildingConfig, building] = await Promise.all([
+      userAccountService?.getActiveTenantAgreement({
+        buildingId: session.buildingId,
+        houseNumber: session.houseNumber
+      }),
+      buildingConfigurationService?.getForBuilding(session.buildingId),
+      store.getBuilding(session.buildingId)
+    ]);
     const identityRequirement = buildResidentIdentityRequirement(
       session,
       agreementState?.agreement
     );
+    const leaseDocument =
+      buildingConfig?.agreementPolicy && typeof buildingConfig.agreementPolicy === "object"
+        ? (buildingConfig.agreementPolicy as {
+            documentUrl?: string;
+            documentFileName?: string;
+          })
+        : null;
+    const leaseAgreement = leaseDocument?.documentUrl
+      ? {
+          required: session.agreementStatus !== "verified",
+          documentUrl: leaseDocument.documentUrl,
+          documentFileName: leaseDocument.documentFileName ?? null,
+          buildingName: building?.name ?? null
+        }
+      : null;
 
     return res.json({
       data: {
@@ -9555,6 +9590,7 @@ async function bootstrap() {
         mustChangePassword: Boolean(session.mustChangePassword),
         tenancyCreatedAt: session.tenancyCreatedAt,
         identityRequirement,
+        leaseAgreement,
         expiresAt: session.expiresAt
       }
     });
@@ -11110,6 +11146,43 @@ async function bootstrap() {
     }
   });
 
+  app.patch("/api/landlord/buildings/:buildingId", async (req, res, next) => {
+    try {
+      const context = await resolveLandlordAccessContext(req, res);
+      if (!context) {
+        return;
+      }
+
+      if (context.role === "caretaker") {
+        return res.status(403).json({
+          error: "Caretaker accounts cannot edit building details."
+        });
+      }
+
+      const buildingId = req.params.buildingId?.trim();
+      if (!buildingId) {
+        return res.status(400).json({ error: "Building id is required" });
+      }
+
+      const hasAccess = await canManageBuildingFromLandlordContext(context, buildingId);
+      if (!hasAccess) {
+        return res.status(403).json({ error: "Building access denied" });
+      }
+
+      const parsed = buildingDetailsUpdateSchema.parse(req.body ?? {});
+      const updated = await store.updateBuildingDetails(buildingId, parsed);
+      if (!updated) {
+        return res.status(404).json({ error: "Building not found" });
+      }
+
+      await syncDerivedBuildingConfigurationState();
+
+      return res.json({ data: updated, role: context.role });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   app.get("/api/landlord/payment-access-controls", async (req, res, next) => {
     try {
       const context = await resolveLandlordAccessContext(req, res);
@@ -11355,6 +11428,71 @@ async function bootstrap() {
           }
         );
         await syncDerivedBuildingConfigurationState();
+
+        return res.json({
+          data: {
+            ...data,
+            buildingName: building.name
+          },
+          role: context.role
+        });
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
+  app.put(
+    "/api/landlord/buildings/:buildingId/lease-agreement",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "Caretaker accounts cannot manage lease agreement documents."
+          });
+        }
+
+        if (!buildingConfigurationService) {
+          return res.status(503).json({
+            error: "Building configuration requires database connection."
+          });
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const parsed = landlordBuildingLeaseAgreementUpdateSchema.parse(req.body ?? {});
+        const actor = actorFromLandlordContext(context);
+
+        const data = await buildingConfigurationService.updateForBuilding(
+          building.id,
+          {
+            agreementPolicy: {
+              documentUrl: parsed.documentUrl,
+              documentFileName: parsed.documentFileName,
+              uploadedAt: new Date().toISOString(),
+              uploadedByUserId: actor.userId ?? null,
+              uploadedByName: actor.name ?? null
+            }
+          },
+          {
+            role: context.role,
+            userId: context.userId
+          }
+        );
 
         return res.json({
           data: {
@@ -11810,7 +11948,7 @@ async function bootstrap() {
         if (!targetUser) {
           if (phone && userAccountService) {
             const phoneDigits = phone.replace(/\D/g, "");
-            const caretakerEmail = `caretaker.${phoneDigits || "user"}.${randomUUID().slice(0, 8)}@caretaker.captyn.local`;
+            const caretakerEmail = `caretaker.${phoneDigits || "user"}.${randomUUID().slice(0, 8)}@caretaker.ruminjo.local`;
             const bootstrapPassword = `${randomUUID()}${randomUUID()}`;
 
             try {
@@ -13003,24 +13141,33 @@ async function bootstrap() {
         return res.status(400).json({ error: "Image file is required." });
       }
 
+      const isLeaseDocumentUpload = parsed.category === "building_lease_document";
       const mimeType = String(fileEntry.type ?? "")
         .trim()
         .toLowerCase();
-      const extension = resolveMediaUploadExtension(fileEntry.name, mimeType);
+      const extension = resolveMediaUploadExtension(
+        fileEntry.name,
+        mimeType,
+        isLeaseDocumentUpload
+          ? LOCAL_LEASE_DOCUMENT_EXTENSION_BY_TYPE
+          : LOCAL_MEDIA_UPLOAD_EXTENSION_BY_TYPE
+      );
       if (!extension) {
         return res.status(400).json({
-          error: "Only JPEG, PNG, and WebP images are supported."
+          error: isLeaseDocumentUpload
+            ? "Only PDF files are supported for lease agreements."
+            : "Only JPEG, PNG, and WebP images are supported."
         });
       }
 
       const sizeBytes = Math.round(Number(fileEntry.size ?? 0));
       if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
-        return res.status(400).json({ error: "Uploaded image is empty." });
+        return res.status(400).json({ error: "Uploaded file is empty." });
       }
 
       if (sizeBytes > LOCAL_MEDIA_UPLOAD_MAX_BYTES) {
         return res.status(400).json({
-          error: "Image is larger than 10 MB."
+          error: isLeaseDocumentUpload ? "File is larger than 10 MB." : "Image is larger than 10 MB."
         });
       }
 
@@ -13108,6 +13255,39 @@ async function bootstrap() {
             normalizeUploadFolderSegment(context.userId ?? context.role, "manager")
           ];
         }
+      } else if (parsed.category === "building_lease_document") {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "Caretaker accounts cannot upload lease agreement documents."
+          });
+        }
+
+        const buildingId = parsed.buildingId?.trim();
+        if (!buildingId) {
+          return res.status(400).json({
+            error: "Building is required for lease agreement documents."
+          });
+        }
+
+        const building = await store.getBuilding(buildingId);
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        targetDirectorySegments = [
+          "lease-agreements",
+          normalizeUploadFolderSegment(building.id, "building")
+        ];
       } else {
         const context = await resolveLandlordAccessContext(req, res);
         if (!context) {
@@ -15272,6 +15452,7 @@ async function bootstrap() {
       balanceKsh: item.balanceKsh,
       paidAmountKsh: item.paidAmountKsh,
       totalPaidKsh: item.totalPaidKsh,
+      prepaidCreditKsh: item.prepaidCreditKsh,
       currentMonthLatePenaltyKsh: item.currentMonthLatePenaltyKsh,
       totalLatePenaltyKsh: item.totalLatePenaltyKsh,
       dueDate: item.dueDate,
@@ -16827,6 +17008,85 @@ async function bootstrap() {
     }
   );
 
+  app.post(
+    "/api/landlord/buildings/:buildingId/houses/:houseNumber/agreement/witness",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "House manager accounts cannot mark tenant agreements as agreed."
+          });
+        }
+
+        if (!userAccountService) {
+          return res.status(503).json({
+            error: "User account service unavailable. Database connection is required."
+          });
+        }
+
+        const buildingId = req.params.buildingId?.trim();
+        const building = buildingId ? await store.getBuilding(buildingId) : null;
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const houseNumber = normalizeHouseNumber(
+          houseNumberQuerySchema.parse({
+            houseNumber: req.params.houseNumber
+          }).houseNumber
+        );
+
+        const parsed = landlordAgreementWitnessSchema.parse(req.body ?? {});
+        const actor = actorFromLandlordContext(context);
+
+        try {
+          const data = await userAccountService.recordStaffWitnessedAgreement(
+            {
+              buildingId: building.id,
+              houseNumber,
+              acceptanceNote: parsed.acceptanceNote
+            },
+            actor
+          );
+
+          return res.json({
+            data,
+            role: context.role
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Unable to record tenant agreement";
+          if (message === "ACTIVE_TENANCY_NOT_FOUND") {
+            return res.status(409).json({
+              error: "An active resident is required before recording a tenant agreement."
+            });
+          }
+          if (message === "TENANT_AGREEMENT_NOT_FOUND") {
+            return res.status(404).json({ error: "No tenant agreement exists for this room yet." });
+          }
+          if (message === "TENANT_AGREEMENT_INCOMPLETE") {
+            return res.status(400).json({
+              error: "Add the tenant's ID document and lease start date before marking the agreement as agreed."
+            });
+          }
+          throw error;
+        }
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
   app.get(
     "/api/landlord/buildings/:buildingId/monthly-combined-utility-charge",
     async (req, res, next) => {
@@ -17099,7 +17359,7 @@ async function bootstrap() {
         }
 
         const filename = [
-          "captyn-housing",
+          "ruminjo-housing",
           normalizeBuildingId(building.id).toLowerCase(),
           data.billingMonth,
           "bulk-utility-audit.csv"

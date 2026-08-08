@@ -7,9 +7,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
     />
+    <script src="/font-loader.js"></script>
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Outfit:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#2f5d50" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -819,6 +827,56 @@
           <button id="mpesa-status-check-btn" type="button">Check status</button>
           <button id="mpesa-status-retry-btn" type="button" class="ghost-btn">Try again</button>
           <button id="mpesa-status-close-btn" type="button" class="ghost-btn">Close</button>
+        </div>
+      </article>
+    </section>
+
+    <section
+      id="lease-agreement-gate"
+      class="modal-shell hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="lease-agreement-gate-title"
+    >
+      <div class="modal-backdrop" aria-hidden="true"></div>
+      <article class="modal-card lease-agreement-gate-card">
+        <div class="modal-head">
+          <div>
+            <p class="subheading">Lease agreement</p>
+            <h2 id="lease-agreement-gate-title">Review and accept your lease agreement</h2>
+          </div>
+        </div>
+
+        <p id="lease-agreement-gate-building" class="item-details"></p>
+
+        <div class="lease-agreement-gate-frame-wrap">
+          <iframe
+            id="lease-agreement-gate-frame"
+            title="Lease agreement"
+            class="lease-agreement-gate-frame"
+          ></iframe>
+        </div>
+
+        <p class="item-details">
+          Can't see the document above?
+          <a
+            id="lease-agreement-gate-open-link"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Open the lease agreement</a>
+          in a new tab.
+        </p>
+
+        <label class="checkbox-row">
+          <input id="lease-agreement-gate-confirm" type="checkbox" />
+          I have read and agree to this lease agreement.
+        </label>
+
+        <p id="lease-agreement-gate-feedback" class="item-details hidden"></p>
+
+        <div class="action-row modal-actions">
+          <button id="lease-agreement-gate-submit" type="button">I Agree — Continue</button>
         </div>
       </article>
     </section>

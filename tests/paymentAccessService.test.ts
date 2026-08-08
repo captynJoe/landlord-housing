@@ -13,24 +13,24 @@ test("removes deleted building payment access records from exported state", () =
       path.join(tempDir, "payment-access-controls.json")
     );
 
-    service.updateForBuilding("CAPTYN-BLDG-00002", {
+    service.updateForBuilding("RUMINJO-BLDG-00002", {
       rentEnabled: true,
       waterEnabled: true,
       electricityEnabled: false
     });
-    service.updateForBuilding("CAPTYN-BLDG-00003", {
+    service.updateForBuilding("RUMINJO-BLDG-00003", {
       rentEnabled: false,
       waterEnabled: true,
       electricityEnabled: true
     });
 
-    assert.equal(service.removeBuilding("CAPTYN-BLDG-00002"), true);
-    assert.equal(service.removeBuilding("CAPTYN-BLDG-00002"), false);
+    assert.equal(service.removeBuilding("RUMINJO-BLDG-00002"), true);
+    assert.equal(service.removeBuilding("RUMINJO-BLDG-00002"), false);
 
     const exported = service.exportState();
     assert.deepEqual(
       exported.records.map((item) => item.buildingId),
-      ["CAPTYN-BLDG-00003"]
+      ["RUMINJO-BLDG-00003"]
     );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });

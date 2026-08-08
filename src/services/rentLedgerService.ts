@@ -84,6 +84,7 @@ export interface RentDueSnapshot extends Omit<RentDueRecord, "reminderState"> {
   status: "clear" | "due_soon" | "overdue";
   paymentStatus: "paid" | "partial" | "not_paid";
   currentBillingMonth: string;
+  prepaidCreditKsh: number;
   paidAmountKsh: number;
   currentMonthPaidKsh: number;
   currentMonthOutstandingKsh: number;
@@ -501,12 +502,22 @@ export class RentLedgerService {
       existing && isoDateKey(existing.dueDate) === dueCycleKey
         ? existing.reminderState
         : {};
+    const existingRawBalanceKsh = existing
+      ? Math.round(Number(existing.balanceKsh ?? 0))
+      : undefined;
+    const requestedBalanceKsh = Math.round(Number(input.balanceKsh ?? 0));
+    const balanceKsh =
+      existingRawBalanceKsh != null &&
+      existingRawBalanceKsh < 0 &&
+      requestedBalanceKsh === Math.max(0, existingRawBalanceKsh)
+        ? existingRawBalanceKsh
+        : requestedBalanceKsh;
 
     const record: RentDueRecord = {
       buildingId: normalizedBuildingId,
       houseNumber: normalizedHouse,
       monthlyRentKsh: input.monthlyRentKsh,
-      balanceKsh: input.balanceKsh,
+      balanceKsh,
       dueDate: input.dueDate,
       note: input.note?.trim(),
       updatedAt: nowIso(),
@@ -649,7 +660,7 @@ export class RentLedgerService {
       }
 
       record.payments.splice(paymentIndex, 1);
-      record.balanceKsh = Math.max(0, Math.round(record.balanceKsh + event.amountKsh));
+      record.balanceKsh = Math.round(Number(record.balanceKsh ?? 0) + event.amountKsh);
       record.updatedAt = nowIso();
       if (record.note === "Rent cleared by CASH payment event.") {
         record.note = undefined;
@@ -1127,6 +1138,7 @@ export class RentLedgerService {
           currentBillingMonth: snapshot.currentBillingMonth,
           currentMonthPaidKsh: snapshot.currentMonthPaidKsh,
           currentMonthOutstandingKsh: snapshot.currentMonthOutstandingKsh,
+          prepaidCreditKsh: snapshot.prepaidCreditKsh,
           arrearsKsh: snapshot.arrearsKsh,
           totalPaidKsh: snapshot.totalPaidKsh,
           currentMonthLatePenaltyKsh: snapshot.currentMonthLatePenaltyKsh,
@@ -1196,7 +1208,7 @@ export class RentLedgerService {
 
       if (!isHeld) {
         record.balanceKsh =
-          Math.max(0, Number(record.balanceKsh ?? 0)) + record.monthlyRentKsh;
+          Math.round(Number(record.balanceKsh ?? 0)) + record.monthlyRentKsh;
       }
       record.dueDate = nextDueDate;
       record.updatedAt = nowIso();
@@ -1265,7 +1277,7 @@ export class RentLedgerService {
       }.`
     };
     record.latePenaltyCharges = [...(record.latePenaltyCharges ?? []), charge];
-    record.balanceKsh = Math.max(0, Math.round(Number(record.balanceKsh ?? 0))) + policy.amountKsh;
+    record.balanceKsh = Math.round(Number(record.balanceKsh ?? 0)) + policy.amountKsh;
     record.updatedAt = appliedAt;
     return true;
   }
@@ -1318,11 +1330,13 @@ export class RentLedgerService {
       buildingId: record.buildingId,
       houseNumber: record.houseNumber
     });
-    record.balanceKsh = Math.max(0, record.balanceKsh - event.amountKsh);
+    record.balanceKsh = Math.round(Number(record.balanceKsh ?? 0) - event.amountKsh);
     record.updatedAt = nowIso();
 
     if (record.balanceKsh === 0 && !record.note?.trim()) {
       record.note = `Rent cleared by ${event.provider.toUpperCase()} payment event.`;
+    } else if (record.balanceKsh < 0 && !record.note?.trim()) {
+      record.note = `Rent prepaid by ${event.provider.toUpperCase()} payment event.`;
     }
   }
 
@@ -1391,7 +1405,9 @@ export class RentLedgerService {
     );
     const overdueStartsAtDate = new Date(safeDueDate);
     overdueStartsAtDate.setUTCDate(overdueStartsAtDate.getUTCDate() + policy.graceDays);
-    const balanceKsh = Math.max(0, Number(record.balanceKsh ?? 0));
+    const rawBalanceKsh = Math.round(Number(record.balanceKsh ?? 0));
+    const balanceKsh = Math.max(0, rawBalanceKsh);
+    const prepaidCreditKsh = Math.max(0, -rawBalanceKsh);
     const monthlyRentKsh = Math.max(0, Number(record.monthlyRentKsh ?? 0));
     const currentBillingMonth = billingMonthFromDateTime(record.dueDate);
     const currentMonthLatePenaltyKsh = (record.latePenaltyCharges ?? [])
@@ -1429,12 +1445,13 @@ export class RentLedgerService {
       houseNumber: record.houseNumber,
       monthlyRentKsh,
       balanceKsh,
+      prepaidCreditKsh,
       dueDate: record.dueDate,
       note: record.note,
       updatedAt: record.updatedAt,
       payments: [...record.payments],
       latePenaltyCharges: [...(record.latePenaltyCharges ?? [])],
-      status: getStatus(record.balanceKsh, daysToDue),
+      status: getStatus(balanceKsh, daysToDue),
       paymentStatus,
       currentBillingMonth,
       paidAmountKsh: currentMonthPaidKsh,

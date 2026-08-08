@@ -154,7 +154,7 @@ function formatDate(value) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-KE", {
+  return new Intl.DateTimeFormat("en-GB", {
     month: "short",
     day: "numeric",
     year: "numeric"
@@ -171,7 +171,7 @@ function formatDateTime(value) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-KE", {
+  return new Intl.DateTimeFormat("en-GB", {
     month: "short",
     day: "numeric",
     year: "numeric",

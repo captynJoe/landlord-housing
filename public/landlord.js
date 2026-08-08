@@ -167,9 +167,37 @@ const directTenantStaffConfirmEl = document.getElementById("direct-tenant-staff-
 const directTenantStaffConfirmWrapEl = document.getElementById("direct-tenant-staff-confirm-wrap");
 const directTenantAcceptanceNoteEl = document.getElementById("direct-tenant-acceptance-note");
 const directTenantAcceptanceNoteWrapEl = document.getElementById("direct-tenant-acceptance-note-wrap");
+const directTenantLeaseDocumentPreviewEl = document.getElementById(
+  "direct-tenant-lease-document-preview"
+);
 const directTenantNoteEl = document.getElementById("direct-tenant-note");
 const directTenantStatusEl = document.getElementById("direct-tenant-status");
 const directTenantSubmitBtnEl = document.getElementById("direct-tenant-submit-btn");
+
+const leaseAgreementDrawerEl = document.getElementById("lease-agreement-drawer");
+const leaseAgreementDrawerBackdropEl = document.getElementById(
+  "lease-agreement-drawer-backdrop"
+);
+const closeLeaseAgreementDrawerBtnEl = document.getElementById(
+  "close-lease-agreement-drawer-btn"
+);
+const leaseAgreementDrawerTitleEl = document.getElementById("lease-agreement-drawer-title");
+const leaseAgreementCurrentStatusEl = document.getElementById("lease-agreement-current-status");
+const leaseAgreementFileEl = document.getElementById("lease-agreement-file");
+const leaseAgreementUploadStatusEl = document.getElementById("lease-agreement-upload-status");
+const leaseAgreementUploadBtnEl = document.getElementById("lease-agreement-upload-btn");
+
+const editBuildingDrawerEl = document.getElementById("edit-building-drawer");
+const editBuildingDrawerBackdropEl = document.getElementById("edit-building-drawer-backdrop");
+const closeEditBuildingDrawerBtnEl = document.getElementById("close-edit-building-drawer-btn");
+const editBuildingDrawerTitleEl = document.getElementById("edit-building-drawer-title");
+const editBuildingFormEl = document.getElementById("edit-building-form");
+const editBuildingNameEl = document.getElementById("edit-building-name");
+const editBuildingAddressEl = document.getElementById("edit-building-address");
+const editBuildingCountyEl = document.getElementById("edit-building-county");
+const editBuildingUnitsEl = document.getElementById("edit-building-units");
+const editBuildingStatusEl = document.getElementById("edit-building-status");
+const editBuildingSubmitBtnEl = document.getElementById("edit-building-submit-btn");
 
 const createBuildingFormEl = document.getElementById("create-building-form");
 const createBuildingNameEl = document.getElementById("create-building-name");
@@ -1945,6 +1973,135 @@ function closeDirectTenantDrawer() {
   }
 }
 
+let leaseAgreementDrawerBuildingId = "";
+
+function closeLeaseAgreementDrawer() {
+  if (!(leaseAgreementDrawerEl instanceof HTMLElement)) {
+    return;
+  }
+  leaseAgreementDrawerEl.classList.add("hidden");
+  if (leaseAgreementDrawerBackdropEl instanceof HTMLElement) {
+    leaseAgreementDrawerBackdropEl.classList.add("hidden");
+  }
+}
+
+async function loadLeaseAgreementDrawerStatus(buildingId) {
+  if (!(leaseAgreementCurrentStatusEl instanceof HTMLElement)) {
+    return;
+  }
+  leaseAgreementCurrentStatusEl.textContent = "Loading current lease agreement...";
+  try {
+    const payload = await requestJson(
+      `/api/landlord/buildings/${encodeURIComponent(buildingId)}/configuration`,
+      { cache: "no-store" }
+    );
+    if (leaseAgreementDrawerBuildingId !== buildingId) {
+      return;
+    }
+    const agreementPolicy = payload.data?.agreementPolicy;
+    const documentUrl =
+      agreementPolicy && typeof agreementPolicy === "object" ? agreementPolicy.documentUrl : null;
+    if (!documentUrl) {
+      leaseAgreementCurrentStatusEl.textContent =
+        "No lease agreement PDF uploaded yet for this building.";
+      return;
+    }
+    leaseAgreementCurrentStatusEl.replaceChildren();
+    const label = document.createElement("span");
+    label.textContent = `Current: ${agreementPolicy.documentFileName || "lease-agreement.pdf"}${
+      agreementPolicy.uploadedAt ? ` (uploaded ${formatDateTime(agreementPolicy.uploadedAt)})` : ""
+    } — `;
+    const link = document.createElement("a");
+    link.href = documentUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Open";
+    leaseAgreementCurrentStatusEl.append(label, link);
+  } catch (error) {
+    if (leaseAgreementDrawerBuildingId === buildingId) {
+      leaseAgreementCurrentStatusEl.textContent = "Unable to load the current lease agreement.";
+    }
+  }
+}
+
+function openLeaseAgreementDrawer(buildingId, buildingName) {
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot manage lease agreement documents.");
+    return;
+  }
+  if (!(leaseAgreementDrawerEl instanceof HTMLElement) || !buildingId) {
+    return;
+  }
+
+  leaseAgreementDrawerBuildingId = buildingId;
+  if (leaseAgreementDrawerTitleEl instanceof HTMLElement) {
+    leaseAgreementDrawerTitleEl.textContent = buildingName
+      ? `Lease Agreement — ${buildingName}`
+      : "Lease Agreement";
+  }
+  if (leaseAgreementFileEl instanceof HTMLInputElement) {
+    leaseAgreementFileEl.value = "";
+  }
+  if (leaseAgreementUploadStatusEl instanceof HTMLElement) {
+    leaseAgreementUploadStatusEl.textContent = "";
+  }
+
+  leaseAgreementDrawerEl.classList.remove("hidden");
+  if (leaseAgreementDrawerBackdropEl instanceof HTMLElement) {
+    leaseAgreementDrawerBackdropEl.classList.remove("hidden");
+  }
+
+  void loadLeaseAgreementDrawerStatus(buildingId);
+}
+
+let editBuildingDrawerBuildingId = "";
+
+function closeEditBuildingDrawer() {
+  if (!(editBuildingDrawerEl instanceof HTMLElement)) {
+    return;
+  }
+  editBuildingDrawerEl.classList.add("hidden");
+  if (editBuildingDrawerBackdropEl instanceof HTMLElement) {
+    editBuildingDrawerBackdropEl.classList.add("hidden");
+  }
+}
+
+function openEditBuildingDrawer(buildingId) {
+  if (isCaretakerRole()) {
+    showError("House manager accounts cannot edit building details.");
+    return;
+  }
+  const building = getBuildingRecord(buildingId);
+  if (!(editBuildingDrawerEl instanceof HTMLElement) || !building) {
+    return;
+  }
+
+  editBuildingDrawerBuildingId = buildingId;
+  if (editBuildingDrawerTitleEl instanceof HTMLElement) {
+    editBuildingDrawerTitleEl.textContent = `Edit Building — ${building.name}`;
+  }
+  if (editBuildingNameEl instanceof HTMLInputElement) {
+    editBuildingNameEl.value = building.name || "";
+  }
+  if (editBuildingAddressEl instanceof HTMLInputElement) {
+    editBuildingAddressEl.value = building.address || "";
+  }
+  if (editBuildingCountyEl instanceof HTMLInputElement) {
+    editBuildingCountyEl.value = building.county || "";
+  }
+  if (editBuildingUnitsEl instanceof HTMLInputElement) {
+    editBuildingUnitsEl.value = building.units ? String(building.units) : "";
+  }
+  if (editBuildingStatusEl instanceof HTMLElement) {
+    editBuildingStatusEl.textContent = "";
+  }
+
+  editBuildingDrawerEl.classList.remove("hidden");
+  if (editBuildingDrawerBackdropEl instanceof HTMLElement) {
+    editBuildingDrawerBackdropEl.classList.remove("hidden");
+  }
+}
+
 function setDirectTenantSubmitting(isSubmitting) {
   if (directTenantSubmitBtnEl instanceof HTMLButtonElement) {
     directTenantSubmitBtnEl.disabled = Boolean(isSubmitting);
@@ -2055,7 +2212,7 @@ function formatDateTime(value) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
@@ -2072,7 +2229,7 @@ function formatDateOnly(value) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium"
   }).format(date);
 }
@@ -2088,7 +2245,7 @@ function formatBillingMonth(value) {
     return normalized;
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     month: "short",
     year: "numeric"
   }).format(date);
@@ -6278,6 +6435,17 @@ function createBuildingPhotoUploadRequest(buildingId) {
   };
 }
 
+function createBuildingLeaseDocumentUploadRequest(buildingId) {
+  return {
+    url: "/api/media/upload",
+    fields: {
+      category: "building_lease_document",
+      buildingId: buildingId || undefined
+    },
+    credentials: "same-origin"
+  };
+}
+
 function syncDirectTenantDocumentPreview() {
   if (!(directTenantDocumentsEl instanceof HTMLInputElement)) {
     return;
@@ -6782,6 +6950,29 @@ function renderBuildings(rows) {
           Delete Building
         </button>
       `;
+    const leaseAgreementButton = isCaretakerRole()
+      ? ""
+      : `
+        <button
+          type="button"
+          data-action="open-lease-agreement-drawer"
+          data-building-id="${escapeHtml(item.id)}"
+          data-building-name="${escapeHtml(item.name)}"
+        >
+          Lease Agreement
+        </button>
+      `;
+    const editBuildingButton = isCaretakerRole()
+      ? ""
+      : `
+        <button
+          type="button"
+          data-action="open-edit-building-drawer"
+          data-building-id="${escapeHtml(item.id)}"
+        >
+          Edit
+        </button>
+      `;
     row.className = `landlord-building-row${isFocused ? " is-focused-row" : ""}`;
     row.innerHTML = `
       <td>${item.id}</td>
@@ -6803,7 +6994,9 @@ function renderBuildings(rows) {
       <td>
         <div class="action-row">
           ${useBuildingButton}
+          ${editBuildingButton}
           ${addRoomsButton}
+          ${leaseAgreementButton}
           ${deleteBuildingButton}
         </div>
       </td>
@@ -9779,6 +9972,26 @@ function renderResidentDrawer(resident) {
     </div>
   `;
 
+  const witnessAgreementButton =
+    canEditAgreement && agreement?.status === "awaiting_resident"
+      ? `
+    <div class="resident-row-actions resident-drawer-actions">
+      <button
+        type="button"
+        data-action="witness-tenant-agreement"
+        data-building-id="${escapeHtml(resident.buildingId)}"
+        data-house-number="${escapeHtml(resident.houseNumber)}"
+      >
+        Mark As Agreed In Person
+      </button>
+    </div>
+    <p class="status-text">
+      This tenant hasn't accepted the lease agreement online yet. Use this if you showed them the
+      lease in the office and they agreed to its terms.
+    </p>
+  `
+      : "";
+
   residentDrawerBodyEl.innerHTML = `
     <div class="resident-summary">
       <p class="status-text">${escapeHtml(buildingLabel)} • House ${escapeHtml(
@@ -9850,6 +10063,7 @@ function renderResidentDrawer(resident) {
             ? `<p class="status-text resident-agreement-error">${escapeHtml(agreementError)}</p>`
             : ""
         }
+        ${witnessAgreementButton}
         ${roomAccountButton}
       </div>
     </details>
@@ -11611,11 +11825,162 @@ directTenantDrawerBackdropEl?.addEventListener("click", () => {
   closeDirectTenantDrawer();
 });
 
+closeLeaseAgreementDrawerBtnEl?.addEventListener("click", () => {
+  closeLeaseAgreementDrawer();
+});
+
+leaseAgreementDrawerBackdropEl?.addEventListener("click", () => {
+  closeLeaseAgreementDrawer();
+});
+
+closeEditBuildingDrawerBtnEl?.addEventListener("click", () => {
+  closeEditBuildingDrawer();
+});
+
+editBuildingDrawerBackdropEl?.addEventListener("click", () => {
+  closeEditBuildingDrawer();
+});
+
+editBuildingFormEl?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  clearError();
+
+  if (!editBuildingDrawerBuildingId) {
+    return;
+  }
+
+  const name = String(editBuildingNameEl?.value || "").trim();
+  const address = String(editBuildingAddressEl?.value || "").trim();
+  const county = String(editBuildingCountyEl?.value || "").trim();
+  const unitsRaw = String(editBuildingUnitsEl?.value || "").trim();
+  const units = unitsRaw ? Number(unitsRaw) : undefined;
+
+  if (!name || !address || !county) {
+    if (editBuildingStatusEl instanceof HTMLElement) {
+      editBuildingStatusEl.textContent = "Name, address, and county are required.";
+    }
+    return;
+  }
+
+  const buildingId = editBuildingDrawerBuildingId;
+  if (editBuildingSubmitBtnEl instanceof HTMLButtonElement) {
+    editBuildingSubmitBtnEl.disabled = true;
+  }
+  if (editBuildingStatusEl instanceof HTMLElement) {
+    editBuildingStatusEl.textContent = "Saving...";
+  }
+
+  void (async () => {
+    try {
+      await requestJson(`/api/landlord/buildings/${encodeURIComponent(buildingId)}`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          name,
+          address,
+          county,
+          units: Number.isFinite(units) ? units : undefined
+        })
+      });
+
+      setStatus(`${name} updated.`);
+      closeEditBuildingDrawer();
+      await loadBuildings();
+    } catch (error) {
+      if (editBuildingStatusEl instanceof HTMLElement) {
+        editBuildingStatusEl.textContent =
+          error instanceof Error ? error.message : "Unable to save building details.";
+      }
+    } finally {
+      if (editBuildingSubmitBtnEl instanceof HTMLButtonElement) {
+        editBuildingSubmitBtnEl.disabled = false;
+      }
+    }
+  })();
+});
+
+leaseAgreementUploadBtnEl?.addEventListener("click", () => {
+  void (async () => {
+    if (!leaseAgreementDrawerBuildingId) {
+      return;
+    }
+    const file = leaseAgreementFileEl?.files?.[0];
+    if (!(file instanceof File)) {
+      if (leaseAgreementUploadStatusEl instanceof HTMLElement) {
+        leaseAgreementUploadStatusEl.textContent = "Choose a PDF file first.";
+      }
+      return;
+    }
+    if (String(file.type ?? "").toLowerCase() !== "application/pdf") {
+      if (leaseAgreementUploadStatusEl instanceof HTMLElement) {
+        leaseAgreementUploadStatusEl.textContent = "Only PDF files are supported.";
+      }
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      if (leaseAgreementUploadStatusEl instanceof HTMLElement) {
+        leaseAgreementUploadStatusEl.textContent = "File is larger than 10 MB.";
+      }
+      return;
+    }
+
+    const buildingId = leaseAgreementDrawerBuildingId;
+    if (leaseAgreementUploadBtnEl instanceof HTMLButtonElement) {
+      leaseAgreementUploadBtnEl.disabled = true;
+    }
+    if (leaseAgreementUploadStatusEl instanceof HTMLElement) {
+      leaseAgreementUploadStatusEl.textContent = "Uploading...";
+    }
+
+    try {
+      const [uploadedUrl] = await uploadImageFiles([file], {
+        createUploadRequest: () => createBuildingLeaseDocumentUploadRequest(buildingId)
+      });
+
+      await requestJson(
+        `/api/landlord/buildings/${encodeURIComponent(buildingId)}/lease-agreement`,
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            documentUrl: uploadedUrl,
+            documentFileName: file.name
+          })
+        }
+      );
+
+      if (leaseAgreementUploadStatusEl instanceof HTMLElement) {
+        leaseAgreementUploadStatusEl.textContent = "Lease agreement uploaded.";
+      }
+      if (leaseAgreementFileEl instanceof HTMLInputElement) {
+        leaseAgreementFileEl.value = "";
+      }
+      await loadLeaseAgreementDrawerStatus(buildingId);
+    } catch (error) {
+      if (leaseAgreementUploadStatusEl instanceof HTMLElement) {
+        leaseAgreementUploadStatusEl.textContent =
+          error instanceof Error ? error.message : "Unable to upload lease agreement.";
+      }
+    } finally {
+      if (leaseAgreementUploadBtnEl instanceof HTMLButtonElement) {
+        leaseAgreementUploadBtnEl.disabled = false;
+      }
+    }
+  })();
+});
+
 directTenantBuildingEl?.addEventListener("change", () => {
   if (directTenantHouseEl instanceof HTMLInputElement) {
     directTenantHouseEl.value = "";
   }
   syncDirectTenantRoomOptions();
+  if (isDirectTenantStaffWitnessed()) {
+    void loadDirectTenantLeaseDocumentPreview();
+  }
 });
 
 openUtilitySetupBtnEl?.addEventListener("click", () => {
@@ -11748,20 +12113,94 @@ function syncDirectTenantDrawerMode() {
   syncDirectTenantAcceptanceFields();
 }
 
+function isDirectTenantStaffWitnessed() {
+  return (
+    directTenantAcceptanceMethodEl instanceof HTMLSelectElement &&
+    directTenantAcceptanceMethodEl.value === "staff_witnessed"
+  );
+}
+
 function syncDirectTenantAcceptanceFields() {
+  const staffWitnessed = isStaffRole() && isDirectTenantStaffWitnessed();
+
   if (directTenantStaffConfirmWrapEl instanceof HTMLElement) {
-    directTenantStaffConfirmWrapEl.classList.add("hidden");
+    directTenantStaffConfirmWrapEl.classList.toggle("hidden", !staffWitnessed);
   }
   if (directTenantAcceptanceNoteWrapEl instanceof HTMLElement) {
-    directTenantAcceptanceNoteWrapEl.classList.add("hidden");
+    directTenantAcceptanceNoteWrapEl.classList.toggle("hidden", !staffWitnessed);
   }
   if (directTenantStaffConfirmEl instanceof HTMLInputElement) {
-    directTenantStaffConfirmEl.required = false;
-    directTenantStaffConfirmEl.checked = false;
+    directTenantStaffConfirmEl.required = staffWitnessed;
+    if (!staffWitnessed) {
+      directTenantStaffConfirmEl.checked = false;
+    }
   }
   if (directTenantAcceptanceNoteEl instanceof HTMLTextAreaElement) {
     directTenantAcceptanceNoteEl.required = false;
-    directTenantAcceptanceNoteEl.value = "";
+    if (!staffWitnessed) {
+      directTenantAcceptanceNoteEl.value = "";
+    }
+  }
+
+  if (staffWitnessed) {
+    void loadDirectTenantLeaseDocumentPreview();
+  } else if (directTenantLeaseDocumentPreviewEl instanceof HTMLElement) {
+    directTenantLeaseDocumentPreviewEl.classList.add("hidden");
+    directTenantLeaseDocumentPreviewEl.replaceChildren();
+  }
+}
+
+async function loadDirectTenantLeaseDocumentPreview() {
+  if (!(directTenantLeaseDocumentPreviewEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const buildingId = String(directTenantBuildingEl?.value || "").trim();
+  if (!buildingId) {
+    directTenantLeaseDocumentPreviewEl.classList.add("hidden");
+    directTenantLeaseDocumentPreviewEl.replaceChildren();
+    return;
+  }
+
+  directTenantLeaseDocumentPreviewEl.classList.remove("hidden");
+  directTenantLeaseDocumentPreviewEl.textContent = "Loading this building's lease agreement...";
+
+  try {
+    const payload = await requestJson(
+      `/api/landlord/buildings/${encodeURIComponent(buildingId)}/configuration`,
+      { cache: "no-store" }
+    );
+    const agreementPolicy = payload.data?.agreementPolicy;
+    const documentUrl =
+      agreementPolicy && typeof agreementPolicy === "object" ? agreementPolicy.documentUrl : null;
+
+    if (!(directTenantAcceptanceMethodEl instanceof HTMLSelectElement) ||
+      directTenantAcceptanceMethodEl.value !== "staff_witnessed" ||
+      String(directTenantBuildingEl?.value || "").trim() !== buildingId) {
+      return;
+    }
+
+    if (!documentUrl) {
+      directTenantLeaseDocumentPreviewEl.textContent =
+        "No lease agreement PDF has been uploaded for this building yet. Upload one from the building settings before marking agreements as agreed in person.";
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = documentUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = `Open ${agreementPolicy.documentFileName || "lease agreement"} to show the tenant`;
+    directTenantLeaseDocumentPreviewEl.replaceChildren(link);
+  } catch (error) {
+    if (
+      directTenantAcceptanceMethodEl instanceof HTMLSelectElement &&
+      directTenantAcceptanceMethodEl.value === "staff_witnessed" &&
+      String(directTenantBuildingEl?.value || "").trim() === buildingId
+    ) {
+      directTenantLeaseDocumentPreviewEl.textContent =
+        "Unable to load this building's lease agreement.";
+    }
   }
 }
 
@@ -11812,9 +12251,18 @@ directTenantFormEl?.addEventListener("submit", (event) => {
   const identityType = String(directTenantIdTypeEl?.value || "national_id").trim();
   const identityNumber = String(directTenantIdNumberEl?.value || "").trim();
   const leaseStartDate = String(directTenantLeaseStartEl?.value || "").trim();
-  const acceptanceMethod = "resident_portal";
-  const note = String(directTenantNoteEl?.value || "").trim() || undefined;
   const staffMode = isStaffRole();
+  const acceptanceMethod =
+    staffMode && isDirectTenantStaffWitnessed() ? "staff_witnessed" : "resident_portal";
+  const staffWitnessConfirmed =
+    acceptanceMethod === "staff_witnessed" &&
+    directTenantStaffConfirmEl instanceof HTMLInputElement &&
+    directTenantStaffConfirmEl.checked;
+  const acceptanceNote =
+    acceptanceMethod === "staff_witnessed"
+      ? String(directTenantAcceptanceNoteEl?.value || "").trim() || undefined
+      : undefined;
+  const note = String(directTenantNoteEl?.value || "").trim() || undefined;
 
   if (!buildingId || !houseNumber || !fullName || !phoneNumber || !leaseStartDate) {
     showError(staffMode ? "Agreement onboarding requires building, room, name, phone, ID number, and lease start date." : "Tenant intake requires building, room, name, phone, and move-in date.");
@@ -11826,6 +12274,10 @@ directTenantFormEl?.addEventListener("submit", (event) => {
   }
   if (staffMode && !identityNumber) {
     showError("Agreement onboarding requires the tenant ID number.");
+    return;
+  }
+  if (acceptanceMethod === "staff_witnessed" && !staffWitnessConfirmed) {
+    showError("Confirm that you showed the tenant the lease agreement in person before continuing.");
     return;
   }
   setDirectTenantSubmitting(true);
@@ -11917,6 +12369,8 @@ directTenantFormEl?.addEventListener("submit", (event) => {
           identityDocumentUrls,
           leaseStartDate,
           acceptanceMethod,
+          staffWitnessConfirmed: acceptanceMethod === "staff_witnessed" ? true : undefined,
+          acceptanceNote,
           note
         })
       });
@@ -12935,6 +13389,19 @@ buildingsBodyEl.addEventListener("click", (event) => {
     return;
   }
 
+  if (target.dataset.action === "open-lease-agreement-drawer") {
+    const buildingName = String(
+      target.dataset.buildingName || getBuildingDisplayNameById(buildingId)
+    ).trim();
+    openLeaseAgreementDrawer(buildingId, buildingName);
+    return;
+  }
+
+  if (target.dataset.action === "open-edit-building-drawer") {
+    openEditBuildingDrawer(buildingId);
+    return;
+  }
+
   if (target.dataset.action !== "switch-building") {
     return;
   }
@@ -13429,6 +13896,13 @@ residentDrawerBodyEl?.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "witness-tenant-agreement") {
+    const buildingId = String(target.dataset.buildingId || "").trim();
+    const houseNumber = String(target.dataset.houseNumber || "").trim();
+    void handleWitnessTenantAgreementClick(target, buildingId, houseNumber);
+    return;
+  }
+
   if (action !== "open-room-account") {
     return;
   }
@@ -13437,6 +13911,53 @@ residentDrawerBodyEl?.addEventListener("click", (event) => {
   const houseNumber = String(target.dataset.houseNumber || "").trim();
   openRoomAccountPage(buildingId, houseNumber);
 });
+
+async function handleWitnessTenantAgreementClick(target, buildingId, houseNumber) {
+  if (!buildingId || !houseNumber) {
+    return;
+  }
+
+  const shouldProceed = window.confirm(
+    "Confirm that you showed this tenant the building's lease agreement in person and they agreed to its terms."
+  );
+  if (!shouldProceed) {
+    return;
+  }
+
+  if (target instanceof HTMLButtonElement) {
+    target.disabled = true;
+  }
+  clearError();
+
+  try {
+    await requestJson(
+      `/api/landlord/buildings/${encodeURIComponent(buildingId)}/houses/${encodeURIComponent(houseNumber)}/agreement/witness`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          staffWitnessConfirmed: true,
+          acceptanceNote: "Lease agreement shown and agreed to in person."
+        })
+      }
+    );
+
+    setStatus("Tenant agreement marked as agreed in person.");
+    const resident = state.selectedResident;
+    if (resident) {
+      await loadResidentAgreement(resident);
+    }
+    await loadResidents();
+  } catch (error) {
+    handleLandlordError(error, "Unable to mark tenant agreement as agreed.");
+  } finally {
+    if (target instanceof HTMLButtonElement) {
+      target.disabled = false;
+    }
+  }
+}
 
 residentDrawerBodyEl?.addEventListener("submit", (event) => {
   const form = event.target;

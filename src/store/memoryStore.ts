@@ -4,6 +4,7 @@ import type { BuildingRepository } from "../repositories/buildingRepository.js";
 import type {
   CreateBuildingInput,
   BuildingMediaUpdateInput,
+  BuildingDetailsUpdateInput,
   LandlordAddBuildingHousesInput,
   CreateIncidentInput,
   CreateVacancySnapshotInput,
@@ -72,6 +73,34 @@ export class MemoryStore implements BuildingRepository {
       ...building.media,
       imageUrls: [...input.imageUrls]
     };
+    building.updatedAt = new Date().toISOString();
+    return building;
+  }
+
+  async updateBuildingDetails(
+    buildingId: string,
+    input: BuildingDetailsUpdateInput
+  ): Promise<Building | undefined> {
+    const building = this.buildings.get(buildingId);
+    if (!building) {
+      return undefined;
+    }
+
+    if (input.name !== undefined) {
+      building.name = input.name;
+    }
+    if (input.address !== undefined) {
+      building.address = input.address;
+    }
+    if (input.county !== undefined) {
+      building.county = input.county;
+    }
+    if (input.cctvStatus !== undefined) {
+      building.cctvStatus = input.cctvStatus;
+    }
+    if (input.units !== undefined) {
+      building.units = input.units;
+    }
     building.updatedAt = new Date().toISOString();
     return building;
   }
@@ -208,7 +237,7 @@ export class MemoryStore implements BuildingRepository {
   }
 
   private createBuildingId(): string {
-    const id = `CAPTYN-BLDG-${String(this.buildingSequence).padStart(5, "0")}`;
+    const id = `RUMINJO-BLDG-${String(this.buildingSequence).padStart(5, "0")}`;
     this.buildingSequence += 1;
     return id;
   }

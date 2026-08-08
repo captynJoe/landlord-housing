@@ -5,8 +5,8 @@ import {
   RentLedgerService
 } from "../src/services/rentLedgerService.js";
 
-const BUILDING_A = "CAPTYN001";
-const BUILDING_B = "CAPTYN002";
+const BUILDING_A = "RUMINJO001";
+const BUILDING_B = "RUMINJO002";
 
 test("returns null for unconfigured building and house number", () => {
   const service = new RentLedgerService();
@@ -119,6 +119,58 @@ test("records admin rent payments with provider metadata against an existing pro
   assert.equal(outcome.snapshot.arrearsKsh, 0);
   assert.equal(service.listPayments({ buildingId: BUILDING_A, houseNumber: "M-2" })[0].provider, "cash");
   assert.equal(service.listCollectionStatus(10, BUILDING_A)[0]?.totalPaidKsh, 1500);
+});
+
+test("records overpaid rent as prepaid credit for future cycles", () => {
+  const service = new RentLedgerService();
+  const dueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+
+  service.upsertRentDue(BUILDING_A, "ADV-1", {
+    monthlyRentKsh: 12000,
+    balanceKsh: 12000,
+    dueDate
+  });
+
+  const payment = service.recordPayment({
+    buildingId: BUILDING_A,
+    houseNumber: "ADV-1",
+    amountKsh: 36000,
+    provider: "cash",
+    providerReference: "advance-rent-001",
+    paidAt: dueDate,
+    source: "manual"
+  });
+
+  assert.equal(payment.snapshot?.balanceKsh, 0);
+  assert.equal(payment.snapshot?.prepaidCreditKsh, 24000);
+  assert.equal(payment.snapshot?.paymentStatus, "paid");
+  assert.equal(service.exportState().records[0]?.balanceKsh, -24000);
+
+  const savedAgain = service.upsertRentDue(BUILDING_A, "ADV-1", {
+    monthlyRentKsh: 12000,
+    balanceKsh: 0,
+    dueDate
+  });
+  assert.equal(savedAgain.balanceKsh, 0);
+  assert.equal(savedAgain.prepaidCreditKsh, 24000);
+  assert.equal(service.exportState().records[0]?.balanceKsh, -24000);
+
+  const [record] = service.exportState().records;
+  assert.ok(record);
+  service.importState({
+    records: [
+      {
+        ...record,
+        dueDate: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ],
+    pendingPayments: []
+  });
+
+  const rolled = service.getRentDue(BUILDING_A, "ADV-1");
+  assert.ok(rolled);
+  assert.equal(rolled.balanceKsh, 0);
+  assert.equal(rolled.prepaidCreditKsh, 12000);
 });
 
 test("unrecords cash rent payments and restores the room balance", () => {

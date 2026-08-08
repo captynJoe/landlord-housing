@@ -40,7 +40,7 @@ function formatUpdatedAt(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Updated: unknown";
 
-  return `Updated ${new Intl.DateTimeFormat("en-US", {
+  return `Updated ${new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date)}`;

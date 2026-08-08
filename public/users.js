@@ -160,6 +160,14 @@ const paymentReceiptCloseEl = document.getElementById("payment-receipt-close");
 const paymentReceiptSaveBtnEl = document.getElementById("payment-receipt-save-btn");
 const paymentReceiptDismissBtnEl = document.getElementById("payment-receipt-dismiss-btn");
 
+const leaseAgreementGateEl = document.getElementById("lease-agreement-gate");
+const leaseAgreementGateBuildingEl = document.getElementById("lease-agreement-gate-building");
+const leaseAgreementGateFrameEl = document.getElementById("lease-agreement-gate-frame");
+const leaseAgreementGateOpenLinkEl = document.getElementById("lease-agreement-gate-open-link");
+const leaseAgreementGateConfirmEl = document.getElementById("lease-agreement-gate-confirm");
+const leaseAgreementGateFeedbackEl = document.getElementById("lease-agreement-gate-feedback");
+const leaseAgreementGateSubmitEl = document.getElementById("lease-agreement-gate-submit");
+
 const reportItemTemplate = document.getElementById("report-item-template");
 const notificationItemTemplate = document.getElementById("notification-item-template");
 
@@ -366,6 +374,13 @@ const REQUIRED_DOM_BINDINGS = Object.freeze([
   ["payment-receipt-backdrop", paymentReceiptBackdropEl],
   ["payment-receipt-card", paymentReceiptCardEl],
   ["payment-receipt-close", paymentReceiptCloseEl],
+  ["lease-agreement-gate", leaseAgreementGateEl],
+  ["lease-agreement-gate-building", leaseAgreementGateBuildingEl],
+  ["lease-agreement-gate-frame", leaseAgreementGateFrameEl],
+  ["lease-agreement-gate-open-link", leaseAgreementGateOpenLinkEl],
+  ["lease-agreement-gate-confirm", leaseAgreementGateConfirmEl],
+  ["lease-agreement-gate-feedback", leaseAgreementGateFeedbackEl],
+  ["lease-agreement-gate-submit", leaseAgreementGateSubmitEl],
   ["payment-receipt-save-btn", paymentReceiptSaveBtnEl],
   ["payment-receipt-dismiss-btn", paymentReceiptDismissBtnEl],
   ["report-item-template", reportItemTemplate],
@@ -409,7 +424,7 @@ function formatDateTime(value) {
     return "Unknown time";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
@@ -1586,7 +1601,8 @@ function getRememberDeviceSelection() {
 function syncModalBodyState() {
   const hasOpenModal =
     !mpesaStatusModalEl.classList.contains("hidden") ||
-    !paymentReceiptModalEl.classList.contains("hidden");
+    !paymentReceiptModalEl.classList.contains("hidden") ||
+    !leaseAgreementGateEl.classList.contains("hidden");
   document.body.classList.toggle("modal-open", hasOpenModal);
 }
 
@@ -3312,6 +3328,10 @@ function renderRentDue(rentDue, fallbackMessage) {
       <dd>${formatCurrency(rentDue.balanceKsh)}</dd>
     </div>
     <div>
+      <dt>Prepaid Credit</dt>
+      <dd>${formatCurrency(rentDue.prepaidCreditKsh ?? rentDue.rentPrepaidCreditKsh ?? 0)}</dd>
+    </div>
+    <div>
       <dt>Paid This Month</dt>
       <dd>${formatCurrency(rentDue.currentMonthPaidKsh ?? rentDue.paidAmountKsh ?? 0)}</dd>
     </div>
@@ -3876,7 +3896,101 @@ function showSignedInState() {
   renderSmsControls();
   syncRememberDeviceToggle();
   updateResidentBranding();
+  renderLeaseAgreementGate();
 }
+
+function renderLeaseAgreementGate() {
+  if (!(leaseAgreementGateEl instanceof HTMLElement)) {
+    return;
+  }
+
+  const session = state.residentSession;
+  const leaseAgreement = session?.leaseAgreement;
+  const shouldShow = Boolean(
+    session &&
+      !isPasswordChangeRequired() &&
+      leaseAgreement?.documentUrl &&
+      session.agreementStatus !== "verified"
+  );
+
+  if (!shouldShow) {
+    setModalOpen(leaseAgreementGateEl, false);
+    return;
+  }
+
+  if (leaseAgreementGateBuildingEl instanceof HTMLElement) {
+    const buildingLabel = leaseAgreement.buildingName || boundBuildingEl.value || "";
+    leaseAgreementGateBuildingEl.textContent = buildingLabel
+      ? `${buildingLabel} — House ${session.houseNumber}`
+      : `House ${session.houseNumber}`;
+  }
+  if (
+    leaseAgreementGateFrameEl instanceof HTMLIFrameElement &&
+    leaseAgreementGateFrameEl.src !== leaseAgreement.documentUrl
+  ) {
+    leaseAgreementGateFrameEl.src = leaseAgreement.documentUrl;
+  }
+  if (leaseAgreementGateOpenLinkEl instanceof HTMLAnchorElement) {
+    leaseAgreementGateOpenLinkEl.href = leaseAgreement.documentUrl;
+  }
+  if (leaseAgreementGateFeedbackEl instanceof HTMLElement) {
+    leaseAgreementGateFeedbackEl.classList.add("hidden");
+    leaseAgreementGateFeedbackEl.textContent = "";
+  }
+  if (leaseAgreementGateConfirmEl instanceof HTMLInputElement) {
+    leaseAgreementGateConfirmEl.checked = false;
+  }
+
+  setModalOpen(leaseAgreementGateEl, true);
+}
+
+async function handleLeaseAgreementGateAccept() {
+  if (!(leaseAgreementGateConfirmEl instanceof HTMLInputElement) || !leaseAgreementGateConfirmEl.checked) {
+    if (leaseAgreementGateFeedbackEl instanceof HTMLElement) {
+      leaseAgreementGateFeedbackEl.textContent =
+        "Check the box to confirm you agree before continuing.";
+      leaseAgreementGateFeedbackEl.classList.remove("hidden");
+    }
+    return;
+  }
+
+  if (leaseAgreementGateSubmitEl instanceof HTMLButtonElement) {
+    leaseAgreementGateSubmitEl.disabled = true;
+  }
+  if (leaseAgreementGateFeedbackEl instanceof HTMLElement) {
+    leaseAgreementGateFeedbackEl.classList.add("hidden");
+  }
+
+  try {
+    await requestJson(
+      "/api/resident/agreement/accept",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({ confirmed: true })
+      },
+      { auth: true }
+    );
+
+    await loadResidentSession();
+  } catch (error) {
+    if (leaseAgreementGateFeedbackEl instanceof HTMLElement) {
+      leaseAgreementGateFeedbackEl.textContent =
+        error instanceof Error ? error.message : "Unable to accept the lease agreement.";
+      leaseAgreementGateFeedbackEl.classList.remove("hidden");
+    }
+  } finally {
+    if (leaseAgreementGateSubmitEl instanceof HTMLButtonElement) {
+      leaseAgreementGateSubmitEl.disabled = false;
+    }
+  }
+}
+
+leaseAgreementGateSubmitEl?.addEventListener("click", () => {
+  void handleLeaseAgreementGateAccept();
+});
 
 async function loadResidentSession() {
   try {

@@ -92,7 +92,7 @@ async function walletRequest<T>(path: string, init: RequestInit): Promise<T> {
   const apiKey = getWalletApiKey();
 
   if (!baseUrl || !apiKey) {
-    throw new Error("CAPTYN Wallet service is not configured.");
+    throw new Error("RUMINJO Wallet service is not configured.");
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
@@ -114,7 +114,7 @@ async function walletRequest<T>(path: string, init: RequestInit): Promise<T> {
 
   if (!response.ok) {
     throw new Error(
-      data?.detail || data?.error || `CAPTYN Wallet request failed with HTTP ${response.status}`
+      data?.detail || data?.error || `RUMINJO Wallet request failed with HTTP ${response.status}`
     );
   }
 

@@ -10,6 +10,7 @@ import type { BuildingRepository } from "./buildingRepository.js";
 import type {
   CreateBuildingInput,
   BuildingMediaUpdateInput,
+  BuildingDetailsUpdateInput,
   LandlordAddBuildingHousesInput,
   CreateIncidentInput,
   CreateVacancySnapshotInput,
@@ -208,6 +209,46 @@ export class PrismaBuildingRepository implements BuildingRepository {
       }
       throw error;
     });
+
+    if (!building) {
+      return undefined;
+    }
+
+    return mapBuilding(building);
+  }
+
+  async updateBuildingDetails(
+    buildingId: string,
+    input: BuildingDetailsUpdateInput
+  ): Promise<Building | undefined> {
+    const building = await this.prisma.building
+      .update({
+        where: { id: buildingId },
+        data: {
+          name: input.name,
+          address: input.address,
+          county: input.county,
+          cctvStatus: input.cctvStatus,
+          units: input.units
+        },
+        include: {
+          incidents: { orderBy: { createdAt: "desc" } },
+          maintenanceRecords: { orderBy: { createdAt: "desc" } },
+          vacancySnapshots: { orderBy: { movedOutAt: "desc" } },
+          houseUnits: { orderBy: { houseNumber: "asc" } }
+        }
+      })
+      .catch((error: unknown) => {
+        if (
+          typeof error === "object" &&
+          error &&
+          "code" in error &&
+          error.code === "P2025"
+        ) {
+          return undefined;
+        }
+        throw error;
+      });
 
     if (!building) {
       return undefined;
@@ -510,12 +551,12 @@ export class PrismaBuildingRepository implements BuildingRepository {
     });
 
     const maxIndex = rows.reduce((max, row) => {
-      const match = /^CAPTYN-BLDG-(\d{5})$/.exec(row.id);
+      const match = /^RUMINJO-BLDG-(\d{5})$/.exec(row.id);
       if (!match) return max;
       const current = Number(match[1]);
       return Number.isFinite(current) ? Math.max(max, current) : max;
     }, 0);
 
-    return `CAPTYN-BLDG-${String(maxIndex + 1).padStart(5, "0")}`;
+    return `RUMINJO-BLDG-${String(maxIndex + 1).padStart(5, "0")}`;
   }
 }

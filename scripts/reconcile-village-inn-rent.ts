@@ -3,7 +3,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const RENT_LEDGER_STATE_KEY = "rent_ledger_v1";
-const VILLAGE_INN_BUILDING_ID = "CAPTYN-BLDG-00002";
+const VILLAGE_INN_BUILDING_ID = "RUMINJO-BLDG-00002";
 const STALE_VILLAGE_INN_NOTE = "Village Inn March 2026 baseline seed on 2026-03-21.";
 
 type RentLedgerRecord = {

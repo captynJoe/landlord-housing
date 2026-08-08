@@ -7,9 +7,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
-      rel="stylesheet"
     />
+    <script src="/font-loader.js"></script>
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;700&display=swap"
+      />
+    </noscript>
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
     <link rel="stylesheet" href="/landlord.css?v=20260729e" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260716b" />
@@ -2192,10 +2200,36 @@
               <span id="direct-tenant-lease-start-label">Lease Start Date</span>
               <input id="direct-tenant-lease-start" type="date" required />
             </label>
-            <p class="status-text agreement-online-note">
-              Resident acceptance happens online in the resident portal after staff saves this lease form.
-            </p>
           </div>
+
+          <label>
+            <span>How will this tenant agree to the lease?</span>
+            <select id="direct-tenant-acceptance-method">
+              <option value="resident_portal">Resident accepts online in their portal later</option>
+              <option value="staff_witnessed">I'm showing them the lease now — mark as agreed</option>
+            </select>
+          </label>
+
+          <div id="direct-tenant-lease-document-preview" class="status-text hidden"></div>
+
+          <label id="direct-tenant-staff-confirm-wrap" class="checkbox-row hidden">
+            <input id="direct-tenant-staff-confirm" type="checkbox" />
+            I showed the tenant this building's lease agreement in person and they agreed to its terms.
+          </label>
+
+          <label id="direct-tenant-acceptance-note-wrap" class="hidden">
+            Note on in-person agreement (optional)
+            <textarea
+              id="direct-tenant-acceptance-note"
+              maxlength="280"
+              rows="2"
+              placeholder="e.g. Signed physical copy kept on file"
+            ></textarea>
+          </label>
+
+          <p class="status-text agreement-online-note">
+            Resident acceptance happens online in the resident portal after staff saves this lease form, unless you mark it as agreed in person above.
+          </p>
 
           <label>
             Note
@@ -2211,6 +2245,65 @@
             Upload ID evidence and set the lease date. The resident accepts the agreement online in their portal.
           </p>
           <button id="direct-tenant-submit-btn" type="submit">Create Tenant Agreement</button>
+        </form>
+      </aside>
+
+      <div id="lease-agreement-drawer-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="lease-agreement-drawer"
+        class="landlord-drawer hidden"
+        aria-label="Building lease agreement"
+      >
+        <header class="landlord-drawer-head">
+          <h2 id="lease-agreement-drawer-title">Lease Agreement</h2>
+          <button id="close-lease-agreement-drawer-btn" type="button" class="ghost-btn">
+            Close
+          </button>
+        </header>
+        <div class="package-card landlord-drawer-form">
+          <p id="lease-agreement-current-status" class="status-text">
+            Loading current lease agreement...
+          </p>
+          <label>
+            Upload / replace lease agreement (PDF)
+            <input id="lease-agreement-file" type="file" accept="application/pdf" />
+          </label>
+          <p id="lease-agreement-upload-status" class="status-text"></p>
+          <button id="lease-agreement-upload-btn" type="button">Upload Lease Agreement</button>
+        </div>
+      </aside>
+
+      <div id="edit-building-drawer-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="edit-building-drawer"
+        class="landlord-drawer hidden"
+        aria-label="Edit building details"
+      >
+        <header class="landlord-drawer-head">
+          <h2 id="edit-building-drawer-title">Edit Building</h2>
+          <button id="close-edit-building-drawer-btn" type="button" class="ghost-btn">
+            Close
+          </button>
+        </header>
+        <form id="edit-building-form" class="package-card landlord-drawer-form">
+          <label>
+            Building Name
+            <input id="edit-building-name" type="text" maxlength="120" required />
+          </label>
+          <label>
+            Address
+            <input id="edit-building-address" type="text" maxlength="200" required />
+          </label>
+          <label>
+            County
+            <input id="edit-building-county" type="text" maxlength="80" required />
+          </label>
+          <label>
+            Units
+            <input id="edit-building-units" type="number" min="1" step="1" />
+          </label>
+          <p id="edit-building-status" class="status-text"></p>
+          <button id="edit-building-submit-btn" type="submit">Save Changes</button>
         </form>
       </aside>
 

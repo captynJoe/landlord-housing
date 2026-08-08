@@ -50,7 +50,7 @@ test("delivers grouped push alerts and billing SMS when resident preferences all
   await service.deliverResidentNotifications([
     {
       id: "rent-1",
-      buildingId: "CAPTYN001",
+      buildingId: "RUMINJO001",
       houseNumber: "A-1",
       title: "Rent Reminder (D-1)",
       message: "Rent balance KSh 12,000 is due tomorrow.",
@@ -61,7 +61,7 @@ test("delivers grouped push alerts and billing SMS when resident preferences all
     },
     {
       id: "utility-1",
-      buildingId: "CAPTYN001",
+      buildingId: "RUMINJO001",
       houseNumber: "A-1",
       title: "Water Payment Received",
       message: "Water payment of KSh 800 has been applied.",
@@ -111,7 +111,7 @@ test("skips billing push and SMS for residents who are not verified", async () =
   await service.deliverResidentNotifications([
     {
       id: "rent-2",
-      buildingId: "CAPTYN001",
+      buildingId: "RUMINJO001",
       houseNumber: "B-2",
       title: "Rent Payment Received",
       message: "M-PESA payment ABC123 has been posted.",
@@ -161,14 +161,14 @@ test("skips SMS when landlord automatic message rules disable the notification k
   await service.deliverResidentNotifications([
     {
       id: "rent-overdue-1",
-      buildingId: "CAPTYN001",
+      buildingId: "RUMINJO001",
       houseNumber: "C-3",
       title: "Rent Overdue",
       message: "Rent is overdue.",
       level: "warning",
       source: "rent",
       createdAt: new Date().toISOString(),
-      dedupeKey: "rent-reminder-overdue-CAPTYN001-C-3-2026-05-29"
+      dedupeKey: "rent-reminder-overdue-RUMINJO001-C-3-2026-05-29"
     }
   ]);
 

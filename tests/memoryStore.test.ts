@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MemoryStore } from "../src/store/memoryStore.js";
 
-test("creates buildings with CAPTYN building IDs", async () => {
+test("creates buildings with RUMINJO building IDs", async () => {
   const store = new MemoryStore();
 
   const building = await store.createBuilding({
@@ -16,7 +16,7 @@ test("creates buildings with CAPTYN building IDs", async () => {
     }
   });
 
-  assert.match(building.id, /^CAPTYN-BLDG-\d{5}$/);
+  assert.match(building.id, /^RUMINJO-BLDG-\d{5}$/);
 });
 
 test("adds and resolves incidents", async () => {

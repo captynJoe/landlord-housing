@@ -1387,7 +1387,7 @@ export class UserAccountService {
   ): Promise<string> {
     const digits = phoneNumber.replace(/\D/g, "");
     const base = digits ? `resident.${digits}` : `resident.${randomBytes(4).toString("hex")}`;
-    const domain = "resident.captyn.local";
+    const domain = "resident.ruminjo.local";
 
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const suffix = attempt === 0 ? "" : `.${attempt}`;
@@ -2047,17 +2047,38 @@ export class UserAccountService {
       throw new Error("IDENTITY_DOCUMENT_REQUIRED");
     }
     const leaseStartDate = new Date(`${input.leaseStartDate}T00:00:00.000Z`);
-    const lifecycle = {
-      status: "awaiting_resident",
-      acceptanceMethod: "resident_portal",
-      acceptedAt: null,
-      acceptedByUserId: null,
-      acceptedByName: null,
-      acceptanceNote: null,
-      verifiedAt: null,
-      verifiedByUserId: null,
-      verifiedByName: null
-    };
+    const isStaffWitnessed = input.acceptanceMethod === "staff_witnessed";
+    if (isStaffWitnessed && input.staffWitnessConfirmed !== true) {
+      throw new Error("STAFF_WITNESS_CONFIRMATION_REQUIRED");
+    }
+    const lifecycleNow = new Date();
+    const staffActorUserId = normalizeOptionalText(actor?.userId) ?? null;
+    const staffActorName = normalizeOptionalText(actor?.fullName) ?? null;
+    const lifecycle = isStaffWitnessed
+      ? {
+          status: "verified",
+          acceptanceMethod: "staff_witnessed",
+          acceptedAt: lifecycleNow,
+          acceptedByUserId: staffActorUserId,
+          acceptedByName: staffActorName,
+          acceptanceNote:
+            normalizeOptionalText(input.acceptanceNote) ??
+            "Lease agreement shown and agreed to in person.",
+          verifiedAt: lifecycleNow,
+          verifiedByUserId: staffActorUserId,
+          verifiedByName: staffActorName
+        }
+      : {
+          status: "awaiting_resident",
+          acceptanceMethod: "resident_portal",
+          acceptedAt: null,
+          acceptedByUserId: null,
+          acceptedByName: null,
+          acceptanceNote: null,
+          verifiedAt: null,
+          verifiedByUserId: null,
+          verifiedByName: null
+        };
 
     if (!identityNumber) {
       throw new Error("IDENTITY_NUMBER_REQUIRED");
@@ -2713,6 +2734,68 @@ export class UserAccountService {
         verifiedAt: acceptedAt,
         verifiedByUserId: input.residentUserId,
         verifiedByName: input.residentName
+      }
+    });
+
+    return { acceptedAt: acceptedAt.toISOString(), status: "verified" as const };
+  }
+
+  async recordStaffWitnessedAgreement(
+    input: {
+      buildingId: string;
+      houseNumber: string;
+      acceptanceNote?: string;
+    },
+    actor: { userId?: string | null; fullName?: string | null }
+  ) {
+    const houseNumber = normalizeHouseNumber(input.houseNumber);
+    const tenancy = await this.prisma.tenancy.findFirst({
+      where: {
+        buildingId: input.buildingId,
+        active: true,
+        unit: {
+          houseNumber,
+          isActive: true
+        }
+      },
+      select: { id: true },
+      orderBy: { createdAt: "desc" }
+    });
+    if (!tenancy) {
+      throw new Error("ACTIVE_TENANCY_NOT_FOUND");
+    }
+
+    const agreement = await this.prisma.tenantAgreement.findUnique({
+      where: { tenancyId: tenancy.id },
+      select: { id: true, identityDocumentUrls: true, leaseStartDate: true }
+    });
+    if (!agreement) {
+      throw new Error("TENANT_AGREEMENT_NOT_FOUND");
+    }
+    if (
+      normalizeStringList(agreement.identityDocumentUrls).length === 0 ||
+      !agreement.leaseStartDate
+    ) {
+      throw new Error("TENANT_AGREEMENT_INCOMPLETE");
+    }
+
+    const staffUserId = normalizeOptionalText(actor.userId) ?? null;
+    const staffName = normalizeOptionalText(actor.fullName) ?? null;
+    const acceptedAt = new Date();
+    await this.prisma.tenantAgreement.update({
+      where: { id: agreement.id },
+      data: {
+        status: "verified",
+        acceptanceMethod: "staff_witnessed",
+        acceptedAt,
+        acceptedByUserId: staffUserId,
+        acceptedByName: staffName,
+        acceptanceNote:
+          normalizeOptionalText(input.acceptanceNote) ??
+          "Lease agreement shown and agreed to in person.",
+        verifiedAt: acceptedAt,
+        verifiedByUserId: staffUserId,
+        verifiedByName: staffName
       }
     });
 

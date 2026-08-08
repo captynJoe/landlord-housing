@@ -1,10 +1,10 @@
-# CAPTYN Housing Building Configuration Platform Plan
+# RUMINJO Housing Building Configuration Platform Plan
 
 ## Goal
 
-Make CAPTYN Housing configurable per building without turning the product into custom software for every landlord.
+Make RUMINJO Housing configurable per building without turning the product into custom software for every landlord.
 
-The platform should provide a fixed core and a strong menu of landlord-selectable options. A landlord should be able to enable, disable, and tune supported modules per building while CAPTYN keeps the data model, workflows, and audit surface consistent.
+The platform should provide a fixed core and a strong menu of landlord-selectable options. A landlord should be able to enable, disable, and tune supported modules per building while RUMINJO keeps the data model, workflows, and audit surface consistent.
 
 ## Current Baseline
 
@@ -191,7 +191,7 @@ Each building should be able to choose:
 - which packages are offered,
 - package prices,
 - hotspot profile names,
-- whether the building uses CAPTYN-managed provisioning.
+- whether the building uses RUMINJO-managed provisioning.
 
 This replaces the current global package registry.
 
@@ -420,4 +420,4 @@ Those features create a support and security burden far beyond the value needed 
 
 The correct direction is not to keep adding isolated switches.
 
-The correct direction is to make `building configuration` a first-class platform concept. CAPTYN should stay one product, but each landlord should be able to choose from a controlled menu of supported building behaviors.
+The correct direction is to make `building configuration` a first-class platform concept. RUMINJO should stay one product, but each landlord should be able to choose from a controlled menu of supported building behaviors.

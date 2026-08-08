@@ -7,7 +7,7 @@ test("syncLegacyPaymentAccess skips orphaned building records", async () => {
   const upsertCalls: string[] = [];
   const prisma = {
     building: {
-      findMany: async () => [{ id: "CAPTYN-BLDG-00002" }]
+      findMany: async () => [{ id: "RUMINJO-BLDG-00002" }]
     },
     buildingConfiguration: {
       upsert: (input: { where: { buildingId: string } }) => {
@@ -23,14 +23,14 @@ test("syncLegacyPaymentAccess skips orphaned building records", async () => {
   const service = new BuildingConfigurationService(prisma);
   await service.syncLegacyPaymentAccess([
     {
-      buildingId: "CAPTYN-BLDG-00002",
+      buildingId: "RUMINJO-BLDG-00002",
       rentEnabled: true,
       waterEnabled: true,
       electricityEnabled: true,
       updatedAt: "2026-05-10T00:00:00.000Z"
     },
     {
-      buildingId: "CAPTYN-BLDG-99999",
+      buildingId: "RUMINJO-BLDG-99999",
       rentEnabled: false,
       waterEnabled: false,
       electricityEnabled: false,
@@ -38,5 +38,5 @@ test("syncLegacyPaymentAccess skips orphaned building records", async () => {
     }
   ]);
 
-  assert.deepEqual(upsertCalls, ["CAPTYN-BLDG-00002"]);
+  assert.deepEqual(upsertCalls, ["RUMINJO-BLDG-00002"]);
 });

@@ -4,11 +4,11 @@ Last updated: 2026-05-19
 
 ## Repository Rule
 
-This project is independent from CAPTYN Housing.
+This project is independent from RUMINJO Housing.
 
 - Dedicated app path: `/home/captyn/landlord-housing`
 - Source blueprint only: `/home/captyn/captyn-housing`
-- Do not patch CAPTYN Housing for this landlord's custom behavior.
+- Do not patch RUMINJO Housing for this landlord's custom behavior.
 - Backport only generic bug fixes intentionally, after reviewing both apps.
 
 ## Branches

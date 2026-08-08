@@ -41,6 +41,24 @@ export const buildingMediaUpdateSchema = z.object({
   imageUrls: z.array(mediaAssetUrlSchema).max(6).default([])
 });
 
+export const buildingDetailsUpdateSchema = z
+  .object({
+    name: nonEmptyString.optional(),
+    address: nonEmptyString.optional(),
+    county: nonEmptyString.optional(),
+    cctvStatus: cctvStatusSchema.optional(),
+    units: z.number().int().positive().optional()
+  })
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.address !== undefined ||
+      value.county !== undefined ||
+      value.cctvStatus !== undefined ||
+      value.units !== undefined,
+    { message: "At least one field is required." }
+  );
+
 export const deleteBuildingSchema = z.object({
   confirmBuildingId: nonEmptyString.max(80).optional(),
   confirmationText: z.literal("DELETE").optional()
@@ -246,7 +264,8 @@ export const residentPushSubscriptionSchema = z.object({
 export const mediaUploadCategorySchema = z.enum([
   "support_evidence",
   "resident_identity",
-  "building_profile"
+  "building_profile",
+  "building_lease_document"
 ]);
 
 export const mediaUploadSignatureRequestSchema = z.object({
@@ -651,27 +670,52 @@ export const landlordTenantIntakeCreateSchema = z.object({
   note: optionalTenantTextSchema(280)
 });
 
-export const landlordDirectTenantCreateSchema = z.object({
-  buildingId: nonEmptyString.max(120),
-  houseNumber: nonEmptyString.max(24),
-  fullName: nonEmptyString.max(120),
-  phoneNumber: kenyaPhoneSchema,
-  identityType: tenantIdentityTypeSchema.default("national_id"),
-  identityNumber: nonEmptyString.min(4).max(80),
-  identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
-  leaseStartDate: z
-    .string()
-    .trim()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, {
-      message: "Use YYYY-MM-DD format."
-    }),
-  acceptanceMethod: z.literal("resident_portal").default("resident_portal"),
-  note: optionalTenantTextSchema(280)
-});
+export const landlordDirectTenantCreateSchema = z
+  .object({
+    buildingId: nonEmptyString.max(120),
+    houseNumber: nonEmptyString.max(24),
+    fullName: nonEmptyString.max(120),
+    phoneNumber: kenyaPhoneSchema,
+    identityType: tenantIdentityTypeSchema.default("national_id"),
+    identityNumber: nonEmptyString.min(4).max(80),
+    identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
+    leaseStartDate: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, {
+        message: "Use YYYY-MM-DD format."
+      }),
+    acceptanceMethod: z
+      .enum(["resident_portal", "staff_witnessed"])
+      .default("resident_portal"),
+    staffWitnessConfirmed: z.boolean().optional(),
+    acceptanceNote: optionalTenantTextSchema(280),
+    note: optionalTenantTextSchema(280)
+  })
+  .superRefine((value, ctx) => {
+    if (value.acceptanceMethod === "staff_witnessed" && value.staffWitnessConfirmed !== true) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["staffWitnessConfirmed"],
+        message:
+          "Confirm that the tenant reviewed the lease agreement in person before marking it agreed."
+      });
+    }
+  });
 
 export const residentAgreementAcceptSchema = z.object({
   confirmed: z.literal(true),
   acceptanceNote: optionalTenantTextSchema(500)
+});
+
+export const landlordAgreementWitnessSchema = z.object({
+  staffWitnessConfirmed: z.literal(true),
+  acceptanceNote: optionalTenantTextSchema(280)
+});
+
+export const landlordBuildingLeaseAgreementUpdateSchema = z.object({
+  documentUrl: z.string().trim().url().max(2_048),
+  documentFileName: nonEmptyString.max(200)
 });
 
 export const residentPasswordRecoveryRequestSchema = z.object({
@@ -1335,6 +1379,7 @@ export type LandlordAddBuildingHousesInput = z.infer<
   typeof landlordAddBuildingHousesSchema
 >;
 export type BuildingMediaUpdateInput = z.infer<typeof buildingMediaUpdateSchema>;
+export type BuildingDetailsUpdateInput = z.infer<typeof buildingDetailsUpdateSchema>;
 export type LandlordRemoveBuildingHouseInput = z.infer<
   typeof landlordRemoveBuildingHouseSchema
 >;
@@ -1420,6 +1465,10 @@ export type LandlordTenantIntakeCreateInput = z.infer<
 >;
 export type LandlordDirectTenantCreateInput = z.infer<
   typeof landlordDirectTenantCreateSchema
+>;
+export type LandlordAgreementWitnessInput = z.infer<typeof landlordAgreementWitnessSchema>;
+export type LandlordBuildingLeaseAgreementUpdateInput = z.infer<
+  typeof landlordBuildingLeaseAgreementUpdateSchema
 >;
 export type TenantAgreementUpsertInput = z.infer<typeof tenantAgreementUpsertSchema>;
 export type LandlordDecisionInput = z.infer<typeof landlordDecisionSchema>;

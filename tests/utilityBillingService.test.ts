@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { UtilityBillingService } from "../src/services/utilityBillingService.js";
 
-const BUILDING_A = "CAPTYN-BLDG-00001";
-const BUILDING_B = "CAPTYN-BLDG-00002";
+const BUILDING_A = "RUMINJO-BLDG-00001";
+const BUILDING_B = "RUMINJO-BLDG-00002";
 
 test("supports fixed-charge bill for house without meter", () => {
   const service = new UtilityBillingService();

@@ -16,12 +16,12 @@ import {
 
 test("admin credential updates accept email-style usernames", () => {
   const parsed = adminAccessCredentialUpdateSchema.parse({
-    username: "joe@captyn.admin",
+    username: "joe@ruminjo.admin",
     password: "DIYPCq18",
     confirmPassword: "DIYPCq18"
   });
 
-  assert.equal(parsed.username, "joe@captyn.admin");
+  assert.equal(parsed.username, "joe@ruminjo.admin");
 });
 
 test("resident phone login does not require building or house selection", () => {

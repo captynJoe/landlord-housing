@@ -1,37 +1,37 @@
-# CAPTYN HOUSING — Vision & Architecture  
-**Author: CAPTYN Joe (BYG)**  
+# RUMINJO HOUSING — Vision & Architecture
+**Author: RUMINJO Joe (BYG)**
 **Status: Exploratory → System Design → Company Bet**
 
 ---
 
 ## 0. Thesis
 
-Kenya does not have a housing market problem.  
+Kenya does not have a housing market problem.
 It has a **truth problem.**
 
-People are tired not because houses are unavailable —  
+People are tired not because houses are unavailable —
 but because reality is hidden behind agents, filters, and manipulation.
 
-CAPTYN Housing exists to make **reality visible, permanent, and computable.**
+RUMINJO Housing exists to make **reality visible, permanent, and computable.**
 
-We are not building another listing platform.  
+We are not building another listing platform.
 We are building a **memory layer for every building in Kenya.**
 
 If a house exists, it will have a digital history.
 
 ---
 
-## 1. What CAPTYN Housing Actually Is
+## 1. What RUMINJO Housing Actually Is
 
-CAPTYN Housing is a **Trust Infrastructure** that sits between:
+RUMINJO Housing is a **Trust Infrastructure** that sits between:
 
-- Tenants  
-- Landlords  
-- Buildings  
-- Security systems  
-- Complaints  
-- Evidence  
-- Time  
+- Tenants
+- Landlords
+- Buildings
+- Security systems
+- Complaints
+- Evidence
+- Time
 
 It is not about searching for a house.
 
@@ -43,16 +43,16 @@ It is about **knowing what you are walking into.**
 
 > **You will never rent blind again.**
 
-Every building listed on CAPTYN Housing must have:
+Every building listed on RUMINJO Housing must have:
 
-- Verified images  
-- Verified video walkthrough  
-- A public history  
-- A complaint record  
-- A maintenance record  
-- A security posture  
+- Verified images
+- Verified video walkthrough
+- A public history
+- A complaint record
+- A maintenance record
+- A security posture
 
-No hiding. No marketing illusion. No “come view.”  
+No hiding. No marketing illusion. No “come view.”
 You already saw it.
 
 ---
@@ -63,14 +63,14 @@ Traditional model:
 
 Tenant → chases → agent → chases → landlord → prays
 
-CAPTYN model:
+RUMINJO model:
 
 Landlord → pays → proves → maintains → competes for tenants
 
-If a landlord is not willing to be transparent,  
-they do not belong on CAPTYN.
+If a landlord is not willing to be transparent,
+they do not belong on RUMINJO.
 
-Listing is not a right.  
+Listing is not a right.
 It is a commitment.
 
 ---
@@ -79,17 +79,17 @@ It is a commitment.
 
 Every property becomes a living digital object:
 
-### Building ID: `CAPTYN-BLDG-XXXXX`
+### Building ID: `RUMINJO-BLDG-XXXXX`
 
 Each profile contains:
 
-### A. Current Reality  
-- 360° images of rooms  
-- Video walkthrough  
-- Floor plan (optional)  
-- Neighborhood context  
+### A. Current Reality
+- 360° images of rooms
+- Video walkthrough
+- Floor plan (optional)
+- Neighborhood context
 
-### B. Public Incident Log  
+### B. Public Incident Log
 Visible to all future tenants:
 
 Examples:
@@ -98,7 +98,7 @@ Examples:
 - “Landlord responsive to repairs”
 - “Electricity tripped twice in July”
 
-This is not slander.  
+This is not slander.
 This is institutional memory.
 
 ---
@@ -108,15 +108,15 @@ This is institutional memory.
 When a tenant vacates:
 
 Landlord MUST upload:
-- Fresh images  
-- Fresh video  
-- Any structural changes  
-- Any damages  
-- Any repairs  
+- Fresh images
+- Fresh video
+- Any structural changes
+- Any damages
+- Any repairs
 
 The system preserves:
-- Before state  
-- After state  
+- Before state
+- After state
 
 So future tenants see **how rooms age over time.**
 
@@ -126,18 +126,18 @@ So future tenants see **how rooms age over time.**
 
 Some buildings will qualify for:
 
-### CAPTYN CCTV STANDARD
+### RUMINJO CCTV STANDARD
 
 Minimum requirements:
-- Gate camera  
-- Corridor camera  
-- Optional parking camera  
+- Gate camera
+- Corridor camera
+- Optional parking camera
 
 Badge displayed as:
 
-> 🟢 **CCTV Protected — CAPTYN Verified**
+> 🟢 **CCTV Protected — RUMINJO Verified**
 
-This is not decoration.  
+This is not decoration.
 It is an operational guarantee.
 
 ---
@@ -146,5 +146,5 @@ It is an operational guarantee.
 
 When a tenant reports theft:
 
-1. Tenant files incident in app  
+1. Tenant files incident in app
 2. System creates case:
