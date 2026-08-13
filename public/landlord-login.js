@@ -4,6 +4,8 @@ const loginFormEl = document.getElementById("landlord-login-form");
 const identifierEl = document.getElementById("landlord-email");
 const ownerIdentifierLabelEl = document.getElementById("owner-identifier-label");
 const passwordEl = document.getElementById("landlord-password");
+const staffBuildingWrapEl = document.getElementById("staff-building-wrap");
+const staffBuildingEl = document.getElementById("staff-building");
 const loginBtnEl = document.getElementById("landlord-login-btn");
 const loginStatusEl = document.getElementById("login-status");
 const loginErrorEl = document.getElementById("login-error");
@@ -29,8 +31,11 @@ const landlordForgotIdentifierEl = document.getElementById(
   "landlord-forgot-identifier"
 );
 const landlordForgotBtnEl = document.getElementById("landlord-forgot-btn");
+const landlordForgotToggleEl = document.getElementById("landlord-forgot-toggle");
 
 let managerMode = "";
+let staffBuildingsLoaded = false;
+let staffBuildingsLoading = false;
 
 function setStatus(message) {
   loginStatusEl.textContent = String(message ?? "");
@@ -69,6 +74,7 @@ function setManagerMode(nextMode) {
   const usesOwnerFields = managerMode === "landlord" || managerMode === "staff";
 
   ownerLoginFieldsEl?.classList.toggle("hidden", !usesOwnerFields);
+  setStaffBuildingChooserVisibility();
 
   managerModeButtons.forEach((button) => {
     const active = button instanceof HTMLElement && button.dataset.managerMode === managerMode;
@@ -79,7 +85,7 @@ function setManagerMode(nextMode) {
   if (ownerIdentifierLabelEl instanceof HTMLElement) {
     ownerIdentifierLabelEl.textContent =
       managerMode === "staff"
-        ? "Staff Email or Phone"
+        ? "Staff Email, Phone, or Landlord Username"
         : "Email, Phone, or Recovery Username";
   }
 
@@ -99,7 +105,7 @@ function setManagerMode(nextMode) {
   const statusMessages = {
     landlord:
       "Landlord sign-in accepts email, phone, or the recovery username for recovery access.",
-    staff: "Staff sign-in uses the email or phone number issued by the landlord."
+    staff: "Staff sign-in uses issued staff email/phone, or landlord credentials with a building check-in."
   };
   setStatus(statusMessages[managerMode] ?? "Choose Landlord or Staff to continue.");
   clearAllErrors();
@@ -139,7 +145,7 @@ function normalizeStaffSignInError(error) {
   const message = error.message || "";
 
   if (/invalid email/i.test(message)) {
-    return "Staff sign-in accepts email or phone number. Choose Landlord for recovery username access.";
+    return "Use a staff email, staff phone number, or landlord username.";
   }
 
   if (/incorrect password/i.test(message)) {
@@ -151,7 +157,7 @@ function normalizeStaffSignInError(error) {
   }
 
   if (error.status === 401) {
-    return "Check the staff email, phone, or password.";
+    return "Check the staff email, phone, landlord username, password, or building.";
   }
 
   return message;
@@ -186,6 +192,69 @@ function looksLikeEmail(value) {
 
 function looksLikeKenyaPhone(value) {
   return /^(\+254|254|0)\d{9}$/.test(String(value ?? "").trim().replace(/[\s-]/g, ""));
+}
+
+function isLegacyStaffUsername(identifier) {
+  const normalized = String(identifier ?? "").trim();
+  return Boolean(normalized && !looksLikeEmail(normalized) && !looksLikeKenyaPhone(normalized));
+}
+
+async function loadStaffBuildingOptions() {
+  if (!(staffBuildingEl instanceof HTMLSelectElement) || staffBuildingsLoaded || staffBuildingsLoading) {
+    return;
+  }
+
+  staffBuildingsLoading = true;
+  staffBuildingEl.replaceChildren(new Option("Loading buildings...", ""));
+
+  try {
+    const payload = await requestJson("/api/buildings", { cache: "no-store" });
+    const buildings = Array.isArray(payload.data) ? payload.data : [];
+    staffBuildingEl.replaceChildren();
+
+    if (!buildings.length) {
+      staffBuildingEl.append(new Option("No buildings available", ""));
+      staffBuildingEl.disabled = true;
+      return;
+    }
+
+    staffBuildingEl.disabled = false;
+    staffBuildingEl.append(new Option("Choose building", ""));
+    buildings
+      .slice()
+      .sort((a, b) =>
+        String(a?.name ?? "").localeCompare(String(b?.name ?? ""), undefined, {
+          numeric: true,
+          sensitivity: "base"
+        })
+      )
+      .forEach((building) => {
+        const label = [building?.name, building?.county, building?.address]
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean)
+          .join(" - ");
+        staffBuildingEl.append(
+          new Option(label || String(building?.id ?? "Building"), String(building?.id ?? ""))
+        );
+      });
+    staffBuildingsLoaded = true;
+  } catch (_error) {
+    staffBuildingEl.replaceChildren(new Option("Unable to load buildings", ""));
+    staffBuildingEl.disabled = true;
+  } finally {
+    staffBuildingsLoading = false;
+  }
+}
+
+function setStaffBuildingChooserVisibility() {
+  const visible = managerMode === "staff" && isLegacyStaffUsername(identifierEl?.value);
+  staffBuildingWrapEl?.classList.toggle("hidden", !visible);
+  if (staffBuildingEl instanceof HTMLSelectElement) {
+    staffBuildingEl.required = visible;
+  }
+  if (visible) {
+    void loadStaffBuildingOptions();
+  }
 }
 
 function isManagementPortalRole(role) {
@@ -254,6 +323,7 @@ async function handleSignedInRole(role, identity = {}) {
 function showPermanentPasswordForm(role, identity = {}) {
   loginFormEl?.classList.add("hidden");
   landlordForgotFormEl?.classList.add("hidden");
+  landlordForgotToggleEl?.classList.add("hidden");
   landlordPasswordChangeFormEl?.classList.remove("hidden");
 
   const label =
@@ -386,18 +456,19 @@ async function signInStaff() {
   const password = passwordEl.value.trim();
 
   if (!identifier) {
-    showPanelError(loginErrorEl, "Provide staff email or phone number.", {
+    showPanelError(loginErrorEl, "Provide staff email, phone number, or landlord username.", {
       reveal: true
     });
     return;
   }
 
-  if (!looksLikeEmail(identifier) && !looksLikeKenyaPhone(identifier)) {
-    showPanelError(
-      loginErrorEl,
-      "Staff sign-in uses email or phone. Choose Landlord if you need recovery username access.",
-      { reveal: true }
-    );
+  const legacyStaffUsername = isLegacyStaffUsername(identifier);
+  const buildingId = staffBuildingEl instanceof HTMLSelectElement ? staffBuildingEl.value.trim() : "";
+
+  if (legacyStaffUsername && !buildingId) {
+    showPanelError(loginErrorEl, "Choose the building to check in before signing in.", {
+      reveal: true
+    });
     return;
   }
 
@@ -410,12 +481,16 @@ async function signInStaff() {
   setStatus("Signing in as staff...");
 
   try {
-    const payload = await requestJson("/api/auth/login", {
+    const url = legacyStaffUsername ? "/api/auth/landlord/login" : "/api/auth/login";
+    const body = legacyStaffUsername
+      ? { username: identifier, password, buildingId }
+      : identifierLoginPayload(identifier, password);
+    const payload = await requestJson(url, {
       method: "POST",
       headers: {
         "content-type": "application/json"
       },
-      body: JSON.stringify(identifierLoginPayload(identifier, password))
+      body: JSON.stringify(body)
     });
 
     const role = payload.data?.role;
@@ -543,8 +618,20 @@ landlordForgotFormEl.addEventListener("submit", (event) => {
   void requestPasswordReset(event);
 });
 
+landlordForgotToggleEl?.addEventListener("click", () => {
+  const willShow = landlordForgotFormEl?.classList.contains("hidden");
+  landlordForgotFormEl?.classList.toggle("hidden", !willShow);
+  if (willShow) {
+    landlordForgotIdentifierEl?.focus({ preventScroll: true });
+  }
+});
+
 landlordPasswordChangeFormEl?.addEventListener("submit", (event) => {
   void submitPermanentPasswordChange(event);
+});
+
+identifierEl?.addEventListener("input", () => {
+  setStaffBuildingChooserVisibility();
 });
 
 managerModeButtons.forEach((button) => {

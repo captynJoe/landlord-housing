@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JK Flats Landlord Sign-In</title>
+    <title>Ruminjo | Landlord &amp; Staff Sign-In</title>
+    <meta name="apple-mobile-web-app-title" content="Ruminjo" />
+    <meta
+      name="description"
+      content="Sign in to Ruminjo to manage buildings, tenants, leases, and billing."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -20,25 +25,28 @@
     </noscript>
     <link rel="stylesheet" href="/admin.css?v=20260529b" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260519a" />
+    <link rel="stylesheet" href="/landlord-modern.css?v=20260813a" />
+    <link rel="stylesheet" href="/landlord-login-modern.css?v=20260813a" />
   </head>
   <body>
-    <div class="backdrop"></div>
-    <main class="shell">
-      <header class="hero">
+    <main class="login-shell">
+      <div class="login-brand">
+        <span class="login-brand-mark" aria-hidden="true">R</span>
         <div>
-          <p class="tag">JK Flats Operations</p>
-          <h1>Landlord Sign-In</h1>
-          <p class="subtitle">
+          <p class="login-brand-name">Ruminjo</p>
+          <p class="login-brand-tagline">Property &amp; Tenant Operations</p>
+        </div>
+      </div>
+
+      <section class="panel login-card">
+        <div class="login-card-head">
+          <h1>Landlord &amp; Staff Sign-In</h1>
+          <p class="status-text">
             Choose your access type, then sign in with the details assigned to that role.
           </p>
         </div>
-        <a href="/" class="home-link">Back to Portal</a>
-      </header>
 
-      <section class="panel auth-panel" style="grid-template-columns: 1fr; max-width: 700px;">
-        <form id="landlord-login-form" class="package-card">
-          <p class="status-text">Who is logging in?</p>
-
+        <form id="landlord-login-form" class="package-card login-form">
           <div class="auth-mode-toggle" role="tablist" aria-label="Landlord or staff sign-in type">
             <button
               id="manager-mode-landlord"
@@ -79,6 +87,12 @@
                 placeholder="Your password"
               />
             </label>
+            <label id="staff-building-wrap" class="hidden">
+              <span>Building to Check In</span>
+              <select id="staff-building">
+                <option value="">Choose building</option>
+              </select>
+            </label>
           </section>
 
           <button id="landlord-login-btn" type="submit">Choose Login Type</button>
@@ -90,8 +104,9 @@
             tabindex="-1"
           ></section>
         </form>
-        <form id="landlord-password-change-form" class="package-card hidden">
-          <h2 style="margin: 0;">Set Permanent Password</h2>
+
+        <form id="landlord-password-change-form" class="package-card login-form hidden">
+          <h2>Set Permanent Password</h2>
           <p class="status-text">
             Temporary password accepted. Set and confirm a permanent password to continue.
           </p>
@@ -128,12 +143,15 @@
             tabindex="-1"
           ></section>
         </form>
-        <p id="login-status" class="status-text">Session not established.</p>
-      </section>
 
-      <section class="panel auth-panel" style="grid-template-columns: 1fr; max-width: 700px; align-items: start;">
-        <form id="landlord-forgot-form" class="package-card">
-          <h2 style="margin: 0;">Forgot Password</h2>
+        <p id="login-status" class="status-text login-status">Session not established.</p>
+
+        <button id="landlord-forgot-toggle" type="button" class="login-forgot-toggle">
+          Forgot password?
+        </button>
+
+        <form id="landlord-forgot-form" class="package-card login-form login-forgot-form hidden">
+          <h2>Forgot Password</h2>
           <p class="status-text">
             Enter email or phone. Management will verify identity and issue a temporary password.
           </p>
@@ -149,17 +167,22 @@
             />
           </label>
           <button id="landlord-forgot-btn" type="submit">Request Reset</button>
+          <section
+            id="landlord-secondary-error"
+            class="error-box hidden inline-error-box"
+            role="alert"
+            aria-live="polite"
+            tabindex="-1"
+          ></section>
         </form>
-        <section
-          id="landlord-secondary-error"
-          class="error-box hidden inline-error-box"
-          role="alert"
-          aria-live="polite"
-          tabindex="-1"
-        ></section>
       </section>
+
+      <div class="login-footer">
+        <a href="/" class="home-link">Back to Portal</a>
+        <p>Ruminjo Property Operations &middot; Secure staff access</p>
+      </div>
     </main>
 
-    <script type="module" src="/landlord-login.js?v=20260726a"></script>
+    <script type="module" src="/landlord-login.js?v=20260813a"></script>
   </body>
 </html>

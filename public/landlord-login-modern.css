@@ -1,0 +1,192 @@
+/* Page-specific refinements for the landlord/staff sign-in screen.
+   Layers on top of admin.css / dedicated-theme.css / landlord-modern.css,
+   reusing the same --lh-* tokens defined in landlord-modern.css. */
+
+body {
+  min-height: 100vh;
+  display: flex;
+}
+
+.login-shell {
+  width: min(100%, 460px);
+  margin: auto;
+  padding: 48px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.login-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--lh-primary, #166c5f), var(--lh-primary-dark, #0f4f47));
+  box-shadow: var(--lh-shadow-md, 0 14px 34px rgba(23, 32, 51, 0.1));
+  color: #fff;
+  font-family: "Fraunces", Inter, "Segoe UI", serif;
+  font-size: 1.32rem;
+  font-weight: 700;
+}
+
+.login-brand-name {
+  margin: 0;
+  color: var(--lh-ink, #172033);
+  font-family: "Fraunces", Inter, "Segoe UI", serif;
+  font-size: 1.46rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+
+.login-brand-tagline {
+  margin: 2px 0 0;
+  color: var(--lh-muted, #667085);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.login-card {
+  width: 100%;
+  margin-top: 0 !important;
+  padding: 26px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-card-head {
+  text-align: left;
+}
+
+.login-card-head h1 {
+  margin: 0 0 6px;
+  color: var(--lh-ink, #172033);
+  font-family: "Fraunces", Inter, "Segoe UI", serif;
+  font-size: 1.34rem;
+  line-height: 1.25;
+}
+
+.login-card-head .status-text {
+  margin: 0;
+}
+
+.login-form {
+  gap: 12px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.login-form h2 {
+  margin: 0;
+  color: var(--lh-ink, #172033);
+  font-size: 1.02rem;
+}
+
+.login-status {
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.login-forgot-toggle {
+  align-self: center;
+  margin-top: 4px;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--lh-blue, #275d8f) !important;
+  font-size: 0.84rem;
+  font-weight: 700 !important;
+  min-height: auto !important;
+  padding: 4px 6px !important;
+  box-shadow: none !important;
+}
+
+.login-forgot-toggle:hover {
+  text-decoration: underline;
+}
+
+.login-forgot-form {
+  margin-top: 4px;
+  border-top: 1px dashed var(--lh-line, #d9e1ea) !important;
+  padding-top: 16px !important;
+}
+
+/* landlord-modern.css forces every <button> to a solid green fill for the
+   app's primary-action styling; the inactive sign-in-mode tab needs to stay
+   visually recessive so the active tab reads as selected. */
+.auth-mode-toggle button:not(.active) {
+  background: transparent !important;
+  color: var(--lh-muted, #667085) !important;
+  box-shadow: none !important;
+}
+
+.auth-mode-toggle button:not(.active) span {
+  color: var(--lh-muted, #667085) !important;
+}
+
+.auth-mode-toggle button.active {
+  background: var(--lh-primary, #166c5f) !important;
+}
+
+.auth-mode-toggle button.active span {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* Same clobbering issue for the small password show/hide icon button. */
+.password-toggle-wrap .password-toggle-btn {
+  min-height: auto !important;
+  width: 34px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  border: 1px solid var(--lh-line-strong, #c4cfdc) !important;
+  background: #fff !important;
+  color: var(--lh-ink, #172033) !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+
+.login-footer {
+  width: 100%;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.login-footer .home-link {
+  min-height: auto;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+}
+
+.login-footer p {
+  margin: 0;
+  color: var(--lh-muted, #667085);
+  font-size: 0.74rem;
+}
+
+@media (max-width: 420px) {
+  .login-shell {
+    padding: 32px 14px 24px;
+  }
+
+  .login-card {
+    padding: 20px !important;
+  }
+}
