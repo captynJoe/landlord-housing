@@ -4,11 +4,12 @@ import type {
   AdminLoginInput
 } from "../validation/schemas.js";
 
-export type AdminRole = "landlord" | "admin" | "root_admin";
+export type AdminRole = "staff" | "landlord" | "admin" | "root_admin";
 
 export interface AdminSession {
   token: string;
   role: AdminRole;
+  assignedBuildingId?: string;
   createdAt: string;
   expiresAt: string;
 }
@@ -131,6 +132,7 @@ export class AdminAuthService {
       this.sessions.set(session.token, {
         token: session.token,
         role: session.role,
+        assignedBuildingId: normalize(session.assignedBuildingId) || undefined,
         createdAt: session.createdAt,
         expiresAt: session.expiresAt
       });
@@ -145,6 +147,7 @@ export class AdminAuthService {
     const accessToken = normalize(input.accessToken);
     const username = normalize(input.username);
     const password = normalize(input.password);
+    const assignedBuildingId = normalize(input.buildingId);
 
     if (accessToken) {
       if (this.rootAdminToken && accessToken === this.rootAdminToken) {
@@ -172,7 +175,7 @@ export class AdminAuthService {
         username === this.landlordUsername &&
         password === this.landlordPassword
       ) {
-        role = "landlord";
+        role = assignedBuildingId ? "staff" : "landlord";
       }
     }
 
@@ -184,6 +187,7 @@ export class AdminAuthService {
     const session: AdminSession = {
       token: createToken("admin"),
       role,
+      assignedBuildingId: role === "staff" ? assignedBuildingId : undefined,
       createdAt,
       expiresAt: addHours(nowMs(), this.sessionTtlHours)
     };
@@ -230,6 +234,7 @@ export class AdminAuthService {
   hasRole(session: AdminSession, minimumRole: AdminRole): boolean {
     if (minimumRole === "landlord") {
       return (
+        session.role === "staff" ||
         session.role === "landlord" ||
         session.role === "admin" ||
         session.role === "root_admin"
