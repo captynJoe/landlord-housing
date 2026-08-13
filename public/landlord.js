@@ -13,6 +13,7 @@ import {
 } from "./portal-branding.js?v=20260716b";
 
 const LANDLORD_SW_URL = "/resident-sw.js?v=20260525a";
+const ROOM_ACCOUNT_FLASH_KEY = "landlord-room-account-flash";
 const authStatusEl = document.getElementById("auth-status");
 const landlordRoleEl = document.getElementById("landlord-role");
 const landlordBrandTagEl = document.getElementById("landlord-brand-tag");
@@ -1948,7 +1949,7 @@ function openDirectTenantDrawer(prefill = {}) {
 
   setDirectTenantStatus(
     isStaffRole()
-      ? "Upload ID evidence and set the lease date. The resident accepts the agreement online in their portal."
+      ? "Upload ID evidence, open the lease PDF, set the lease date, and confirm the tenant reviewed it."
       : "Create a tenant intake for staff to complete lease details and documents."
   );
   clearError();
@@ -4119,6 +4120,20 @@ function buildPrintableTenantAgreementHtml(resident, agreementPayload) {
   const tenantPhone = agreementResident.phone || resident?.residentPhone || "-";
   const buildingName = resident?.buildingName || getBuildingNameById(resident?.buildingId) || resident?.buildingId || "-";
   const documents = normalizeDocumentUrls(agreement.identityDocumentUrls);
+  const leaseAgreement = agreementPayload?.leaseAgreement ?? null;
+  const leaseDocumentUrl =
+    leaseAgreement && typeof leaseAgreement === "object" ? String(leaseAgreement.documentUrl || "").trim() : "";
+  const leaseDocumentName =
+    leaseAgreement && typeof leaseAgreement === "object"
+      ? String(leaseAgreement.documentFileName || "Mounted lease agreement").trim()
+      : "";
+  const leaseDocumentHtml = leaseDocumentUrl
+    ? '<a href="' +
+      escapeHtml(leaseDocumentUrl) +
+      '" target="_blank" rel="noreferrer">' +
+      escapeHtml(leaseDocumentName || "Mounted lease agreement") +
+      "</a>"
+    : "No mounted lease document";
   const row = (label, value) => "<tr><th>" + escapeHtml(label) + "</th><td>" + value + "</td></tr>";
   const textValue = (value, fallback = "-") => escapeHtml(String(value ?? "").trim() || fallback);
   const moneyValue = (value) => Number.isFinite(Number(value)) ? escapeHtml(formatCurrency(Number(value))) : "-";
@@ -4128,8 +4143,8 @@ function buildPrintableTenantAgreementHtml(resident, agreementPayload) {
     "<style>body{font-family:Arial,sans-serif;margin:32px;color:#172033;}h1{margin:0 0 4px;}p{margin:4px 0 16px;}table{width:100%;border-collapse:collapse;margin-top:16px;}th,td{border:1px solid #cfd7e6;padding:10px;text-align:left;vertical-align:top;}th{width:32%;background:#f4f7fb}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:42px}.line{border-top:1px solid #172033;padding-top:8px}.documents a{display:block;margin:4px 0}@media print{button{display:none}}</style>",
     "</head><body>",
     '<button onclick="window.print()">Print</button>',
-    "<h1>Tenant Agreement Snapshot</h1>",
-    "<p>Generated from the landlord housing manager.</p>",
+    "<h1>Room Lease Agreement Summary</h1>",
+    "<p>Generated from the landlord housing manager. Keep this autofilled room summary with the mounted lease PDF.</p>",
     "<table><tbody>",
     row("Building", textValue(buildingName)),
     row("House / Room", textValue(resident?.houseNumber)),
@@ -4141,7 +4156,10 @@ function buildPrintableTenantAgreementHtml(resident, agreementPayload) {
     row("Work / School", textValue([agreement.organizationName, agreement.organizationLocation].filter(Boolean).join(" • "))),
     row("Sponsor / Guardian", textValue([agreement.sponsorName, agreement.sponsorPhone].filter(Boolean).join(" • "))),
     row("Emergency Contact", textValue([agreement.emergencyContactName, agreement.emergencyContactPhone].filter(Boolean).join(" • "))),
-    row("Lease", textValue([agreement.leaseStartDate || "open", agreement.leaseEndDate || "ongoing"].join(" -> "))),
+    row("Lease Date", textValue(agreement.leaseStartDate || "Not recorded")),
+    row("Lease Period", textValue([agreement.leaseStartDate || "open", agreement.leaseEndDate || "ongoing"].join(" -> "))),
+    row("Mounted Lease PDF", leaseDocumentHtml),
+    row("Agreement Status", textValue([agreement.acceptanceMethod || "not recorded", agreement.acceptedAt].filter(Boolean).join(" at "))),
     row("Monthly Rent", moneyValue(agreement.monthlyRentKsh)),
     row("Deposit", moneyValue(agreement.depositKsh)),
     row("Deposit Paid", moneyValue(agreement.depositPaidKsh)),
@@ -9986,8 +10004,7 @@ function renderResidentDrawer(resident) {
       </button>
     </div>
     <p class="status-text">
-      This tenant hasn't accepted the lease agreement online yet. Use this if you showed them the
-      lease in the office and they agreed to its terms.
+      Use this when staff showed the mounted lease agreement to the tenant in person and the tenant agreed to proceed.
     </p>
   `
       : "";
@@ -12084,7 +12101,6 @@ function getDirectTenantLeaseCompletionElements() {
     directTenantIdNumberEl?.closest("label"),
     directTenantDocumentsEl?.closest("label"),
     directTenantDocumentPreviewEl,
-    directTenantAcceptanceMethodEl?.closest("label"),
     directTenantStaffConfirmWrapEl,
     directTenantAcceptanceNoteWrapEl
   ].filter((item) => item instanceof HTMLElement);
@@ -12107,21 +12123,15 @@ function syncDirectTenantDrawerMode() {
   if (directTenantIdNumberEl instanceof HTMLInputElement) {
     directTenantIdNumberEl.required = staffMode;
   }
-  if (directTenantAcceptanceMethodEl instanceof HTMLSelectElement) {
-    directTenantAcceptanceMethodEl.required = staffMode;
-  }
   syncDirectTenantAcceptanceFields();
 }
 
 function isDirectTenantStaffWitnessed() {
-  return (
-    directTenantAcceptanceMethodEl instanceof HTMLSelectElement &&
-    directTenantAcceptanceMethodEl.value === "staff_witnessed"
-  );
+  return isStaffRole();
 }
 
 function syncDirectTenantAcceptanceFields() {
-  const staffWitnessed = isStaffRole() && isDirectTenantStaffWitnessed();
+  const staffWitnessed = isDirectTenantStaffWitnessed();
 
   if (directTenantStaffConfirmWrapEl instanceof HTMLElement) {
     directTenantStaffConfirmWrapEl.classList.toggle("hidden", !staffWitnessed);
@@ -12174,9 +12184,7 @@ async function loadDirectTenantLeaseDocumentPreview() {
     const documentUrl =
       agreementPolicy && typeof agreementPolicy === "object" ? agreementPolicy.documentUrl : null;
 
-    if (!(directTenantAcceptanceMethodEl instanceof HTMLSelectElement) ||
-      directTenantAcceptanceMethodEl.value !== "staff_witnessed" ||
-      String(directTenantBuildingEl?.value || "").trim() !== buildingId) {
+    if (!isStaffRole() || String(directTenantBuildingEl?.value || "").trim() !== buildingId) {
       return;
     }
 
@@ -12193,11 +12201,7 @@ async function loadDirectTenantLeaseDocumentPreview() {
     link.textContent = `Open ${agreementPolicy.documentFileName || "lease agreement"} to show the tenant`;
     directTenantLeaseDocumentPreviewEl.replaceChildren(link);
   } catch (error) {
-    if (
-      directTenantAcceptanceMethodEl instanceof HTMLSelectElement &&
-      directTenantAcceptanceMethodEl.value === "staff_witnessed" &&
-      String(directTenantBuildingEl?.value || "").trim() === buildingId
-    ) {
+    if (isStaffRole() && String(directTenantBuildingEl?.value || "").trim() === buildingId) {
       directTenantLeaseDocumentPreviewEl.textContent =
         "Unable to load this building's lease agreement.";
     }
@@ -12252,8 +12256,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
   const identityNumber = String(directTenantIdNumberEl?.value || "").trim();
   const leaseStartDate = String(directTenantLeaseStartEl?.value || "").trim();
   const staffMode = isStaffRole();
-  const acceptanceMethod =
-    staffMode && isDirectTenantStaffWitnessed() ? "staff_witnessed" : "resident_portal";
+  const acceptanceMethod = staffMode ? "staff_witnessed" : "resident_portal";
   const staffWitnessConfirmed =
     acceptanceMethod === "staff_witnessed" &&
     directTenantStaffConfirmEl instanceof HTMLInputElement &&
@@ -12354,7 +12357,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
         : [];
       const identityDocumentUrls = normalizeDocumentUrls(uploadedDocumentUrls);
 
-      const payload = await requestJson("/api/landlord/residents/direct", {
+      const payload = await requestJson("/api/landlord/tenant-agreement-drafts", {
         method: "POST",
         headers: {
           "content-type": "application/json"
@@ -12376,71 +12379,25 @@ directTenantFormEl?.addEventListener("submit", (event) => {
       });
 
       const data = payload.data ?? {};
-      const smsStatus = data.sms?.status;
-      const smsText =
-        smsStatus === "sent"
-          ? " SMS sent."
-          : smsStatus === "failed"
-            ? " SMS failed; share the sign-in details manually."
-            : " SMS is not configured; share the sign-in details manually.";
-      const buildingName =
-        data.building?.name || getBuildingDisplayNameById(buildingId, "selected building");
-      const residentName = data.tenant?.fullName || fullName;
-      const resolvedBillingStartDate = String(data.billingStartDate || leaseStartDate || "").trim();
-      const billingPauseText = data.billingHold?.active
-        ? ` Billing is paused until ${resolvedBillingStartDate}.`
-        : ` Billing starts ${resolvedBillingStartDate}.`;
-
-      if (data.messageCenter) {
-        setMessageCenterData(data.messageCenter);
-        renderMessageCenter();
-      }
-
-      if (directTenantFormEl instanceof HTMLFormElement) {
-        directTenantFormEl.reset();
-      }
-      if (directTenantBuildingEl instanceof HTMLSelectElement) {
-        syncDirectTenantBuildingOptions(buildingId);
-        directTenantBuildingEl.value = buildingId;
-      }
-      syncDirectTenantRoomOptions();
-      if (directTenantLeaseStartEl instanceof HTMLInputElement) {
-        directTenantLeaseStartEl.value = new Date().toISOString().slice(0, 10);
-      }
-      if (directTenantAcceptanceMethodEl instanceof HTMLSelectElement) {
-        directTenantAcceptanceMethodEl.value = "resident_portal";
-      }
-      if (directTenantStaffConfirmEl instanceof HTMLInputElement) {
-        directTenantStaffConfirmEl.checked = false;
-      }
-      if (directTenantAcceptanceNoteEl instanceof HTMLTextAreaElement) {
-        directTenantAcceptanceNoteEl.value = "";
-      }
-      syncDirectTenantDrawerMode();
-      if (directTenantIdTypeEl instanceof HTMLSelectElement) {
-        directTenantIdTypeEl.value = "national_id";
-      }
-      if (directTenantDocumentsEl instanceof HTMLInputElement) {
-        directTenantDocumentsEl.value = "";
-      }
-      syncDirectTenantDocumentPreview();
+      const buildingName = getBuildingDisplayNameById(buildingId, "selected building");
+      const residentName = data.draft?.fullName || fullName;
 
       closeDirectTenantDrawer();
-      setStatus(
-        `${residentName} added to ${buildingName} ${data.houseNumber || houseNumber}. They can sign in with their phone number and ID number as the temporary password.${billingPauseText}${smsText}`
-      );
-      await Promise.all([
-        loadBuildings(),
-        loadApplications(),
-        loadRentStatus(),
-        loadRegistryRows(),
-        loadMessageCenter()
-      ]);
-      await loadResidents();
+
+      try {
+        sessionStorage.setItem(
+          ROOM_ACCOUNT_FLASH_KEY,
+          `Draft saved for ${residentName} in ${buildingName} ${data.houseNumber || houseNumber}. Add the Lease End date on the Lease Form below to finish creating the tenant.`
+        );
+      } catch (_error) {
+        // sessionStorage unavailable (private browsing, etc.) — the room account page still loads fine without the flash message.
+      }
+
+      openRoomAccountPage(buildingId, data.houseNumber || houseNumber);
     } catch (error) {
       setDirectTenantStatus(
         isStaffRole()
-          ? "Upload ID evidence and set the lease date. The resident accepts the agreement online in their portal."
+          ? "Upload ID evidence, open the lease PDF, set the lease date, and confirm the tenant reviewed it."
           : "Create a tenant intake for staff to complete lease details and documents."
       );
       handleLandlordError(error, "Failed to create tenant agreement.");
@@ -14067,7 +14024,7 @@ applicationsBodyEl.addEventListener("click", (event) => {
       phoneNumber: target.dataset.phone,
       note: target.dataset.note
     });
-    setDirectTenantStatus("Complete the lease form and upload ID evidence. The resident accepts the agreement online in their portal.");
+    setDirectTenantStatus("Complete the lease form, upload ID evidence, open the lease PDF, and confirm the tenant reviewed it.");
     return;
   }
 

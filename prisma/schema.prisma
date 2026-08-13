@@ -97,6 +97,7 @@ model Building {
   houseUnits                 HouseUnit[]
   tenantApplications         TenantApplication[]
   tenantAgreements           TenantAgreement[]
+  tenantAgreementDrafts      TenantAgreementDraft[]
   tenancies                  Tenancy[]
   roomAccountAuditEvents     RoomAccountAuditEvent[]
   roomBillingHolds           RoomBillingHold[]
@@ -408,6 +409,41 @@ model TenantAgreement {
   @@index([buildingId, houseNumber, updatedAt])
   @@index([residentUserId])
   @@index([status, updatedAt])
+}
+
+model TenantAgreementDraft {
+  id                        String                  @id @default(uuid())
+  buildingId                String
+  houseNumber               String
+  fullName                  String
+  phoneNumber               String
+  identityType              TenantIdentityType?
+  identityNumber            String?
+  identityDocumentUrls      Json                    @default("[]")
+  leaseStartDate            DateTime?
+  leaseEndDate              DateTime?
+  occupationStatus          TenantOccupationStatus?
+  occupationLabel           String?
+  organizationName          String?
+  organizationLocation      String?
+  studentRegistrationNumber String?
+  sponsorName               String?
+  sponsorPhone              String?
+  emergencyContactName      String?
+  emergencyContactPhone     String?
+  specialTerms              String?
+  acceptanceMethod          String?
+  staffWitnessConfirmed     Boolean                 @default(false)
+  acceptanceNote            String?
+  note                      String?
+  createdByUserId           String?
+  createdByName             String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+  building                  Building                @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@unique([buildingId, houseNumber])
+  @@index([buildingId, houseNumber])
 }
 
 model HouseholdMemberRegistry {

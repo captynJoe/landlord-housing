@@ -11,6 +11,7 @@ import {
   validateImageFiles
 } from "./media-upload.js";
 
+const ROOM_ACCOUNT_FLASH_KEY = "landlord-room-account-flash";
 const roomAccountTagEl = document.getElementById("room-account-tag");
 const roomAccountTitleEl = document.getElementById("room-account-title");
 const roomAccountSubtitleEl = document.getElementById("room-account-subtitle");
@@ -1170,9 +1171,12 @@ function getExistingIdentityDocumentUrls(payload = state.data) {
 }
 
 function canEditTenantDetails(payload = state.data) {
+  const agreementState = getAgreementState(payload);
   return (
     String(state.role ?? "").trim() !== "caretaker" &&
-    Boolean(getAgreementState(payload).hasActiveResident || payload?.room?.hasActiveResident)
+    Boolean(
+      agreementState.hasActiveResident || payload?.room?.hasActiveResident || agreementState.isDraft
+    )
   );
 }
 
@@ -1210,17 +1214,20 @@ function renderManagementForms(payload) {
   const agreement = agreementState.agreement ?? {};
   const buildingConfiguration = payload?.buildingConfiguration ?? {};
   const hasActiveResident = Boolean(agreementState.hasActiveResident || room.hasActiveResident);
+  const isDraft = Boolean(agreementState.isDraft);
   const canEditAgreement = canEditTenantDetails(payload);
   const canEditRent = canEditRentSetup();
 
   setManagementStatus(
     hasActiveResident
       ? "Complete lease details, resident documents, and room billing terms from this workspace."
-      : "This room has no active resident. Billing terms can be prepared, and lease details unlock after assignment."
+      : isDraft
+        ? "A tenant draft is saved for this room. Add the Lease End date (and any other details) below, then save to create the tenant."
+        : "This room has no active resident. Billing terms can be prepared, and lease details unlock after assignment."
   );
   setPillText(
     roomAgreementStateEl,
-    hasActiveResident ? (canEditAgreement ? "Editable" : "Read only") : "Vacant"
+    hasActiveResident ? (canEditAgreement ? "Editable" : "Read only") : isDraft ? "Draft" : "Vacant"
   );
   setPillText(roomRentSetupStateEl, canEditRent ? "Editable" : "Read only");
 
@@ -1894,6 +1901,23 @@ function setRoomFormsSaving(saving) {
   }
 }
 
+function describeMissingFinalizeFields(payload) {
+  const missing = [];
+  if (!payload.identityType || !payload.identityNumber) {
+    missing.push("ID type and number");
+  }
+  if (!payload.identityDocumentUrls?.length) {
+    missing.push("an ID photo");
+  }
+  if (!payload.leaseStartDate) {
+    missing.push("lease start date");
+  }
+  if (!payload.leaseEndDate) {
+    missing.push("lease end date");
+  }
+  return missing;
+}
+
 async function saveRoomAgreement(event) {
   event.preventDefault();
   if (state.loading || state.formSaving || !canEditTenantDetails()) {
@@ -1905,12 +1929,59 @@ async function saveRoomAgreement(event) {
     return;
   }
 
+  const agreementState = getAgreementState();
+  const isDraft = Boolean(agreementState.isDraft) && !agreementState.hasActiveResident;
+
   setRoomFormsSaving(true);
   showError("");
-  setManagementStatus("Saving tenant details...");
+  setManagementStatus(isDraft ? "Saving draft..." : "Saving tenant details...");
 
   try {
     const payload = await buildAgreementPayloadFromForm(form);
+
+    if (isDraft) {
+      const draft = agreementState.agreement ?? {};
+      const draftOnlyFields = {
+        buildingId: state.buildingId,
+        houseNumber: state.houseNumber,
+        fullName: draft.fullName,
+        phoneNumber: draft.phoneNumber,
+        acceptanceMethod: draft.acceptanceMethod,
+        staffWitnessConfirmed: draft.staffWitnessConfirmed,
+        acceptanceNote: draft.acceptanceNote,
+        note: draft.note
+      };
+      const missingFields = describeMissingFinalizeFields(payload);
+
+      if (missingFields.length === 0) {
+        const finalized = await requestJson("/api/landlord/residents/direct", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...payload, ...draftOnlyFields })
+        });
+        const smsStatus = finalized.data?.sms?.status;
+        const smsText =
+          smsStatus === "sent"
+            ? " SMS sent."
+            : " SMS not sent; share the sign-in details manually.";
+        await loadRoomAccount();
+        const message = `Tenant created. They can sign in with their phone number and ID number as the temporary password.${smsText}`;
+        setManagementStatus(message);
+        notifyStatus(message);
+      } else {
+        await requestJson("/api/landlord/tenant-agreement-drafts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...payload, ...draftOnlyFields })
+        });
+        await loadRoomAccount();
+        const message = `Draft saved. Still needed to create the tenant: ${missingFields.join(", ")}.`;
+        setManagementStatus(message);
+        notifyStatus("Draft saved.");
+      }
+      return;
+    }
+
     await requestJson(
       `/api/landlord/buildings/${encodeURIComponent(state.buildingId)}/houses/${encodeURIComponent(
         state.houseNumber
@@ -1934,7 +2005,7 @@ async function saveRoomAgreement(event) {
 
     const message = error instanceof Error ? error.message : "Unable to save tenant details.";
     showError(message);
-    setManagementStatus("Tenant details save failed.");
+    setManagementStatus(isDraft ? "Draft save failed." : "Tenant details save failed.");
   } finally {
     setRoomFormsSaving(false);
   }
@@ -2329,6 +2400,17 @@ async function init() {
     state.houseNumber = route.houseNumber;
     setStatus("Loading room account...");
     await loadRoomAccount();
+
+    let flashMessage = null;
+    try {
+      flashMessage = sessionStorage.getItem(ROOM_ACCOUNT_FLASH_KEY);
+      sessionStorage.removeItem(ROOM_ACCOUNT_FLASH_KEY);
+    } catch (_error) {
+      // sessionStorage unavailable — nothing to restore.
+    }
+    if (flashMessage) {
+      setStatus(flashMessage);
+    }
   } catch (error) {
     if (error?.status === 401) {
       redirectToLogin();

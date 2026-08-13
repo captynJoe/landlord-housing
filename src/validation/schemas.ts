@@ -661,6 +661,117 @@ export const residentAdminPasswordResetSchema = z.object({
   temporaryPassword: z.string().min(8).max(128)
 });
 
+const tenantAgreementDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, {
+    message: "Use YYYY-MM-DD format."
+  });
+
+const tenantAgreementIdentityFieldsShape = {
+  identityType: optionalTenantIdentityTypeSchema,
+  identityNumber: optionalTenantTextSchema(80),
+  identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema
+};
+
+const tenantAgreementLeaseDetailFieldsShape = {
+  occupationStatus: optionalTenantOccupationStatusSchema,
+  occupationLabel: optionalTenantTextSchema(120),
+  organizationName: optionalTenantTextSchema(160),
+  organizationLocation: optionalTenantTextSchema(160),
+  studentRegistrationNumber: optionalTenantTextSchema(80),
+  sponsorName: optionalTenantTextSchema(120),
+  sponsorPhone: optionalTenantPhoneSchema,
+  emergencyContactName: optionalTenantTextSchema(120),
+  emergencyContactPhone: optionalTenantPhoneSchema,
+  leaseEndDate: tenantAgreementDateSchema.optional(),
+  monthlyRentKsh: z.number().int().min(0).max(10_000_000).optional(),
+  depositKsh: z.number().int().min(0).max(10_000_000).optional(),
+  depositPaidKsh: z.number().int().min(0).max(10_000_000).optional(),
+  paymentDueDay: z.number().int().min(1).max(31).optional(),
+  specialTerms: z.string().trim().max(1_200).optional()
+};
+
+const tenantAgreementFieldsShape = {
+  ...tenantAgreementIdentityFieldsShape,
+  ...tenantAgreementLeaseDetailFieldsShape
+};
+
+function applyTenantAgreementFieldRefinements(
+  value: {
+    identityType?: string | null;
+    identityNumber?: string | null;
+    identityDocumentUrls?: unknown[];
+    occupationStatus?: string | null;
+    organizationName?: string | null;
+    leaseStartDate?: string | null;
+    leaseEndDate?: string | null;
+    depositKsh?: number | null;
+    depositPaidKsh?: number | null;
+  },
+  context: z.RefinementCtx
+) {
+  if (value.identityNumber && !value.identityType) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["identityType"],
+      message: "Select the ID type for the provided ID number."
+    });
+  }
+
+  if (value.identityDocumentUrls?.length && (!value.identityType || !value.identityNumber)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["identityNumber"],
+      message: "Add the ID type and ID number before uploading ID photos."
+    });
+  }
+
+  if (
+    value.occupationStatus &&
+    ["employed", "self_employed", "student"].includes(value.occupationStatus) &&
+    !value.organizationName
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["organizationName"],
+      message: "Employer, business, or school name is required for this occupation status."
+    });
+  }
+
+  if (value.leaseStartDate && value.leaseEndDate) {
+    const startAt = new Date(`${value.leaseStartDate}T00:00:00.000Z`);
+    const endAt = new Date(`${value.leaseEndDate}T00:00:00.000Z`);
+    if (endAt.getTime() < startAt.getTime()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["leaseEndDate"],
+        message: "Lease end date must be on or after the lease start date."
+      });
+    }
+  }
+
+  if (value.depositPaidKsh != null && value.depositKsh == null) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["depositKsh"],
+      message: "Set the agreed deposit before recording how much has been paid."
+    });
+  }
+
+  if (
+    value.depositPaidKsh != null &&
+    value.depositKsh != null &&
+    value.depositPaidKsh > value.depositKsh
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["depositPaidKsh"],
+      message: "Deposit paid cannot be more than the agreed deposit amount."
+    });
+  }
+}
+
 export const landlordTenantIntakeCreateSchema = z.object({
   buildingId: nonEmptyString.max(120),
   houseNumber: nonEmptyString.max(24),
@@ -690,7 +801,8 @@ export const landlordDirectTenantCreateSchema = z
       .default("resident_portal"),
     staffWitnessConfirmed: z.boolean().optional(),
     acceptanceNote: optionalTenantTextSchema(280),
-    note: optionalTenantTextSchema(280)
+    note: optionalTenantTextSchema(280),
+    ...tenantAgreementLeaseDetailFieldsShape
   })
   .superRefine((value, ctx) => {
     if (value.acceptanceMethod === "staff_witnessed" && value.staffWitnessConfirmed !== true) {
@@ -701,7 +813,26 @@ export const landlordDirectTenantCreateSchema = z
           "Confirm that the tenant reviewed the lease agreement in person before marking it agreed."
       });
     }
+    applyTenantAgreementFieldRefinements(value, ctx);
   });
+
+export const landlordTenantAgreementDraftSaveSchema = z
+  .object({
+    buildingId: nonEmptyString.max(120),
+    houseNumber: nonEmptyString.max(24),
+    fullName: nonEmptyString.max(120),
+    phoneNumber: kenyaPhoneSchema,
+    identityType: optionalTenantIdentityTypeSchema,
+    identityNumber: optionalTenantTextSchema(80),
+    identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
+    leaseStartDate: tenantAgreementDateSchema.optional(),
+    acceptanceMethod: z.enum(["resident_portal", "staff_witnessed"]).optional(),
+    staffWitnessConfirmed: z.boolean().optional(),
+    acceptanceNote: optionalTenantTextSchema(280),
+    note: optionalTenantTextSchema(280),
+    ...tenantAgreementLeaseDetailFieldsShape
+  })
+  .superRefine(applyTenantAgreementFieldRefinements);
 
 export const residentAgreementAcceptSchema = z.object({
   confirmed: z.literal(true),
@@ -750,7 +881,8 @@ export const adminLoginSchema = z
   .object({
     accessToken: z.string().trim().max(200).optional(),
     username: z.string().trim().max(80).optional(),
-    password: z.string().trim().max(120).optional()
+    password: z.string().trim().max(120).optional(),
+    buildingId: z.string().trim().max(120).optional()
   })
   .superRefine((value, context) => {
     const hasToken = Boolean(value.accessToken && value.accessToken.length > 0);
@@ -859,97 +991,12 @@ export const tenantApplicationSchema = z.object({
   note: optionalTenantTextSchema(280)
 });
 
-const tenantAgreementDateSchema = z
-  .string()
-  .trim()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, {
-    message: "Use YYYY-MM-DD format."
-  });
-
 export const tenantAgreementUpsertSchema = z
   .object({
-    identityType: optionalTenantIdentityTypeSchema,
-    identityNumber: optionalTenantTextSchema(80),
-    identityDocumentUrls: optionalTenantIdentityDocumentUrlsSchema,
-    occupationStatus: optionalTenantOccupationStatusSchema,
-    occupationLabel: optionalTenantTextSchema(120),
-    organizationName: optionalTenantTextSchema(160),
-    organizationLocation: optionalTenantTextSchema(160),
-    studentRegistrationNumber: optionalTenantTextSchema(80),
-    sponsorName: optionalTenantTextSchema(120),
-    sponsorPhone: optionalTenantPhoneSchema,
-    emergencyContactName: optionalTenantTextSchema(120),
-    emergencyContactPhone: optionalTenantPhoneSchema,
-    leaseStartDate: tenantAgreementDateSchema.optional(),
-    leaseEndDate: tenantAgreementDateSchema.optional(),
-    monthlyRentKsh: z.number().int().min(0).max(10_000_000).optional(),
-    depositKsh: z.number().int().min(0).max(10_000_000).optional(),
-    depositPaidKsh: z.number().int().min(0).max(10_000_000).optional(),
-    paymentDueDay: z.number().int().min(1).max(31).optional(),
-    specialTerms: z.string().trim().max(1_200).optional()
+    ...tenantAgreementFieldsShape,
+    leaseStartDate: tenantAgreementDateSchema.optional()
   })
-  .superRefine((value, context) => {
-    if (value.identityNumber && !value.identityType) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["identityType"],
-        message: "Select the ID type for the provided ID number."
-      });
-    }
-
-    if (value.identityDocumentUrls?.length && (!value.identityType || !value.identityNumber)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["identityNumber"],
-        message: "Add the ID type and ID number before uploading ID photos."
-      });
-    }
-
-    if (
-      value.occupationStatus &&
-      ["employed", "self_employed", "student"].includes(value.occupationStatus) &&
-      !value.organizationName
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["organizationName"],
-        message:
-          "Employer, business, or school name is required for this occupation status."
-      });
-    }
-
-    if (value.leaseStartDate && value.leaseEndDate) {
-      const startAt = new Date(`${value.leaseStartDate}T00:00:00.000Z`);
-      const endAt = new Date(`${value.leaseEndDate}T00:00:00.000Z`);
-      if (endAt.getTime() < startAt.getTime()) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["leaseEndDate"],
-          message: "Lease end date must be on or after the lease start date."
-        });
-      }
-    }
-
-    if (value.depositPaidKsh != null && value.depositKsh == null) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["depositKsh"],
-        message: "Set the agreed deposit before recording how much has been paid."
-      });
-    }
-
-    if (
-      value.depositPaidKsh != null &&
-      value.depositKsh != null &&
-      value.depositPaidKsh > value.depositKsh
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["depositPaidKsh"],
-        message: "Deposit paid cannot be more than the agreed deposit amount."
-      });
-    }
-  });
+  .superRefine(applyTenantAgreementFieldRefinements);
 
 export const residentTenantProfileUpsertSchema = z
   .object({
@@ -1465,6 +1512,9 @@ export type LandlordTenantIntakeCreateInput = z.infer<
 >;
 export type LandlordDirectTenantCreateInput = z.infer<
   typeof landlordDirectTenantCreateSchema
+>;
+export type LandlordTenantAgreementDraftSaveInput = z.infer<
+  typeof landlordTenantAgreementDraftSaveSchema
 >;
 export type LandlordAgreementWitnessInput = z.infer<typeof landlordAgreementWitnessSchema>;
 export type LandlordBuildingLeaseAgreementUpdateInput = z.infer<

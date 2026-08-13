@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="/admin.css?v=20260322b" />
     <link rel="stylesheet" href="/landlord.css?v=20260729e" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=20260716b" />
+    <link rel="stylesheet" href="/landlord-modern.css?v=20260812a" />
   </head>
   <body>
     <div class="backdrop"></div>
@@ -2202,34 +2203,26 @@
             </label>
           </div>
 
-          <label>
-            <span>How will this tenant agree to the lease?</span>
-            <select id="direct-tenant-acceptance-method">
-              <option value="resident_portal">Resident accepts online in their portal later</option>
-              <option value="staff_witnessed">I'm showing them the lease now — mark as agreed</option>
-            </select>
-          </label>
+          <p class="status-text agreement-online-note">
+            Staff must open this building's mounted lease agreement, show it to the tenant, and confirm it was shown before saving.
+          </p>
 
           <div id="direct-tenant-lease-document-preview" class="status-text hidden"></div>
 
           <label id="direct-tenant-staff-confirm-wrap" class="checkbox-row hidden">
             <input id="direct-tenant-staff-confirm" type="checkbox" />
-            I showed the tenant this building's lease agreement in person and they agreed to its terms.
+            I showed the tenant this building's mounted lease agreement in person and they agreed to proceed for this room.
           </label>
 
           <label id="direct-tenant-acceptance-note-wrap" class="hidden">
-            Note on in-person agreement (optional)
+            Staff note on lease review (optional)
             <textarea
               id="direct-tenant-acceptance-note"
               maxlength="280"
               rows="2"
-              placeholder="e.g. Signed physical copy kept on file"
+              placeholder="e.g. Physical copy shown and tenant confirmed"
             ></textarea>
           </label>
-
-          <p class="status-text agreement-online-note">
-            Resident acceptance happens online in the resident portal after staff saves this lease form, unless you mark it as agreed in person above.
-          </p>
 
           <label>
             Note
@@ -2242,7 +2235,7 @@
           </label>
 
           <p id="direct-tenant-status" class="status-text">
-            Upload ID evidence and set the lease date. The resident accepts the agreement online in their portal.
+            Upload ID evidence, open the lease PDF, set the lease date, and confirm the tenant reviewed it.
           </p>
           <button id="direct-tenant-submit-btn" type="submit">Create Tenant Agreement</button>
         </form>
@@ -2310,6 +2303,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=20260729e"></script>
+    <script type="module" src="/landlord.js?v=20260813b"></script>
   </body>
 </html>

@@ -1,0 +1,603 @@
+:root {
+  --lh-bg: #f6f8fb;
+  --lh-surface: #ffffff;
+  --lh-surface-raised: #fbfcfe;
+  --lh-ink: #172033;
+  --lh-muted: #667085;
+  --lh-line: #d9e1ea;
+  --lh-line-strong: #c4cfdc;
+  --lh-primary: #166c5f;
+  --lh-primary-dark: #0f4f47;
+  --lh-primary-soft: #e5f3f0;
+  --lh-blue: #275d8f;
+  --lh-blue-soft: #e8f1fb;
+  --lh-amber: #aa6a16;
+  --lh-amber-soft: #fff4df;
+  --lh-danger: #b42318;
+  --lh-danger-soft: #fee4e2;
+  --lh-radius: 8px;
+  --lh-shadow-sm: 0 1px 2px rgba(23, 32, 51, 0.06);
+  --lh-shadow-md: 0 14px 34px rgba(23, 32, 51, 0.1);
+  --lh-focus: 0 0 0 3px rgba(39, 93, 143, 0.22);
+}
+
+html {
+  background: var(--lh-bg);
+}
+
+body {
+  color: var(--lh-ink);
+  background:
+    linear-gradient(180deg, #f9fbfd 0%, #f2f5f8 42%, #eef3f6 100%) !important;
+  font-family: Inter, "Aptos", "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0;
+}
+
+.backdrop {
+  display: none;
+}
+
+.shell {
+  width: min(100%, 1480px);
+  max-width: 1480px !important;
+  padding: 18px 18px 36px;
+}
+
+.panel,
+.package-card,
+.metric-card,
+.resident-overview-card,
+.utility-summary-card,
+.room-account-audit-card,
+.room-account-issue-card,
+.room-billing-hold-card,
+.landlord-notification-item,
+.upload-preview-item,
+.empty-state {
+  border: 1px solid var(--lh-line) !important;
+  border-radius: var(--lh-radius) !important;
+  background: var(--lh-surface) !important;
+  box-shadow: var(--lh-shadow-sm) !important;
+}
+
+.panel {
+  margin-top: 12px;
+  padding: 16px;
+}
+
+.panel-head {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.panel-head h2,
+.panel-head h3,
+.landlord-navbar-title,
+.package-card h2,
+.package-card h3,
+.dashboard-section-title h3 {
+  color: var(--lh-ink) !important;
+  font-family: Inter, "Aptos", "Segoe UI", Arial, sans-serif !important;
+  letter-spacing: 0;
+}
+
+.panel-head h2 {
+  font-size: 1.18rem;
+  line-height: 1.25;
+}
+
+.status-text,
+.panel-note,
+.ticket-details,
+tbody td,
+.daily-card small {
+  color: var(--lh-muted) !important;
+}
+
+.tag,
+.dashboard-kicker,
+label,
+thead th,
+.landlord-ticket-response-label,
+.resident-overview-card p,
+.daily-card span {
+  color: var(--lh-muted) !important;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.landlord-navbar-panel {
+  position: sticky;
+  top: 10px;
+  z-index: 12;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background:
+    linear-gradient(135deg, #111827 0%, #193449 48%, #0f4f47 100%) !important;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16) !important;
+  color: #fff;
+}
+
+.landlord-navbar-title {
+  max-width: none;
+  color: #fff !important;
+  font-size: clamp(1.28rem, 1.2vw + 1rem, 1.9rem) !important;
+}
+
+.landlord-navbar-status,
+.landlord-navbar-tag,
+.landlord-navbar-panel label {
+  color: rgba(255, 255, 255, 0.78) !important;
+}
+
+.landlord-navbar-actions > :is(a, button, span),
+.landlord-global-search button {
+  min-height: 36px;
+  border-radius: var(--lh-radius) !important;
+  font-size: 0.82rem;
+}
+
+.landlord-navbar-actions > a,
+.landlord-navbar-actions > span,
+.landlord-alert-btn,
+.landlord-push-alerts-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.landlord-primary-cta,
+.landlord-global-search button {
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  background: #ffffff !important;
+  color: #143348 !important;
+}
+
+.landlord-global-search {
+  grid-template-columns: minmax(280px, 1.35fr) minmax(180px, 0.65fr) auto;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.landlord-global-search-field input,
+.landlord-global-search-field select {
+  min-height: 38px;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+
+.landlord-workspace {
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 14px;
+}
+
+body .landlord-side-panel.panel {
+  top: 96px;
+  padding: 10px;
+  border-color: var(--lh-line) !important;
+  background: var(--lh-surface) !important;
+  color: var(--lh-ink) !important;
+  box-shadow: var(--lh-shadow-sm) !important;
+}
+
+body .landlord-side-panel .landlord-nav {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  background: transparent !important;
+}
+
+body .landlord-side-panel .landlord-nav-btn {
+  justify-content: flex-start;
+  min-height: 38px;
+  border: 1px solid transparent !important;
+  border-radius: var(--lh-radius) !important;
+  background: transparent !important;
+  color: var(--lh-muted) !important;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+body .landlord-side-panel .landlord-nav-btn:hover {
+  border-color: var(--lh-line) !important;
+  background: var(--lh-surface-raised) !important;
+  color: var(--lh-ink) !important;
+}
+
+body .landlord-side-panel .landlord-nav-btn.active,
+body .landlord-side-panel .landlord-nav-btn.has-alert {
+  border-color: rgba(22, 108, 95, 0.18) !important;
+  background: var(--lh-primary-soft) !important;
+  color: var(--lh-primary-dark) !important;
+  box-shadow: inset 3px 0 0 var(--lh-primary) !important;
+}
+
+body .landlord-side-panel .panel-head h2,
+body .landlord-side-panel .landlord-focus-field,
+body .landlord-side-panel .landlord-focus-note,
+body .landlord-side-panel label,
+body .landlord-side-panel .status-text {
+  color: var(--lh-muted) !important;
+}
+
+body .landlord-side-panel .landlord-focus-stat,
+body .landlord-side-panel .metric-card {
+  border-color: var(--lh-line) !important;
+  background: var(--lh-surface-raised) !important;
+  color: var(--lh-ink) !important;
+}
+
+body .landlord-side-panel .landlord-focus-stat span,
+body .landlord-side-panel .metric-card p {
+  color: var(--lh-muted) !important;
+}
+
+body .landlord-side-panel .landlord-focus-stat strong,
+body .landlord-side-panel .metric-card strong,
+.resident-overview-card strong,
+.metric-card strong {
+  color: var(--lh-ink) !important;
+}
+
+body .landlord-side-panel .landlord-focus-actions button {
+  border: 1px solid var(--lh-line) !important;
+  background: var(--lh-surface) !important;
+  color: var(--lh-ink) !important;
+}
+
+.landlord-content {
+  gap: 12px;
+}
+
+.panel.wide-panel.landlord-view {
+  padding: 18px;
+}
+
+.daily-dashboard {
+  gap: 12px;
+  margin: 14px 0 18px;
+}
+
+.daily-dashboard-cards {
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.daily-card {
+  min-height: 118px;
+  border-color: var(--lh-line) !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  color: var(--lh-ink) !important;
+  box-shadow: var(--lh-shadow-sm) !important;
+}
+
+button.daily-card {
+  color: var(--lh-ink) !important;
+}
+
+.daily-card-primary {
+  border-color: rgba(22, 108, 95, 0.24) !important;
+  background: linear-gradient(135deg, #123044 0%, #166c5f 100%) !important;
+  color: #fff !important;
+}
+
+.daily-card-primary span,
+.daily-card-primary strong,
+.daily-card-primary small {
+  color: #fff !important;
+}
+
+.daily-card strong {
+  color: var(--lh-ink) !important;
+  font-size: 1.45rem;
+}
+
+.daily-card span {
+  color: var(--lh-muted) !important;
+}
+
+.daily-card small {
+  line-height: 1.35;
+}
+
+.daily-action-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.daily-action-grid button {
+  border: 1px solid var(--lh-line) !important;
+  background: var(--lh-surface) !important;
+  color: var(--lh-ink) !important;
+}
+
+.daily-action-grid button:hover {
+  border-color: rgba(22, 108, 95, 0.24) !important;
+  background: var(--lh-primary-soft) !important;
+  color: var(--lh-primary-dark) !important;
+}
+
+button,
+.btn,
+.btn-primary,
+.ghost-btn,
+.btn-secondary,
+.home-link {
+  min-height: 36px;
+  border-radius: var(--lh-radius) !important;
+  font-weight: 750;
+}
+
+button,
+.btn-primary {
+  border: 1px solid transparent !important;
+  background: linear-gradient(135deg, var(--lh-primary), var(--lh-primary-dark)) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+button:hover,
+.btn:hover,
+.home-link:hover {
+  transform: none;
+  box-shadow: var(--lh-shadow-sm) !important;
+}
+
+.ghost-btn,
+.btn-secondary,
+.home-link,
+.action-row button:not(.btn-danger):not(.landlord-primary-cta) {
+  border: 1px solid var(--lh-line) !important;
+  background: var(--lh-surface) !important;
+  color: var(--lh-ink) !important;
+}
+
+.btn-danger,
+button.btn-danger {
+  border-color: rgba(180, 35, 24, 0.2) !important;
+  background: var(--lh-danger-soft) !important;
+  color: var(--lh-danger) !important;
+}
+
+input,
+select,
+textarea {
+  min-height: 38px;
+  border: 1px solid var(--lh-line-strong) !important;
+  border-radius: var(--lh-radius) !important;
+  background: #fff !important;
+  color: var(--lh-ink) !important;
+  box-shadow: none;
+}
+
+textarea {
+  line-height: 1.4;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: 0 !important;
+  box-shadow: var(--lh-focus) !important;
+}
+
+.inline-fields,
+.compact-fields,
+.room-management-fields,
+.utility-meter-modal-form,
+.message-center-compose {
+  gap: 10px;
+}
+
+.table-wrap {
+  border: 1px solid var(--lh-line);
+  border-radius: var(--lh-radius);
+  background: #fff;
+  box-shadow: var(--lh-shadow-sm);
+}
+
+.table-wrap table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--lh-line) !important;
+  background: #f3f6fa !important;
+  color: #475467 !important;
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf1f5 !important;
+  color: #344054 !important;
+}
+
+tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.status-chip,
+.message-status-pill,
+.landlord-notification-chip,
+.landlord-nav-badge,
+.nav-dot {
+  border-radius: 999px !important;
+  font-weight: 800;
+}
+
+.landlord-nav-badge,
+.nav-dot {
+  background: var(--lh-amber-soft) !important;
+  color: var(--lh-amber) !important;
+}
+
+.resident-overview-cards,
+.expense-dashboard-cards {
+  gap: 10px;
+}
+
+.resident-overview-card {
+  min-height: 104px;
+  padding: 14px !important;
+}
+
+button.resident-overview-card:hover,
+button.resident-overview-card:focus-visible,
+button.resident-overview-card.is-active {
+  border-color: rgba(39, 93, 143, 0.28) !important;
+  background: var(--lh-blue-soft) !important;
+  color: var(--lh-ink) !important;
+}
+
+.landlord-drawer-backdrop,
+.room-confirm-backdrop {
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: blur(3px);
+}
+
+.landlord-drawer,
+.landlord-sheet-modal,
+.utility-setup-modal,
+.move-out-settlement-modal,
+.room-confirm-modal {
+  border-color: var(--lh-line) !important;
+  border-radius: var(--lh-radius) 0 0 var(--lh-radius) !important;
+  background: var(--lh-surface) !important;
+  box-shadow: -18px 0 44px rgba(15, 23, 42, 0.18) !important;
+  color: var(--lh-ink) !important;
+}
+
+.landlord-drawer-head,
+.landlord-sheet-modal .panel-head {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  margin: -18px -18px 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--lh-line);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+}
+
+.landlord-drawer-form label,
+.room-management-fields label,
+.room-billing-hold-form label {
+  color: var(--lh-muted) !important;
+}
+
+.resident-drawer-panel {
+  border-color: var(--lh-line) !important;
+  border-radius: var(--lh-radius) !important;
+  background: var(--lh-surface) !important;
+}
+
+.resident-drawer-panel summary {
+  background: #f8fafc !important;
+}
+
+.agreement-online-note,
+#direct-tenant-lease-document-preview {
+  border: 1px solid rgba(39, 93, 143, 0.2);
+  border-radius: var(--lh-radius);
+  background: var(--lh-blue-soft);
+  color: #21496f !important;
+  padding: 10px 12px;
+}
+
+#direct-tenant-lease-document-preview a {
+  color: #1e5b91;
+  font-weight: 800;
+}
+
+#direct-tenant-staff-confirm-wrap {
+  border: 1px solid rgba(22, 108, 95, 0.24);
+  border-radius: var(--lh-radius);
+  background: var(--lh-primary-soft);
+  color: var(--lh-primary-dark) !important;
+  padding: 10px 12px;
+}
+
+.error-box,
+.feedback.error,
+.resident-alert-danger {
+  border-color: rgba(180, 35, 24, 0.24) !important;
+  background: var(--lh-danger-soft) !important;
+  color: var(--lh-danger) !important;
+}
+
+@media (max-width: 1180px) {
+  .landlord-navbar-panel {
+    position: static;
+  }
+
+  body .landlord-side-panel.panel {
+    top: 12px;
+  }
+
+  .landlord-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  body .landlord-side-panel.panel {
+    position: static;
+  }
+
+  body .landlord-side-panel .landlord-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  body .landlord-side-panel .landlord-nav-btn {
+    justify-content: center;
+  }
+
+  .daily-dashboard-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding: 10px 10px 28px;
+  }
+
+  .landlord-navbar-head,
+  .panel-head,
+  .dashboard-section-title {
+    display: grid;
+  }
+
+  .landlord-navbar-actions,
+  .action-row {
+    justify-content: stretch;
+  }
+
+  .landlord-navbar-actions > :is(a, button, span),
+  .action-row > :is(a, button),
+  .landlord-global-search button {
+    width: 100%;
+  }
+
+  .landlord-global-search,
+  body .landlord-side-panel .landlord-nav,
+  .daily-dashboard-cards,
+  .daily-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel.wide-panel.landlord-view,
+  .panel,
+  .package-card {
+    padding: 12px;
+  }
+}

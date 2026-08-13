@@ -130,6 +130,9 @@ test("direct tenant onboarding forces first login password change and approves t
         tenantAgreementUpsertCalls.push(args);
         return { id: "agreement-1" };
       }
+    },
+    tenantAgreementDraft: {
+      deleteMany: async () => ({ count: 0 })
     }
   };
   let transactionCall = 0;

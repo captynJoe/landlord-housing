@@ -11,6 +11,7 @@ import type {
   AdminRevokeLandlordInput,
   CreateLandlordAccessRequestInput,
   LandlordDirectTenantCreateInput,
+  LandlordTenantAgreementDraftSaveInput,
   LandlordTenantIntakeCreateInput,
   LandlordDecisionInput,
   OwnerStaffCreateInput,
@@ -103,6 +104,45 @@ function normalizeStringList(value: unknown): string[] {
         .filter(Boolean)
     )
   ];
+}
+
+type TenantAgreementLeaseDetailInput = Pick<
+  TenantAgreementUpsertInput,
+  | "occupationStatus"
+  | "occupationLabel"
+  | "organizationName"
+  | "organizationLocation"
+  | "studentRegistrationNumber"
+  | "sponsorName"
+  | "sponsorPhone"
+  | "emergencyContactName"
+  | "emergencyContactPhone"
+  | "leaseEndDate"
+  | "monthlyRentKsh"
+  | "depositKsh"
+  | "depositPaidKsh"
+  | "paymentDueDay"
+  | "specialTerms"
+>;
+
+function normalizeTenantAgreementLeaseDetailFields(input: TenantAgreementLeaseDetailInput) {
+  return {
+    occupationStatus: input.occupationStatus ?? null,
+    occupationLabel: normalizeOptionalText(input.occupationLabel) ?? null,
+    organizationName: normalizeOptionalText(input.organizationName) ?? null,
+    organizationLocation: normalizeOptionalText(input.organizationLocation) ?? null,
+    studentRegistrationNumber: normalizeOptionalText(input.studentRegistrationNumber) ?? null,
+    sponsorName: normalizeOptionalText(input.sponsorName) ?? null,
+    sponsorPhone: normalizeOptionalText(input.sponsorPhone) ?? null,
+    emergencyContactName: normalizeOptionalText(input.emergencyContactName) ?? null,
+    emergencyContactPhone: normalizeOptionalText(input.emergencyContactPhone) ?? null,
+    leaseEndDate: input.leaseEndDate ? new Date(`${input.leaseEndDate}T00:00:00.000Z`) : null,
+    monthlyRentKsh: input.monthlyRentKsh ?? null,
+    depositKsh: input.depositKsh ?? null,
+    depositPaidKsh: input.depositPaidKsh ?? null,
+    paymentDueDay: input.paymentDueDay ?? null,
+    specialTerms: normalizeOptionalText(input.specialTerms) ?? null
+  };
 }
 
 function isMissingTenantApplicationIdentityColumnsError(error: unknown): boolean {
@@ -307,6 +347,85 @@ function mapTenantAgreement(record: TenantAgreementRecord) {
     verifiedAt: record.verifiedAt?.toISOString(),
     verifiedByUserId: record.verifiedByUserId ?? undefined,
     verifiedByName: record.verifiedByName ?? undefined,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString()
+  };
+}
+
+const tenantAgreementDraftSelect = {
+  id: true,
+  buildingId: true,
+  houseNumber: true,
+  fullName: true,
+  phoneNumber: true,
+  identityType: true,
+  identityNumber: true,
+  identityDocumentUrls: true,
+  leaseStartDate: true,
+  leaseEndDate: true,
+  occupationStatus: true,
+  occupationLabel: true,
+  organizationName: true,
+  organizationLocation: true,
+  studentRegistrationNumber: true,
+  sponsorName: true,
+  sponsorPhone: true,
+  emergencyContactName: true,
+  emergencyContactPhone: true,
+  specialTerms: true,
+  acceptanceMethod: true,
+  staffWitnessConfirmed: true,
+  acceptanceNote: true,
+  note: true,
+  createdAt: true,
+  updatedAt: true
+} satisfies Prisma.TenantAgreementDraftSelect;
+
+type TenantAgreementDraftRecord = Prisma.TenantAgreementDraftGetPayload<{
+  select: typeof tenantAgreementDraftSelect;
+}>;
+
+// Shaped with the same field names/undefined-semantics as mapTenantAgreement() so
+// room-account.js's generic `agreement.*` prefill code works unchanged against a draft.
+function mapTenantAgreementDraft(record: TenantAgreementDraftRecord) {
+  return {
+    id: record.id,
+    tenancyId: undefined,
+    buildingId: record.buildingId,
+    houseNumber: record.houseNumber,
+    residentUserId: undefined,
+    fullName: record.fullName,
+    phoneNumber: record.phoneNumber,
+    identityType: record.identityType ?? undefined,
+    identityNumber: record.identityNumber ?? undefined,
+    identityDocumentUrls: normalizeStringList(record.identityDocumentUrls),
+    occupationStatus: record.occupationStatus ?? undefined,
+    occupationLabel: record.occupationLabel ?? undefined,
+    organizationName: record.organizationName ?? undefined,
+    organizationLocation: record.organizationLocation ?? undefined,
+    studentRegistrationNumber: record.studentRegistrationNumber ?? undefined,
+    sponsorName: record.sponsorName ?? undefined,
+    sponsorPhone: record.sponsorPhone ?? undefined,
+    emergencyContactName: record.emergencyContactName ?? undefined,
+    emergencyContactPhone: record.emergencyContactPhone ?? undefined,
+    leaseStartDate: toDateOnlyString(record.leaseStartDate),
+    leaseEndDate: toDateOnlyString(record.leaseEndDate),
+    monthlyRentKsh: undefined,
+    depositKsh: undefined,
+    depositPaidKsh: undefined,
+    paymentDueDay: undefined,
+    specialTerms: record.specialTerms ?? undefined,
+    status: "draft",
+    acceptanceMethod: record.acceptanceMethod ?? undefined,
+    staffWitnessConfirmed: record.staffWitnessConfirmed,
+    acceptedAt: undefined,
+    acceptedByUserId: undefined,
+    acceptedByName: undefined,
+    acceptanceNote: record.acceptanceNote ?? undefined,
+    verifiedAt: undefined,
+    verifiedByUserId: undefined,
+    verifiedByName: undefined,
+    note: record.note ?? undefined,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString()
   };
@@ -2106,6 +2225,7 @@ export class UserAccountService {
       normalizeOptionalText(input.note) ?? "Tenant added directly by management.";
     const reviewedByUserId = normalizeOptionalText(actor?.userId) ?? null;
     const now = new Date();
+    const leaseDetailFields = normalizeTenantAgreementLeaseDetailFields(input);
 
     const { application, building } = await this.prisma.$transaction(async (tx) => {
       const building = await tx.building.findUnique({
@@ -2170,6 +2290,7 @@ export class UserAccountService {
           identityNumber,
           identityDocumentUrls,
           leaseStartDate,
+          ...leaseDetailFields,
           ...lifecycle
         },
         create: {
@@ -2181,8 +2302,13 @@ export class UserAccountService {
           identityNumber,
           identityDocumentUrls,
           leaseStartDate,
+          ...leaseDetailFields,
           ...lifecycle
         }
+      });
+
+      await tx.tenantAgreementDraft.deleteMany({
+        where: { buildingId: building.id, houseNumber }
       });
 
       return {
@@ -2214,6 +2340,85 @@ export class UserAccountService {
         label: "ID number entered"
       }
     };
+  }
+
+  async saveTenantAgreementDraft(
+    input: LandlordTenantAgreementDraftSaveInput,
+    actor?: { userId?: string | null; fullName?: string | null }
+  ) {
+    const houseNumber = normalizeHouseNumber(input.houseNumber);
+
+    const activeTenancy = await this.prisma.tenancy.findFirst({
+      where: {
+        buildingId: input.buildingId,
+        active: true,
+        unit: { houseNumber, isActive: true }
+      },
+      select: { id: true }
+    });
+    if (activeTenancy) {
+      throw new Error("HOUSE_OCCUPIED");
+    }
+
+    // TenantAgreementDraft has no billing columns (monthlyRentKsh/depositKsh/depositPaidKsh/
+    // paymentDueDay) — billing terms are managed independently of the resident lifecycle,
+    // even for a vacant/draft room. Drop them before writing the draft row.
+    const {
+      monthlyRentKsh: _monthlyRentKsh,
+      depositKsh: _depositKsh,
+      depositPaidKsh: _depositPaidKsh,
+      paymentDueDay: _paymentDueDay,
+      ...draftLeaseDetailFields
+    } = normalizeTenantAgreementLeaseDetailFields(input);
+
+    const sharedFields = {
+      fullName: normalizeOptionalText(input.fullName) ?? `Resident ${houseNumber}`,
+      phoneNumber: normalizeKenyaPhone(input.phoneNumber),
+      identityType: input.identityType ?? null,
+      identityNumber: normalizeOptionalText(input.identityNumber) ?? null,
+      identityDocumentUrls: normalizeStringList(input.identityDocumentUrls),
+      leaseStartDate: input.leaseStartDate
+        ? new Date(`${input.leaseStartDate}T00:00:00.000Z`)
+        : null,
+      acceptanceMethod: input.acceptanceMethod ?? null,
+      staffWitnessConfirmed: input.staffWitnessConfirmed === true,
+      acceptanceNote: normalizeOptionalText(input.acceptanceNote) ?? null,
+      note: normalizeOptionalText(input.note) ?? null,
+      ...draftLeaseDetailFields
+    };
+
+    const draft = await this.prisma.tenantAgreementDraft.upsert({
+      where: {
+        buildingId_houseNumber: { buildingId: input.buildingId, houseNumber }
+      },
+      update: sharedFields,
+      create: {
+        buildingId: input.buildingId,
+        houseNumber,
+        ...sharedFields,
+        createdByUserId: normalizeOptionalText(actor?.userId) ?? null,
+        createdByName: normalizeOptionalText(actor?.fullName) ?? null
+      },
+      select: tenantAgreementDraftSelect
+    });
+
+    return {
+      houseNumber,
+      isDraft: true,
+      draft: mapTenantAgreementDraft(draft)
+    };
+  }
+
+  async getTenantAgreementDraft(input: { buildingId: string; houseNumber: string }) {
+    const houseNumber = normalizeHouseNumber(input.houseNumber);
+    const draft = await this.prisma.tenantAgreementDraft.findUnique({
+      where: {
+        buildingId_houseNumber: { buildingId: input.buildingId, houseNumber }
+      },
+      select: tenantAgreementDraftSelect
+    });
+
+    return draft ? mapTenantAgreementDraft(draft) : null;
   }
 
   async createTenantApplication(

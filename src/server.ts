@@ -141,6 +141,7 @@ import {
   ownerNotificationReadSchema,
   landlordMessageSendSchema,
   landlordDirectTenantCreateSchema,
+  landlordTenantAgreementDraftSaveSchema,
   landlordTenantIntakeCreateSchema,
   landlordAutomaticMessageRulesUpdateSchema,
   updateResidentNotificationPreferencesSchema,
@@ -1334,6 +1335,95 @@ function isOwnerAccessRole(role: string): boolean {
     role === "admin" ||
     role === "root_admin"
   );
+}
+
+type LeaseAgreementPolicy = {
+  documentUrl: string;
+  documentFileName?: string | null;
+  uploadedAt?: string | null;
+  uploadedByUserId?: string | null;
+  uploadedByName?: string | null;
+  source?: string;
+};
+
+type LeaseAgreementBuildingRef = {
+  id?: string | null;
+  name?: string | null;
+};
+
+function normalizeLeaseAgreementText(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getMountedLeaseAgreementPolicy(
+  building: LeaseAgreementBuildingRef | null | undefined
+): LeaseAgreementPolicy | null {
+  const text = normalizeLeaseAgreementText(
+    [building?.id, building?.name].filter(Boolean).join(" ")
+  );
+
+  if (text.includes("00002") || text.includes("lynas")) {
+    return {
+      documentUrl: "/lease-agreements/lynas-tenancy-2025.pdf",
+      documentFileName: "LYNAS TENANCY 2025.pdf",
+      uploadedAt: "2026-08-08T00:00:00.000Z",
+      source: "mounted_default"
+    };
+  }
+
+  if (text.includes("00001") || text.includes("rosa")) {
+    return {
+      documentUrl: "/lease-agreements/rosa-tenancy-agreement-2025.pdf",
+      documentFileName: "ROSA TENANCY AGREEMENT 2025.pdf",
+      uploadedAt: "2026-08-08T00:00:00.000Z",
+      source: "mounted_default"
+    };
+  }
+
+  return null;
+}
+
+function readLeaseAgreementPolicy(value: unknown): LeaseAgreementPolicy | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+  const documentUrl = String(source.documentUrl ?? "").trim();
+  if (!documentUrl) {
+    return null;
+  }
+
+  return {
+    documentUrl,
+    documentFileName:
+      typeof source.documentFileName === "string" && source.documentFileName.trim()
+        ? source.documentFileName.trim()
+        : null,
+    uploadedAt:
+      typeof source.uploadedAt === "string" && source.uploadedAt.trim()
+        ? source.uploadedAt.trim()
+        : null,
+    uploadedByUserId:
+      typeof source.uploadedByUserId === "string" && source.uploadedByUserId.trim()
+        ? source.uploadedByUserId.trim()
+        : null,
+    uploadedByName:
+      typeof source.uploadedByName === "string" && source.uploadedByName.trim()
+        ? source.uploadedByName.trim()
+        : null
+  };
+}
+
+function resolveLeaseAgreementPolicy(
+  building: LeaseAgreementBuildingRef | null | undefined,
+  config: Pick<BuildingConfigurationRecord, "agreementPolicy"> | null | undefined
+): LeaseAgreementPolicy | null {
+  return readLeaseAgreementPolicy(config?.agreementPolicy) ?? getMountedLeaseAgreementPolicy(building);
 }
 
 async function bootstrap() {
@@ -4330,6 +4420,7 @@ async function bootstrap() {
   type LandlordAccessContext = {
     role: LandlordAccessRole;
     userId?: string;
+    assignedBuildingId?: string;
     userSession: OptionalUserSession;
   };
 
@@ -4348,10 +4439,26 @@ async function bootstrap() {
     res: express.Response
   ): Promise<LandlordAccessContext | null> => {
     const userSession = await resolveOptionalUserSession(req);
+    const legacySession = adminAuthService.getSession(readAdminSessionToken(req));
+    if (legacySession?.role === "staff" && adminAuthService.hasRole(legacySession, "landlord")) {
+      if (!legacySession.assignedBuildingId) {
+        res.status(401).json({ error: "Choose a building before signing in as staff." });
+        return null;
+      }
+
+      return {
+        role: "staff",
+        userId: undefined as string | undefined,
+        assignedBuildingId: legacySession.assignedBuildingId,
+        userSession: null
+      };
+    }
+
     if (userSession && hasUserRoleAtLeast(userSession.role, "landlord")) {
       return {
         role: userSession.role as LandlordAccessRole,
         userId: userSession.userId,
+        assignedBuildingId: userSession.assignedBuildingId,
         userSession
       };
     }
@@ -4359,7 +4466,6 @@ async function bootstrap() {
     // House-manager access has been retired. Only explicit landlord/staff roles
     // can enter the management workspace.
 
-    const legacySession = adminAuthService.getSession(readAdminSessionToken(req));
     if (legacySession && adminAuthService.hasRole(legacySession, "landlord")) {
       if (userAccountService) {
         const primaryLandlordUser = await userAccountService.getPrimaryLandlordUser();
@@ -4463,6 +4569,7 @@ async function bootstrap() {
   const canManageBuildingFromLandlordContext = async (
     context: {
       role: string;
+      assignedBuildingId?: string;
       userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
     },
     buildingId: string
@@ -4477,6 +4584,7 @@ async function bootstrap() {
 
   const listVisibleBuildingIdsForLandlordContext = async (context: {
     role: string;
+    assignedBuildingId?: string;
     userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
   }): Promise<Set<string> | null> => {
     if (context.role === "admin" || context.role === "root_admin") {
@@ -4485,6 +4593,11 @@ async function bootstrap() {
 
     if (context.role === "landlord" && !context.userSession) {
       return null;
+    }
+
+    if (context.role === "staff" && !context.userSession) {
+      const assignedBuildingId = String(context.assignedBuildingId ?? "").trim();
+      return assignedBuildingId ? new Set([assignedBuildingId]) : new Set<string>();
     }
 
     if (context.role === "caretaker") {
@@ -4512,6 +4625,7 @@ async function bootstrap() {
 
   const listVisibleBuildingsForLandlordContext = async (context: {
     role: string;
+    assignedBuildingId?: string;
     userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
   }) => {
     const rawBuildings = await store.listBuildings();
@@ -6397,7 +6511,8 @@ async function bootstrap() {
       buildingConfiguration,
       auditEvents,
       billingHolds,
-      agreementState
+      agreementState,
+      tenantAgreementDraft
     ] = await Promise.all([
       buildLandlordUtilityRegistryRows(building.id, [normalizedHouseNumber]),
       listVisibleHouseNumbersForBuildings([building]),
@@ -6411,8 +6526,23 @@ async function bootstrap() {
             buildingId: building.id,
             houseNumber: normalizedHouseNumber
           })
+        : Promise.resolve(null),
+      userAccountService
+        ? userAccountService.getTenantAgreementDraft({
+            buildingId: building.id,
+            houseNumber: normalizedHouseNumber
+          })
         : Promise.resolve(null)
     ]);
+
+    // A draft-only room has no active Tenancy, so it never surfaces via
+    // getActiveTenantAgreement — merge it in here, shaped like a real
+    // agreement, so room-account.js's generic agreement.* prefill code
+    // works unchanged for a room that's mid-draft.
+    const resolvedAgreementState =
+      agreementState && !agreementState.hasActiveResident && tenantAgreementDraft
+        ? { ...agreementState, isDraft: true, agreement: tenantAgreementDraft }
+        : agreementState;
 
     const room =
       roomRows.find((item) => normalizeHouseNumber(item.houseNumber) === normalizedHouseNumber) ??
@@ -6643,7 +6773,7 @@ async function bootstrap() {
       tickets,
       auditEvents,
       billingHolds,
-      agreementState,
+      agreementState: resolvedAgreementState,
       monthlyCombinedCharge,
       buildingConfiguration
     };
@@ -8608,6 +8738,7 @@ async function bootstrap() {
     const pathValue = req.path ?? "";
     if (
       pathValue === "/landlord" ||
+      pathValue === "/management" ||
       pathValue.startsWith("/landlord/rooms/") ||
       pathValue === "/landlord/login" ||
       pathValue === "/resident" ||
@@ -8634,6 +8765,28 @@ async function bootstrap() {
 
   app.get("/landlord/login", (_req, res) => {
     res.sendFile(path.join(publicDir, "landlord-login.html"));
+  });
+
+  app.get("/management", async (req, res) => {
+    const token = readAdminSessionToken(req);
+    const session = adminAuthService.getSession(token);
+
+    if (session && adminAuthService.hasRole(session, "landlord")) {
+      return res.sendFile(path.join(publicDir, "management.html"));
+    }
+
+    if (userAccountService) {
+      const userSession = await userAccountService.getSession(readUserSessionToken(req));
+      if (
+        userSession &&
+        (hasUserRoleAtLeast(userSession.role, "landlord") ||
+          listCaretakerBuildingIdsForUser(userSession.userId).size > 0)
+      ) {
+        return res.sendFile(path.join(publicDir, "management.html"));
+      }
+    }
+
+    return res.redirect("/landlord/login");
   });
 
   app.get("/admin", (req, res) => {
@@ -9037,14 +9190,29 @@ async function bootstrap() {
       );
       const managerPassword =
         typeof req.body?.password === "string" ? req.body.password.trim() : "";
+      const managerBuildingId =
+        typeof req.body?.buildingId === "string" ? req.body.buildingId.trim() : "";
       if (managerUsername && managerPassword) {
         const managerSession = adminAuthService.login({
           username: managerUsername,
-          password: managerPassword
+          password: managerPassword,
+          buildingId: managerBuildingId
         });
         if (managerSession && adminAuthService.hasRole(managerSession, "landlord")) {
+          if (managerSession.role === "staff") {
+            const assignedBuildingId = String(managerSession.assignedBuildingId ?? "").trim();
+            const assignedBuilding = assignedBuildingId
+              ? await store.getBuilding(assignedBuildingId)
+              : null;
+            if (!assignedBuilding) {
+              adminAuthService.revokeSession(managerSession.token);
+              return res.status(404).json({ error: "Choose a valid building before signing in as staff." });
+            }
+          }
+
           const expiresAtMs = new Date(managerSession.expiresAt).getTime();
           const maxAgeMs = Math.max(0, expiresAtMs - Date.now());
+          res.clearCookie(userSessionCookieName, clearSessionCookieOptions());
           res.cookie(
             adminSessionCookieName,
             managerSession.token,
@@ -9054,7 +9222,8 @@ async function bootstrap() {
           return res.json({
             data: {
               role: managerSession.role,
-              expiresAt: managerSession.expiresAt
+              expiresAt: managerSession.expiresAt,
+              assignedBuildingId: managerSession.assignedBuildingId
             }
           });
         }
@@ -9562,14 +9731,8 @@ async function bootstrap() {
       session,
       agreementState?.agreement
     );
-    const leaseDocument =
-      buildingConfig?.agreementPolicy && typeof buildingConfig.agreementPolicy === "object"
-        ? (buildingConfig.agreementPolicy as {
-            documentUrl?: string;
-            documentFileName?: string;
-          })
-        : null;
-    const leaseAgreement = leaseDocument?.documentUrl
+    const leaseDocument = resolveLeaseAgreementPolicy(building, buildingConfig);
+    const leaseAgreement = leaseDocument
       ? {
           required: session.agreementStatus !== "verified",
           documentUrl: leaseDocument.documentUrl,
@@ -9901,12 +10064,14 @@ async function bootstrap() {
       const expiresAtMs = new Date(session.expiresAt).getTime();
       const maxAgeMs = Math.max(0, expiresAtMs - Date.now());
 
+      res.clearCookie(userSessionCookieName, clearSessionCookieOptions());
       res.cookie(adminSessionCookieName, session.token, buildSessionCookieOptions(req, maxAgeMs));
 
       return res.json({
         data: {
           role: session.role,
-          expiresAt: session.expiresAt
+          expiresAt: session.expiresAt,
+          assignedBuildingId: session.assignedBuildingId
         }
       });
     } catch (error) {
@@ -10278,7 +10443,7 @@ async function bootstrap() {
     }
   );
 
-  app.post("/api/auth/landlord/login", (req, res, next) => {
+  app.post("/api/auth/landlord/login", async (req, res, next) => {
     try {
       const parsed = adminLoginSchema.parse(req.body);
       const session = adminAuthService.login(parsed);
@@ -10287,15 +10452,28 @@ async function bootstrap() {
         return res.status(401).json({ error: "Invalid landlord login credentials" });
       }
 
+      if (session.role === "staff") {
+        const assignedBuildingId = String(session.assignedBuildingId ?? "").trim();
+        const assignedBuilding = assignedBuildingId
+          ? await store.getBuilding(assignedBuildingId)
+          : null;
+        if (!assignedBuilding) {
+          adminAuthService.revokeSession(session.token);
+          return res.status(404).json({ error: "Choose a valid building before signing in as staff." });
+        }
+      }
+
       const expiresAtMs = new Date(session.expiresAt).getTime();
       const maxAgeMs = Math.max(0, expiresAtMs - Date.now());
 
+      res.clearCookie(userSessionCookieName, clearSessionCookieOptions());
       res.cookie(adminSessionCookieName, session.token, buildSessionCookieOptions(req, maxAgeMs));
 
       return res.json({
         data: {
           role: session.role,
-          expiresAt: session.expiresAt
+          expiresAt: session.expiresAt,
+          assignedBuildingId: session.assignedBuildingId
         }
       });
     } catch (error) {
@@ -10309,7 +10487,8 @@ async function bootstrap() {
       return res.json({
         data: {
           role: legacySession.role,
-          expiresAt: legacySession.expiresAt
+          expiresAt: legacySession.expiresAt,
+          assignedBuildingId: legacySession.assignedBuildingId
         }
       });
     }
@@ -11329,9 +11508,12 @@ async function bootstrap() {
           return res.status(404).json({ error: "Building configuration not found" });
         }
 
+        const agreementPolicy = resolveLeaseAgreementPolicy(building, data);
+
         return res.json({
           data: {
             ...data,
+            agreementPolicy: agreementPolicy ?? data.agreementPolicy,
             buildingName: building.name
           },
           role: context.role
@@ -16919,13 +17101,20 @@ async function bootstrap() {
           }).houseNumber
         );
 
-        const data = await userAccountService.getActiveTenantAgreement({
-          buildingId: building.id,
-          houseNumber
-        });
+        const [data, buildingConfig] = await Promise.all([
+          userAccountService.getActiveTenantAgreement({
+            buildingId: building.id,
+            houseNumber
+          }),
+          buildingConfigurationService?.getForBuilding(building.id)
+        ]);
+        const leaseAgreement = resolveLeaseAgreementPolicy(building, buildingConfig);
 
         return res.json({
-          data,
+          data: {
+            ...data,
+            leaseAgreement
+          },
           role: context.role
         });
       } catch (error) {
@@ -17785,6 +17974,79 @@ async function bootstrap() {
             });
           }
           return next(error);
+        }
+      } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
+  app.post(
+    "/api/landlord/tenant-agreement-drafts",
+    async (req, res, next) => {
+      try {
+        const context = await resolveLandlordAccessContext(req, res);
+        if (!context) {
+          return;
+        }
+
+        if (context.role === "caretaker") {
+          return res.status(403).json({
+            error: "House manager accounts cannot add tenants directly."
+          });
+        }
+
+        if (!userAccountService) {
+          return res.status(503).json({
+            error: "User account service unavailable. Database connection is required."
+          });
+        }
+
+        const parsed = landlordTenantAgreementDraftSaveSchema.parse(req.body ?? {});
+        const building = await store.getBuilding(parsed.buildingId);
+        if (!building) {
+          return res.status(404).json({ error: "Building not found" });
+        }
+
+        const hasAccess = await canManageBuildingFromLandlordContext(context, building.id);
+        if (!hasAccess) {
+          return res.status(403).json({ error: "Building access denied" });
+        }
+
+        const normalizedHouseNumber = normalizeHouseNumber(parsed.houseNumber);
+        const visibleHouseNumbers = await listVisibleHouseNumbersForBuildings([building]);
+        const configuredHouseNumbers = new Set(
+          (building.houseNumbers ?? []).map((item) => normalizeHouseNumber(item))
+        );
+        if (
+          (visibleHouseNumbers.size > 0 || configuredHouseNumbers.size > 0) &&
+          !visibleHouseNumbers.has(normalizedHouseNumber) &&
+          !configuredHouseNumbers.has(normalizedHouseNumber)
+        ) {
+          return res.status(404).json({
+            error: `House ${normalizedHouseNumber} is not registered in ${building.name}.`
+          });
+        }
+
+        try {
+          const actor = actorFromLandlordContext(context);
+          const data = await userAccountService.saveTenantAgreementDraft(
+            { ...parsed, buildingId: building.id },
+            { userId: actor.userId, fullName: actor.name }
+          );
+
+          return res.status(201).json({
+            data,
+            role: context.role
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unable to save draft.";
+          if (message === "HOUSE_OCCUPIED") {
+            return res.status(409).json({
+              error: "This room already has an active resident."
+            });
+          }
+          throw error;
         }
       } catch (error) {
         return next(error);
