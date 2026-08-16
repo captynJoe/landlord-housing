@@ -9,6 +9,10 @@ services:
       POSTGRES_DB: landlord_housing
     ports:
       - "127.0.0.1:5434:5432"
+    cpus: ${LANDLORD_HOUSING_POSTGRES_CPUS:-0.25}
+    mem_limit: ${LANDLORD_HOUSING_POSTGRES_MEM_LIMIT:-512m}
+    memswap_limit: ${LANDLORD_HOUSING_POSTGRES_MEMSWAP_LIMIT:-768m}
+    mem_reservation: ${LANDLORD_HOUSING_POSTGRES_MEM_RESERVATION:-128m}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U captyn -d landlord_housing"]
       interval: 5s
