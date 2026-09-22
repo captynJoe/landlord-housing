@@ -179,15 +179,23 @@ export function toPaymentAccessRecord(
 }
 
 export class BuildingConfigurationService {
+  private readonly buildingsKnownToHaveConfig = new Set<string>();
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async ensureDefaultsForBuildings(buildings: Array<Pick<Building, "id">>): Promise<void> {
-    if (buildings.length === 0) {
+    // This is called on every landlord startup/refresh for every visible building — once a
+    // building has a config row (the overwhelmingly common case), re-upserting it every time
+    // is pure wasted round trips, so skip anything we've already confirmed exists.
+    const pending = buildings.filter(
+      (building) => !this.buildingsKnownToHaveConfig.has(building.id)
+    );
+    if (pending.length === 0) {
       return;
     }
 
     await this.prisma.$transaction(
-      buildings.map((building) =>
+      pending.map((building) =>
         this.prisma.buildingConfiguration.upsert({
           where: { buildingId: building.id },
           update: {},
@@ -198,6 +206,10 @@ export class BuildingConfigurationService {
         })
       )
     );
+
+    for (const building of pending) {
+      this.buildingsKnownToHaveConfig.add(building.id);
+    }
   }
 
   async listForBuildings(buildingIds: string[]): Promise<BuildingConfigurationRecord[]> {

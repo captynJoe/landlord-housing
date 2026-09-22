@@ -7110,14 +7110,21 @@ async function bootstrap() {
     role: string;
     userId?: string;
     userSession: Awaited<ReturnType<typeof resolveOptionalUserSession>>;
-  }, options: { mode?: "quick" | "full" } = {}) => {
+  }, options: { mode?: "quick" | "full"; preferredBuildingId?: string } = {}) => {
     const quickStartup = options.mode === "quick";
     scheduleStartupRecurringUtilityBackfill("landlord.startup");
     const buildings = await listLandlordBuildingSummaries(context);
     const visibleBuildingIds = new Set(buildings.map((item) => item.id));
     const applicationStatus: TenantApplicationStatus = "pending";
-    const registryBuildingId = buildings[0]?.id ?? "";
-    const roomBuildingId = buildings[0]?.id ?? "";
+    // The client remembers which building the landlord was last looking at (localStorage)
+    // and asks for it here — without this, every refresh silently snapped back to
+    // whichever building happens to be first in the list.
+    const requestedBuildingId = String(options.preferredBuildingId ?? "").trim();
+    const defaultBuildingId = visibleBuildingIds.has(requestedBuildingId)
+      ? requestedBuildingId
+      : buildings[0]?.id ?? "";
+    const registryBuildingId = defaultBuildingId;
+    const roomBuildingId = defaultBuildingId;
 
     const applicationsPromise = (async () => {
       if (!userAccountService) {
@@ -7153,16 +7160,16 @@ async function bootstrap() {
             .filter((item) => !visibleBuildingIds.size || visibleBuildingIds.has(item.buildingId))
         );
 
-    const [applications, rentStatus, residentDirectory, visibleHouseNumbers, tickets] =
+    const [applications, rentStatus, residentDirectory, visibleHouseNumbers, tickets, paymentAccess] =
       await Promise.all([
         applicationsPromise,
         listLandlordRentCollectionStatusRows(visibleBuildingIds, 1_200),
         residentDirectoryPromise,
         visibleHouseNumbersPromise,
-        ticketsPromise
+        ticketsPromise,
+        listPaymentAccessRowsForBuildings(buildings)
       ]);
 
-    const paymentAccess = await listPaymentAccessRowsForBuildings(buildings);
     const paymentProfiles = paymentProfileService.listProfiles(
       "/api/payments/mpesa/rent-callback"
     );
@@ -10697,7 +10704,11 @@ async function bootstrap() {
       }
 
       const mode = req.query.mode === "quick" ? "quick" : "full";
-      const data = await buildLandlordStartupPayload(context, { mode });
+      const preferredBuildingId =
+        typeof req.query.preferredBuildingId === "string"
+          ? req.query.preferredBuildingId.trim()
+          : "";
+      const data = await buildLandlordStartupPayload(context, { mode, preferredBuildingId });
       return res.json({ data, role: context.role, mode });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load landlord data.";

@@ -68,14 +68,22 @@ function mapRow(
 }
 
 export class BuildingWifiPackageService {
+  private readonly buildingsKnownToHaveDefaults = new Set<string>();
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async ensureDefaultsForBuildings(buildings: Array<Pick<Building, "id">>): Promise<void> {
-    if (buildings.length === 0) {
+    // Called from many request paths for the same buildings over and over — once the four
+    // default packages exist for a building, re-upserting all of them every time is wasted
+    // round trips, so skip anything already confirmed present.
+    const pending = buildings.filter(
+      (building) => !this.buildingsKnownToHaveDefaults.has(building.id)
+    );
+    if (pending.length === 0) {
       return;
     }
 
-    const operations = buildings.flatMap((building) =>
+    const operations = pending.flatMap((building) =>
       DEFAULT_BUILDING_WIFI_PACKAGES.map((pkg) =>
         this.prisma.buildingWifiPackage.upsert({
           where: {
@@ -99,6 +107,10 @@ export class BuildingWifiPackageService {
     );
 
     await this.prisma.$transaction(operations);
+
+    for (const building of pending) {
+      this.buildingsKnownToHaveDefaults.add(building.id);
+    }
   }
 
   async listForBuilding(
