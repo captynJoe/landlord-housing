@@ -2,16 +2,16 @@ import {
   applyDocumentBranding,
   getResidentProfileTitle,
   getResidentShellBrand
-} from "./portal-branding.js?v=20260521b";
-import { notifyError, notifyStatus } from "./notifications.js";
+} from "./portal-branding.js?v=64f8887549";
+import { notifyError, notifyStatus } from "./notifications.js?v=eccde9f9f2";
 import {
   createUploadedImageGallery,
   renderSelectedImagePreviews,
   uploadImageFiles,
   validateImageFiles
-} from "./media-upload.js";
+} from "./media-upload.js?v=50b8cea2ba";
 
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260523b";
+const RESIDENT_SW_URL = "/resident-sw.js?v=9e14ed9de9";
 
 const apiStatusEl = document.getElementById("api-status");
 const authStateEl = document.getElementById("auth-state");

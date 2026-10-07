@@ -1,20 +1,20 @@
-import { initPasswordVisibilityToggles } from "./password-visibility.js";
+import { initPasswordVisibilityToggles } from "./password-visibility.js?v=4365ca0d38";
 import {
   createUploadedImageGallery,
   renderSelectedImagePreviews,
   uploadImageFiles,
   validateImageFiles
-} from "./media-upload.js";
+} from "./media-upload.js?v=50b8cea2ba";
 import {
   applyDocumentBranding,
   getResidentPortalTitle,
   getResidentShellBrand
-} from "./portal-branding.js?v=20260521b";
+} from "./portal-branding.js?v=64f8887549";
 
 const RESIDENT_TOKEN_KEY = "estatedesk_resident_session_token";
 const RESIDENT_SESSION_TOKEN_KEY = "estatedesk_resident_session_token_session";
 const RESIDENT_REMEMBER_DEVICE_KEY = "estatedesk_resident_remember_device";
-const RESIDENT_SW_URL = "/resident-sw.js?v=20260523c";
+const RESIDENT_SW_URL = "/resident-sw.js?v=9e14ed9de9";
 
 let deferredInstallPrompt = null;
 let residentSwRegistrationPromise = null;

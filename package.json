@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "dev:local": "bash scripts/dev-local.sh",
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && npm run build:public",
+    "build:public": "tsc -p tsconfig.public.json && node scripts/stamp-public-assets.mjs",
     "build:client": "tsc -p tsconfig.client.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",

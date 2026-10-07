@@ -1,4 +1,4 @@
-import { initPasswordVisibilityToggles } from "./password-visibility.js";
+import { initPasswordVisibilityToggles } from "./password-visibility.js?v=4365ca0d38";
 
 const loginFormEl = document.getElementById("landlord-login-form");
 const identifierEl = document.getElementById("landlord-email");

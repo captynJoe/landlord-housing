@@ -1,6 +1,6 @@
-import { initPasswordVisibilityToggles } from "./password-visibility.js";
-import { initResponsiveTables } from "./mobile-table.js";
-import { notifyError, notifyStatus } from "./notifications.js";
+import { initPasswordVisibilityToggles } from "./password-visibility.js?v=4365ca0d38";
+import { initResponsiveTables } from "./mobile-table.js?v=c4c693a0d2";
+import { notifyError, notifyStatus } from "./notifications.js?v=eccde9f9f2";
 
 const authStatusEl = document.getElementById("auth-status");
 const adminRoleEl = document.getElementById("admin-role");

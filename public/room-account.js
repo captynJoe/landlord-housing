@@ -2,14 +2,14 @@ import {
   applyDocumentBranding,
   getLandlordPortalTitle,
   getLandlordShellBrand
-} from "./portal-branding.js?v=20260521b";
-import { notifyError, notifyStatus } from "./notifications.js";
+} from "./portal-branding.js?v=64f8887549";
+import { notifyError, notifyStatus } from "./notifications.js?v=eccde9f9f2";
 import {
   createUploadedImageGallery,
   renderSelectedImagePreviews,
   uploadImageFiles,
   validateImageFiles
-} from "./media-upload.js";
+} from "./media-upload.js?v=50b8cea2ba";
 
 const ROOM_ACCOUNT_FLASH_KEY = "landlord-room-account-flash";
 const roomAccountTagEl = document.getElementById("room-account-tag");

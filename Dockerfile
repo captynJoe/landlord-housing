@@ -10,7 +10,8 @@ RUN npm ci --include=dev
 COPY prisma ./prisma
 RUN npm run prisma:generate
 
-COPY tsconfig.json tsconfig.client.json ./
+COPY tsconfig.json tsconfig.client.json tsconfig.public.json ./
+COPY scripts/stamp-public-assets.mjs ./scripts/stamp-public-assets.mjs
 COPY src ./src
 COPY public ./public
 
