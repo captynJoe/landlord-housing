@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JK Flats Landlord Workspace</title>
+    <title>Ruminjo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,71 +22,61 @@
     <link rel="stylesheet" href="/landlord.css?v=8709b98621" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=aefbff730d" />
     <link rel="stylesheet" href="/landlord-modern.css?v=921be132d5" />
+    <link rel="stylesheet" href="/landlord-shell.css?v=2fc3444f04" />
   </head>
   <body>
     <div class="backdrop"></div>
-    <main class="shell">
-      <section class="panel landlord-navbar-panel">
-        <div class="landlord-navbar-head">
-          <div class="landlord-navbar-copy">
-            <p id="landlord-brand-tag" class="tag landlord-navbar-tag">JK Flats</p>
-            <h1 id="landlord-brand-title" class="landlord-navbar-title">Landlord Workspace</h1>
-            <p id="auth-status" class="status-text landlord-navbar-status">
-              Checking landlord session...
-            </p>
-          </div>
-          <div class="landlord-navbar-actions">
-            <a href="/resident" class="home-link">Resident Desk</a>
-            <span id="landlord-role" class="status-text">role: -</span>
-            <button
-              id="landlord-notifications-btn"
-              type="button"
-              class="landlord-alert-btn hidden"
-              aria-expanded="false"
-              aria-controls="landlord-notifications-panel"
-            >
-              Alerts
-              <span
-                id="landlord-notifications-badge"
-                class="landlord-nav-badge hidden"
-                aria-live="polite"
-              ></span>
-            </button>
-            <button
-              id="landlord-push-alerts-btn"
-              type="button"
-              class="landlord-push-alerts-btn hidden"
-            >
-              Enable Alerts
-            </button>
-            <button id="refresh-all-btn" type="button">Refresh All</button>
-            <button id="landlord-logout-btn" type="button">Sign Out</button>
-            <button
-              type="button"
-              class="landlord-primary-cta"
-              data-action="open-create-building-drawer"
-            >
-              + New Building
-            </button>
-          </div>
-        </div>
-        <form id="landlord-global-search-form" class="landlord-global-search">
-          <label class="landlord-global-search-field">
-            Quick Room Search
+    <main class="shell lh-shell">
+      <header class="lh-topbar">
+        <div class="lh-topbar-row">
+          <span class="lh-brand-mark" aria-hidden="true">Ruminjo</span>
+          <h1 id="landlord-brand-title" class="lh-sr-only">Ruminjo</h1>
+          <p id="auth-status" class="lh-sr-only" role="status">Checking landlord session...</p>
+          <label class="lh-building-switch">
+            <span class="lh-sr-only">Building</span>
+            <select id="landlord-focus-building-select"></select>
+          </label>
+          <form id="landlord-global-search-form" class="lh-search" role="search">
             <input
               id="landlord-global-search-input"
               type="search"
               maxlength="120"
-              placeholder="Name, phone, house"
+              placeholder="Find a room: name, phone, house"
+              aria-label="Find a room"
             />
-          </label>
-          <label class="landlord-global-search-field">
-            Building
-            <select id="landlord-global-search-building"></select>
-          </label>
-          <button id="landlord-global-search-btn" type="submit">Open Room</button>
-        </form>
-      </section>
+            <select id="landlord-global-search-building" class="hidden" aria-hidden="true" tabindex="-1"></select>
+            <button id="landlord-global-search-btn" type="submit">Open</button>
+          </form>
+          <div class="lh-topbar-actions">
+            <button
+              id="landlord-notifications-btn"
+              type="button"
+              class="lh-icon-btn lh-alert-btn hidden"
+              aria-expanded="false"
+              aria-controls="landlord-notifications-panel"
+              aria-label="Alerts"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              <span id="landlord-notifications-badge" class="lh-dot-badge hidden" aria-live="polite"></span>
+            </button>
+            <button id="refresh-all-btn" type="button" class="lh-icon-btn" aria-label="Refresh">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+            </button>
+            <details class="lh-menu">
+              <summary class="lh-icon-btn" aria-label="Menu">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              </summary>
+              <div class="lh-menu-panel">
+                <p class="lh-menu-role"><strong>Ruminjo</strong> · <span id="landlord-role">role: -</span></p>
+                <button type="button" data-action="open-create-building-drawer">New Building</button>
+                <button id="landlord-push-alerts-btn" type="button" class="hidden">Enable Alerts</button>
+                <a href="/resident">Resident Desk</a>
+                <button id="landlord-logout-btn" type="button" class="lh-menu-danger">Sign Out</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </header>
 
       <section
         id="landlord-notifications-panel"
@@ -106,134 +96,30 @@
         <div id="landlord-notifications-list" class="landlord-notification-list"></div>
       </section>
 
-      <div class="landlord-workspace">
-        <aside class="panel landlord-side-panel" aria-label="Landlord and staff workspace">
-          <nav class="landlord-nav" aria-label="Landlord sections">
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="overview"
-              data-landlord-section-target="overview-collections-panel"
-            >
-              Dashboard
-            </button>
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="tenants"
-              data-landlord-section-target="residents-section"
-            >
-              Rooms
-            </button>
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="applications"
-              data-landlord-section-target="applications-section"
-            >
+      <div class="lh-workspace">
+        <aside class="lh-sidebar" aria-label="Management workspace">
+          <nav class="lh-nav" aria-label="Landlord sections">
+            <button type="button" class="lh-nav-btn" data-landlord-view="overview" data-landlord-section-target="overview-collections-panel">Dashboard</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="tenants" data-landlord-section-target="residents-section">Rooms</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="applications" data-landlord-section-target="applications-section">
               <span class="landlord-nav-label">Requests</span>
-              <span
-                id="applications-nav-badge"
-                class="landlord-nav-badge hidden"
-                aria-live="polite"
-              ></span>
+              <span id="applications-nav-badge" class="lh-count-badge hidden" aria-live="polite"></span>
             </button>
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="messages"
-              data-landlord-section-target="message-center-section"
-            >
-              Messages
-            </button>
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="documents"
-              data-landlord-section-target="documents-section"
-            >
-              Documents
-            </button>
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="expenses"
-              data-landlord-section-target="utilities-expenditures-section"
-            >
-              Costs
-            </button>
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="buildings"
-              data-landlord-section-target="buildings-section"
-            >
-              Buildings
-            </button>
-            <button
-              type="button"
-              class="landlord-nav-btn"
-              data-landlord-view="settings"
-              data-landlord-section-target="settings-section"
-            >
-              Setup
-            </button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="messages" data-landlord-section-target="message-center-section">Messages</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="documents" data-landlord-section-target="documents-section">Documents</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="expenses" data-landlord-section-target="utilities-expenditures-section">Costs</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="buildings" data-landlord-section-target="buildings-section">Buildings</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="settings" data-landlord-section-target="settings-section">Setup</button>
           </nav>
 
-          <section class="landlord-focus-panel">
-            <div class="panel-head">
-              <h2>Building Focus</h2>
-              <div class="action-row landlord-focus-actions">
-                <button
-                  type="button"
-                  data-landlord-focus-target-view="buildings"
-                  data-landlord-focus-target-section="buildings-section"
-                >
-                  Buildings
-                </button>
-                <button
-                  type="button"
-                  data-landlord-focus-target-view="tenants"
-                  data-landlord-focus-target-section="residents-section"
-                >
-                  Rooms
-                </button>
-                <button
-                  type="button"
-                  data-landlord-focus-target-view="applications"
-                  data-landlord-focus-target-section="overview-issues-section"
-                >
-                  Requests
-                </button>
-              </div>
+          <section class="lh-side-block lh-focus" aria-live="polite">
+            <div class="lh-stat-grid">
+              <div class="lh-stat"><span>Units</span><strong id="landlord-focus-units">-</strong></div>
+              <div class="lh-stat"><span>Residents</span><strong id="landlord-focus-residents">-</strong></div>
+              <div class="lh-stat"><span>Open Bills</span><strong id="landlord-focus-open-bills">-</strong></div>
+              <div class="lh-stat"><span>Outstanding</span><strong id="landlord-focus-outstanding">-</strong></div>
             </div>
-            <div class="landlord-focus-grid">
-              <label class="landlord-focus-field">
-                Working Building
-                <select id="landlord-focus-building-select"></select>
-              </label>
-              <div class="landlord-focus-summary" aria-live="polite">
-                <div class="landlord-focus-stat">
-                  <span>Units</span>
-                  <strong id="landlord-focus-units">-</strong>
-                </div>
-                <div class="landlord-focus-stat">
-                  <span>Residents</span>
-                  <strong id="landlord-focus-residents">-</strong>
-                </div>
-                <div class="landlord-focus-stat">
-                  <span>Open Bills</span>
-                  <strong id="landlord-focus-open-bills">-</strong>
-                </div>
-                <div class="landlord-focus-stat">
-                  <span>Outstanding</span>
-                  <strong id="landlord-focus-outstanding">-</strong>
-                </div>
-              </div>
-            </div>
-            <p id="landlord-focus-note" class="status-text landlord-focus-note">
-              Choose a building to keep the workspace aligned.
-            </p>
+            <p id="landlord-focus-note" class="lh-focus-note"></p>
           </section>
         </aside>
         <section class="layout landlord-content">
@@ -243,30 +129,7 @@
           id="overview-collections-panel"
         >
           <div class="panel-head landlord-dashboard-head">
-            <div>
-              <p class="tag dashboard-kicker">Daily View</p>
-              <h2 id="overview-daily-heading">Dashboard</h2>
-              <p id="overview-daily-subtitle" class="status-text">
-                Current building activity, collections, rooms, and requests.
-              </p>
-            </div>
-            <div class="action-row dashboard-lookup-row">
-              <label class="dashboard-lookup-field">
-                Room Lookup
-                <input
-                  id="overview-room-search-input"
-                  type="search"
-                  maxlength="120"
-                  placeholder="Name, phone, house"
-                />
-              </label>
-              <label class="dashboard-lookup-field">
-                Building
-                <select id="overview-room-building-select"></select>
-              </label>
-              <button id="overview-open-room-btn" type="button">Open Room</button>
-              <button id="refresh-overview-dashboard" type="button">Refresh</button>
-            </div>
+            <h2 id="overview-daily-heading">Dashboard</h2>
           </div>
 
           <section class="daily-dashboard" aria-live="polite">
@@ -274,32 +137,26 @@
               <button type="button" class="daily-card daily-card-primary daily-card-btn" data-dashboard-action="payments">
                 <span>Collected This Month</span>
                 <strong id="overview-daily-collected">-</strong>
-                <small>Rent and utility payments</small>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="outstanding">
                 <span>Total Outstanding</span>
                 <strong id="overview-daily-outstanding">-</strong>
-                <small>Rooms needing follow-up</small>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="unpaid-rooms">
                 <span>Unpaid Rooms</span>
                 <strong id="overview-daily-unpaid">-</strong>
-                <small>Rent or utilities open</small>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="issues">
                 <span>Open Issues</span>
                 <strong id="overview-daily-issues">-</strong>
-                <small>Resident reports not resolved</small>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="requests">
                 <span>Tenant Requests</span>
                 <strong id="overview-daily-requests">-</strong>
-                <small>Applications waiting</small>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="vacant-rooms">
                 <span>Vacant Rooms</span>
                 <strong id="overview-daily-vacant">-</strong>
-                <small>Rooms ready for assignment</small>
               </button>
             </div>
             <div class="daily-action-grid">
@@ -313,7 +170,6 @@
 
           <div class="dashboard-section-title">
             <h3>Rooms To Watch</h3>
-            <p class="status-text">Outstanding balances and recent payments for the focused building.</p>
           </div>
           <div class="table-wrap dashboard-watch-table" id="overview-collections-section">
             <table>
@@ -2303,6 +2159,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=967538306b"></script>
+    <script type="module" src="/landlord.js?v=26a2451347"></script>
   </body>
 </html>

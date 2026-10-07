@@ -370,7 +370,6 @@ const overviewRoomBuildingSelectEl = document.getElementById("overview-room-buil
 const overviewRoomSearchInputEl = document.getElementById("overview-room-search-input");
 const overviewOpenRoomBtnEl = document.getElementById("overview-open-room-btn");
 const overviewDailyHeadingEl = document.getElementById("overview-daily-heading");
-const overviewDailySubtitleEl = document.getElementById("overview-daily-subtitle");
 const overviewDailyCollectedEl = document.getElementById("overview-daily-collected");
 const overviewDailyOutstandingEl = document.getElementById("overview-daily-outstanding");
 const overviewDailyUnpaidEl = document.getElementById("overview-daily-unpaid");
@@ -1518,7 +1517,8 @@ function updateLandlordBranding() {
   applyDocumentBranding(portalTitle, shellBrand);
 }
 
-function setActiveLandlordView(nextView) {
+function setActiveLandlordView(nextView, options = {}) {
+  const previousView = state.activeLandlordView;
   const requestedView = String(nextView ?? "").trim();
   const normalizedView =
     requestedView === "residents" || requestedView === "utilities"
@@ -1556,6 +1556,20 @@ function setActiveLandlordView(nextView) {
     }
     panel.classList.toggle("hidden", panel.dataset.landlordViewPanel !== targetView);
   });
+
+  document.body.dataset.landlordView = targetView;
+  const activeNavButton = landlordNavButtons.find((button) => button.classList.contains("active"));
+  const navStrip = activeNavButton?.parentElement;
+  if (activeNavButton instanceof HTMLElement && navStrip && navStrip.scrollWidth > navStrip.clientWidth) {
+    navStrip.scrollTo({
+      left: activeNavButton.offsetLeft - (navStrip.clientWidth - activeNavButton.offsetWidth) / 2,
+      behavior: "smooth"
+    });
+  }
+
+  if (targetView === "settings" && previousView !== "settings" && !options.skipLoad) {
+    syncSettingsBuildingOptions();
+  }
 }
 
 function scrollToLandlordSection(sectionId) {
@@ -6053,7 +6067,7 @@ async function ensureLandlordServiceWorkerRegistration() {
       .register(LANDLORD_SW_URL, { scope: "/" })
       .catch((error) => {
         landlordSwRegistrationPromise = null;
-        console.error("Failed to register JK Flats service worker", error);
+        console.error("Failed to register Ruminjo service worker", error);
         return null;
       });
   }
@@ -6672,7 +6686,6 @@ function getPendingApplicationRowsForFocusedBuilding() {
 function renderDailyDashboard() {
   const requiredEls = [
     overviewDailyHeadingEl,
-    overviewDailySubtitleEl,
     overviewDailyCollectedEl,
     overviewDailyOutstandingEl,
     overviewDailyUnpaidEl,
@@ -6738,11 +6751,6 @@ function renderDailyDashboard() {
   overviewDailyHeadingEl.textContent = isStaffRole()
     ? buildingLabel + " Staff Work Desk"
     : buildingLabel + " Dashboard";
-  overviewDailySubtitleEl.textContent = isStaffRole()
-    ? "Agreement intake, resident documents, room assignment, requests, and daily follow-up for your building."
-    : focusedBuildingId
-      ? "Daily collection, issue, request, and room signals for the focused building."
-      : "Daily collection, issue, request, and room signals across the portfolio.";
   overviewDailyCollectedEl.textContent = formatCurrency(rentCollectedThisMonth + utilityCollectedThisMonth);
   overviewDailyOutstandingEl.textContent = formatCurrency(outstanding);
   overviewDailyUnpaidEl.textContent = String(unpaidRoomKeys.size);
@@ -6844,7 +6852,7 @@ function renderLandlordFocusPanel() {
     landlordFocusResidentsEl.textContent = "-";
     landlordFocusOpenBillsEl.textContent = "-";
     landlordFocusOutstandingEl.textContent = "-";
-    landlordFocusNoteEl.textContent = "Choose a building to keep the workspace aligned.";
+    landlordFocusNoteEl.textContent = "";
     return;
   }
 
@@ -15624,6 +15632,25 @@ refreshAllBtnEl.addEventListener("click", () => {
 landlordLogoutBtnEl.addEventListener("click", () => {
   void signOut();
 });
+
+const landlordMenuEl = document.querySelector(".lh-menu");
+if (landlordMenuEl instanceof HTMLDetailsElement) {
+  landlordMenuEl.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest(".lh-menu-panel :is(button, a)")) {
+      landlordMenuEl.open = false;
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (landlordMenuEl.open && event.target instanceof Node && !landlordMenuEl.contains(event.target)) {
+      landlordMenuEl.open = false;
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      landlordMenuEl.open = false;
+    }
+  });
+}
 
 void (async () => {
   const now = new Date();

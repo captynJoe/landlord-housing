@@ -2,7 +2,7 @@ import {
   applyDocumentBranding,
   getLandlordPortalTitle,
   getLandlordShellBrand
-} from "./portal-branding.js?v=64f8887549";
+} from "./portal-branding.js?v=d15ebc0cd6";
 import { notifyError, notifyStatus } from "./notifications.js?v=eccde9f9f2";
 import {
   createUploadedImageGallery,

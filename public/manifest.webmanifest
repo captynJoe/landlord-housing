@@ -1,7 +1,7 @@
 {
   "id": "/resident",
-  "name": "JK Flats Resident",
-  "short_name": "JK Flats",
+  "name": "Ruminjo Resident",
+  "short_name": "Ruminjo",
   "description": "Resident workspace for rent, utility, support, and building updates.",
   "start_url": "/resident",
   "scope": "/",

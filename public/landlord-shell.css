@@ -1,0 +1,709 @@
+/*
+ * Ruminjo landlord shell (top bar, section nav, sidebar summary).
+ * Same layout as captyn-housing's landlord shell; colours map onto the Ruminjo
+ * palette from landlord-modern.css / dedicated-theme.css. Loaded last.
+ */
+
+:root {
+  --captyn-ink: var(--lh-ink, #172033);
+  --captyn-ink-strong: #101828;
+  --captyn-muted: var(--lh-muted, #667085);
+  --captyn-panel: #ffffff;
+  --captyn-panel-strong: #ffffff;
+  --captyn-panel-soft: #f3f7f5;
+  --captyn-canvas: var(--lh-bg, #f6f8fb);
+  --captyn-line: var(--lh-line, #d9e1ea);
+  --captyn-navy: var(--lh-primary-dark, #0f4f47);
+  --captyn-blue: var(--lh-primary, #166c5f);
+  --captyn-blue-soft: var(--lh-primary-soft, #e5f3f0);
+  --captyn-green: #2d6b45;
+  --captyn-amber: var(--lh-amber, #aa6a16);
+  --captyn-red: var(--lh-danger, #b42318);
+  --captyn-font-display: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+}
+
+body {
+  background: var(--captyn-canvas);
+}
+
+.lh-brand-mark {
+  color: var(--captyn-navy);
+  font-family: var(--captyn-font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.lh-sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lh-topbar .hidden,
+.lh-sidebar .hidden {
+  display: none !important;
+}
+
+.lh-shell {
+  padding-top: 16px;
+}
+
+/* ---------- Top bar ---------- */
+
+.lh-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--captyn-line);
+  border-radius: var(--radius-lg);
+  background: var(--captyn-panel-strong);
+  box-shadow: 0 10px 26px rgba(11, 26, 58, 0.08);
+}
+
+.lh-topbar-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 280px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.lh-building-switch {
+  display: block;
+  min-width: 0;
+  margin: 0;
+}
+
+.lh-building-switch select {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 34px 6px 10px;
+  border: 1px solid transparent !important;
+  background-color: transparent !important;
+  color: var(--captyn-ink-strong) !important;
+  font-family: var(--captyn-font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.lh-building-switch select:hover {
+  border-color: var(--captyn-line) !important;
+}
+
+.lh-building-switch select option {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.lh-search {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+}
+
+.lh-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 0.92rem;
+}
+
+.lh-search button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 16px;
+  box-shadow: none;
+}
+
+.lh-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lh-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--captyn-line) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--captyn-panel-soft) !important;
+  color: var(--captyn-ink) !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  list-style: none;
+}
+
+.lh-icon-btn:hover {
+  border-color: var(--captyn-blue) !important;
+  color: var(--captyn-blue) !important;
+}
+
+.lh-icon-btn::-webkit-details-marker {
+  display: none;
+}
+
+.lh-icon-btn svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lh-alert-btn.has-alert {
+  color: var(--captyn-blue) !important;
+}
+
+.lh-dot-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--captyn-red);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Menu */
+
+.lh-menu {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  background: none !important;
+}
+
+.lh-menu[open] > summary {
+  border-color: var(--captyn-blue) !important;
+  color: var(--captyn-blue) !important;
+}
+
+.lh-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  display: grid;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--captyn-line);
+  border-radius: var(--radius-md);
+  background: var(--captyn-panel-strong);
+  box-shadow: 0 18px 40px rgba(11, 26, 58, 0.22);
+}
+
+.lh-menu-role {
+  margin: 0;
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--captyn-line);
+  margin-bottom: 4px;
+  color: var(--captyn-muted);
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+
+.lh-menu-panel > :is(button, a) {
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--captyn-ink) !important;
+  box-shadow: none !important;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+}
+
+.lh-menu-panel > :is(button, a):hover {
+  background: var(--captyn-blue-soft) !important;
+}
+
+.lh-menu-panel > button:disabled {
+  color: var(--captyn-muted) !important;
+  cursor: default;
+}
+
+.lh-menu-panel > .lh-menu-danger {
+  color: var(--captyn-red) !important;
+}
+
+/* ---------- Workspace ---------- */
+
+.lh-workspace {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.lh-workspace > .landlord-content {
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+
+.lh-workspace > .landlord-content > .panel:first-child,
+.lh-workspace > .landlord-content > .landlord-view {
+  margin-top: 0;
+}
+
+.lh-sidebar {
+  position: sticky;
+  top: 86px;
+  display: grid;
+  gap: 12px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* Section nav */
+
+.lh-nav {
+  position: relative;
+  display: grid;
+  gap: 2px;
+}
+
+.lh-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0 !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: var(--captyn-muted) !important;
+  box-shadow: none !important;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.lh-nav-btn:hover {
+  background: var(--captyn-blue-soft) !important;
+  color: var(--captyn-ink) !important;
+}
+
+.lh-nav-btn.active {
+  background: var(--captyn-navy) !important;
+  color: #fff !important;
+}
+
+.lh-count-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--captyn-red);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* Building summary + numbers */
+
+.lh-side-block {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--captyn-line);
+  border-radius: var(--radius-md);
+  background: var(--captyn-panel-strong);
+}
+
+.lh-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.lh-stat {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--captyn-panel-soft);
+}
+
+.lh-stat span,
+.lh-metric-row span {
+  color: var(--captyn-muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.lh-stat strong {
+  overflow: hidden;
+  color: var(--captyn-ink-strong);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lh-focus-note {
+  margin: 8px 2px 0;
+  color: var(--captyn-muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.lh-focus-note:empty {
+  display: none;
+}
+
+.lh-metrics {
+  display: grid;
+  padding: 4px;
+}
+
+.lh-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: var(--captyn-ink) !important;
+  box-shadow: none !important;
+  text-align: left;
+}
+
+.lh-metric-row:hover {
+  background: var(--captyn-blue-soft) !important;
+}
+
+.lh-metric-row strong {
+  color: var(--captyn-ink-strong);
+  font-size: 0.9rem;
+}
+
+/* Dedicated room workspace route hides the sidebar */
+body.landlord-rooms-route .lh-sidebar {
+  display: none !important;
+}
+
+body.landlord-rooms-route .lh-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ---------- Dashboard tidy-up ---------- */
+
+.landlord-dashboard-head {
+  margin-bottom: 4px;
+}
+
+.daily-dashboard {
+  margin-top: 10px;
+}
+
+.daily-card {
+  gap: 4px;
+  padding: 12px 14px;
+  border-color: var(--captyn-line);
+  background: var(--captyn-panel-strong);
+  box-shadow: none;
+}
+
+.daily-card span {
+  color: var(--captyn-muted);
+  font-size: 0.7rem;
+}
+
+.daily-card strong {
+  color: var(--captyn-ink-strong);
+}
+
+.daily-card-primary {
+  border-color: transparent;
+  background: var(--captyn-navy);
+}
+
+.daily-card-primary span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.daily-card-primary strong {
+  color: #fff;
+}
+
+.daily-action-grid button {
+  border: 1px solid var(--captyn-line) !important;
+  background: var(--captyn-blue-soft) !important;
+  color: var(--captyn-ink) !important;
+  box-shadow: none !important;
+}
+
+.daily-action-grid button:hover {
+  border-color: var(--captyn-blue) !important;
+  color: var(--captyn-blue) !important;
+}
+
+.dashboard-section-title h3 {
+  color: var(--captyn-ink-strong);
+}
+
+/* ---------- Tablet / phone ---------- */
+
+@media (max-width: 980px) {
+  .lh-shell {
+    padding: 0 10px 40px;
+  }
+
+  .lh-topbar {
+    position: static;
+    margin: 0 -10px 0;
+    padding: 10px 12px;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .lh-topbar-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "building actions"
+      "search search";
+    row-gap: 8px;
+  }
+
+  .lh-brand-mark {
+    display: none;
+  }
+
+  .lh-building-switch {
+    grid-area: building;
+  }
+
+  .lh-building-switch select {
+    padding-left: 2px;
+    font-size: 1.1rem;
+  }
+
+  .lh-search {
+    grid-area: search;
+  }
+
+  .lh-topbar-actions {
+    grid-area: actions;
+  }
+
+  .lh-workspace {
+    display: block;
+  }
+
+  /* The sidebar collapses to a sticky, swipeable section strip. */
+  .lh-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    display: block;
+    margin: 0 -10px 12px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--captyn-line);
+    background: var(--captyn-canvas);
+  }
+
+  .lh-nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .lh-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .lh-nav-btn {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--captyn-line) !important;
+    border-radius: 999px !important;
+    background: var(--captyn-panel-strong) !important;
+    font-size: 0.86rem;
+    scroll-snap-align: start;
+  }
+
+  .lh-nav-btn.active {
+    border-color: var(--captyn-navy) !important;
+  }
+
+  .lh-count-badge {
+    min-width: 18px;
+    height: 18px;
+    font-size: 0.66rem;
+    line-height: 18px;
+  }
+
+  /* The dashboard cards already carry these numbers on small screens. */
+  .lh-side-block {
+    display: none;
+  }
+
+  .landlord-content > .panel,
+  .landlord-content > .landlord-view {
+    margin-top: 0;
+  }
+
+  .landlord-notification-panel {
+    margin: 10px 0 0;
+  }
+}
+
+/* Mobile table cards were hard-coded white; follow the theme instead. */
+@media (max-width: 680px) {
+  .landlord-content .table-wrap table[data-mobile-cards="true"] tr {
+    border-color: var(--captyn-line);
+    background: var(--captyn-panel-strong);
+  }
+
+  .landlord-content .table-wrap table[data-mobile-cards="true"] tr td {
+    background: transparent;
+  }
+}
+
+@media (max-width: 1200px) {
+  .landlord-content .utility-registry-table-wrap table[data-mobile-cards="true"] tr {
+    border-color: var(--captyn-line);
+    background: var(--captyn-panel-strong);
+  }
+
+  .landlord-content .utility-registry-table-wrap table[data-mobile-cards="true"] tr td {
+    background: transparent;
+  }
+}
+
+@media (max-width: 680px) {
+  .panel {
+    padding: 14px 12px;
+  }
+
+  .panel-head h2 {
+    font-size: 1.15rem;
+  }
+
+  .daily-dashboard-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .daily-card-primary {
+    grid-column: 1 / -1;
+  }
+
+  .daily-card {
+    padding: 10px 12px;
+    min-height: 0;
+  }
+
+  .daily-card strong {
+    font-size: 1.15rem;
+  }
+
+  .daily-action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .daily-action-grid button {
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+
+  /*
+   * Older mobile rules force every action-row into a one-column grid with
+   * full-width buttons. Let buttons share a line and wrap instead.
+   */
+  .landlord-content .action-row,
+  .landlord-content .panel-head .action-row,
+  .landlord-notification-panel .action-row {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .landlord-content .action-row > button,
+  .landlord-content .action-row > a,
+  .landlord-notification-panel .action-row > button {
+    flex: 1 1 calc(50% - 6px);
+    width: auto !important;
+    min-width: 0;
+    min-height: 38px;
+    padding: 6px 10px;
+    font-size: 0.86rem;
+  }
+
+  .landlord-content .action-row > label,
+  .landlord-content .action-row > input,
+  .landlord-content .action-row > select,
+  .landlord-content .action-row > div {
+    flex: 1 1 100%;
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .lh-search button {
+    padding: 0 12px;
+  }
+
+  .daily-dashboard-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+.daily-card.daily-card-primary span,
+.daily-card.daily-card-primary strong,
+.daily-card.daily-card-primary small {
+  color: #ffffff !important;
+}

@@ -9,12 +9,12 @@ import {
   applyDocumentBranding,
   getResidentPortalTitle,
   getResidentShellBrand
-} from "./portal-branding.js?v=64f8887549";
+} from "./portal-branding.js?v=d15ebc0cd6";
 
 const RESIDENT_TOKEN_KEY = "estatedesk_resident_session_token";
 const RESIDENT_SESSION_TOKEN_KEY = "estatedesk_resident_session_token_session";
 const RESIDENT_REMEMBER_DEVICE_KEY = "estatedesk_resident_remember_device";
-const RESIDENT_SW_URL = "/resident-sw.js?v=9e14ed9de9";
+const RESIDENT_SW_URL = "/resident-sw.js?v=cfcd356430";
 
 let deferredInstallPrompt = null;
 let residentSwRegistrationPromise = null;

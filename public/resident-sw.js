@@ -10,9 +10,9 @@ const APP_ASSETS = [
   "/user.css?v=265d920019",
   "/landlord.css?v=8709b98621",
   "/dedicated-theme.css?v=aefbff730d",
-  "/users.js?v=5ea464f6b0",
-  "/user.js?v=94d9856fa0",
-  "/landlord.js?v=7ec707be4b",
+  "/users.js?v=6588ce47f9",
+  "/user.js?v=df48cfad3c",
+  "/landlord.js?v=589fe7c719",
   "/password-visibility.js",
   "/manifest.webmanifest",
   "/icons/housing-app.svg",
@@ -136,7 +136,7 @@ self.addEventListener("push", (event) => {
     };
   }
 
-  const title = data.title || "JK Flats Resident";
+  const title = data.title || "Ruminjo Resident";
   const options = {
     body: data.body || "New resident update available.",
     icon: "/icons/housing-app.svg",

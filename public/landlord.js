@@ -2,8 +2,8 @@
 import { initResponsiveTables } from "./mobile-table.js?v=c4c693a0d2";
 import { notifyError, notifyStatus } from "./notifications.js?v=eccde9f9f2";
 import { createUploadedImageGallery, renderSelectedImagePreviews, uploadImageFiles, validateImageFiles } from "./media-upload.js?v=50b8cea2ba";
-import { applyDocumentBranding, getLandlordPortalTitle, getLandlordShellBrand } from "./portal-branding.js?v=64f8887549";
-const LANDLORD_SW_URL = "/resident-sw.js?v=9e14ed9de9";
+import { applyDocumentBranding, getLandlordPortalTitle, getLandlordShellBrand } from "./portal-branding.js?v=d15ebc0cd6";
+const LANDLORD_SW_URL = "/resident-sw.js?v=cfcd356430";
 const ROOM_ACCOUNT_FLASH_KEY = "landlord-room-account-flash";
 const authStatusEl = document.getElementById("auth-status");
 const landlordRoleEl = document.getElementById("landlord-role");
@@ -278,7 +278,6 @@ const overviewRoomBuildingSelectEl = document.getElementById("overview-room-buil
 const overviewRoomSearchInputEl = document.getElementById("overview-room-search-input");
 const overviewOpenRoomBtnEl = document.getElementById("overview-open-room-btn");
 const overviewDailyHeadingEl = document.getElementById("overview-daily-heading");
-const overviewDailySubtitleEl = document.getElementById("overview-daily-subtitle");
 const overviewDailyCollectedEl = document.getElementById("overview-daily-collected");
 const overviewDailyOutstandingEl = document.getElementById("overview-daily-outstanding");
 const overviewDailyUnpaidEl = document.getElementById("overview-daily-unpaid");
@@ -1154,7 +1153,8 @@ function updateLandlordBranding() {
     }
     applyDocumentBranding(portalTitle, shellBrand);
 }
-function setActiveLandlordView(nextView) {
+function setActiveLandlordView(nextView, options = {}) {
+    const previousView = state.activeLandlordView;
     const requestedView = String(nextView ?? "").trim();
     const normalizedView = requestedView === "residents" || requestedView === "utilities"
         ? "tenants"
@@ -1185,6 +1185,18 @@ function setActiveLandlordView(nextView) {
         }
         panel.classList.toggle("hidden", panel.dataset.landlordViewPanel !== targetView);
     });
+    document.body.dataset.landlordView = targetView;
+    const activeNavButton = landlordNavButtons.find((button) => button.classList.contains("active"));
+    const navStrip = activeNavButton?.parentElement;
+    if (activeNavButton instanceof HTMLElement && navStrip && navStrip.scrollWidth > navStrip.clientWidth) {
+        navStrip.scrollTo({
+            left: activeNavButton.offsetLeft - (navStrip.clientWidth - activeNavButton.offsetWidth) / 2,
+            behavior: "smooth"
+        });
+    }
+    if (targetView === "settings" && previousView !== "settings" && !options.skipLoad) {
+        syncSettingsBuildingOptions();
+    }
 }
 function scrollToLandlordSection(sectionId) {
     window.requestAnimationFrame(() => {
@@ -4694,7 +4706,7 @@ async function ensureLandlordServiceWorkerRegistration() {
             .register(LANDLORD_SW_URL, { scope: "/" })
             .catch((error) => {
             landlordSwRegistrationPromise = null;
-            console.error("Failed to register JK Flats service worker", error);
+            console.error("Failed to register Ruminjo service worker", error);
             return null;
         });
     }
@@ -5219,7 +5231,6 @@ function getPendingApplicationRowsForFocusedBuilding() {
 function renderDailyDashboard() {
     const requiredEls = [
         overviewDailyHeadingEl,
-        overviewDailySubtitleEl,
         overviewDailyCollectedEl,
         overviewDailyOutstandingEl,
         overviewDailyUnpaidEl,
@@ -5269,11 +5280,6 @@ function renderDailyDashboard() {
     overviewDailyHeadingEl.textContent = isStaffRole()
         ? buildingLabel + " Staff Work Desk"
         : buildingLabel + " Dashboard";
-    overviewDailySubtitleEl.textContent = isStaffRole()
-        ? "Agreement intake, resident documents, room assignment, requests, and daily follow-up for your building."
-        : focusedBuildingId
-            ? "Daily collection, issue, request, and room signals for the focused building."
-            : "Daily collection, issue, request, and room signals across the portfolio.";
     overviewDailyCollectedEl.textContent = formatCurrency(rentCollectedThisMonth + utilityCollectedThisMonth);
     overviewDailyOutstandingEl.textContent = formatCurrency(outstanding);
     overviewDailyUnpaidEl.textContent = String(unpaidRoomKeys.size);
@@ -5351,7 +5357,7 @@ function renderLandlordFocusPanel() {
         landlordFocusResidentsEl.textContent = "-";
         landlordFocusOpenBillsEl.textContent = "-";
         landlordFocusOutstandingEl.textContent = "-";
-        landlordFocusNoteEl.textContent = "Choose a building to keep the workspace aligned.";
+        landlordFocusNoteEl.textContent = "";
         return;
     }
     landlordFocusUnitsEl.textContent = String(summary.units);
@@ -12463,6 +12469,24 @@ refreshAllBtnEl.addEventListener("click", () => {
 landlordLogoutBtnEl.addEventListener("click", () => {
     void signOut();
 });
+const landlordMenuEl = document.querySelector(".lh-menu");
+if (landlordMenuEl instanceof HTMLDetailsElement) {
+    landlordMenuEl.addEventListener("click", (event) => {
+        if (event.target instanceof Element && event.target.closest(".lh-menu-panel :is(button, a)")) {
+            landlordMenuEl.open = false;
+        }
+    });
+    document.addEventListener("click", (event) => {
+        if (landlordMenuEl.open && event.target instanceof Node && !landlordMenuEl.contains(event.target)) {
+            landlordMenuEl.open = false;
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            landlordMenuEl.open = false;
+        }
+    });
+}
 void (async () => {
     const now = new Date();
     utilityBillMonthEl.value = toMonthInputValue(now);

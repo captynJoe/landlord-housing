@@ -191,7 +191,7 @@ function renderSidebar() {
         <img src="/icons/housing-app.svg" alt="" />
         <div>
           <p class="management-kicker">EstateDesk</p>
-          <h1>JK Flats</h1>
+          <h1>Ruminjo</h1>
           <p class="management-muted">Operations desk · ${escapeHtml(state.role)}</p>
         </div>
       </div>
