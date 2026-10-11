@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { initResponsiveTables } from "./mobile-table.js?v=c4c693a0d2";
 import { notifyError, notifyStatus } from "./notifications.js?v=eccde9f9f2";
+import { applyHouseSheetImport, buildXlsx, describeHouseSheetPlan, houseSheetRowsFromRegistry, houseSheetTable, parseHouseSheet, prepareHouseSheetImport, readSpreadsheet } from "./house-sheet.js?v=dc667cfbc0";
 import { createUploadedImageGallery, renderSelectedImagePreviews, uploadImageFiles, validateImageFiles } from "./media-upload.js?v=50b8cea2ba";
 import { applyDocumentBranding, getLandlordPortalTitle, getLandlordShellBrand } from "./portal-branding.js?v=d15ebc0cd6";
 const LANDLORD_SW_URL = "/resident-sw.js?v=cfcd356430";
@@ -224,6 +225,9 @@ const roomLedgerBodyEl = document.getElementById("room-ledger-body");
 const residentSourceTableEl = document.querySelector(".resident-source-table");
 const residentsBodyEl = document.getElementById("residents-body");
 const refreshResidentsBtnEl = document.getElementById("refresh-residents");
+const houseSheetExportBtnEl = document.getElementById("house-sheet-export-btn");
+const houseSheetImportBtnEl = document.getElementById("house-sheet-import-btn");
+const houseSheetFileEl = document.getElementById("house-sheet-file");
 const documentsSummaryEl = document.getElementById("documents-summary");
 const documentsBodyEl = document.getElementById("documents-body");
 const refreshDocumentsBtnEl = document.getElementById("refresh-documents");
@@ -972,21 +976,8 @@ function renderMessageCenter() {
     renderAutomaticMessageRules();
     const sms = state.messageCenterSms ?? {};
     const messages = Array.isArray(state.messages) ? state.messages : [];
-    const selectedBuildingId = String(state.selectedMessageBuildingId || getFocusedBuildingId() || "").trim();
-    const buildingLabel = selectedBuildingId
-        ? getBuildingDisplayNameById(selectedBuildingId, selectedBuildingId)
-        : "All buildings";
-    const openIssues = Array.isArray(state.tickets)
-        ? state.tickets.filter((ticket) => String(ticket?.status || "") !== "resolved").length
-        : 0;
     if (messageCenterSummaryEl instanceof HTMLElement) {
-        const provider = sms.provider ? sms.provider : "SMS";
-        const sender = sms.senderId ? ` from ${sms.senderId}` : "";
-        const issueText = `${openIssues} open resident issue${openIssues === 1 ? "" : "s"}`;
-        const messageText = `${messages.length} recent SMS message${messages.length === 1 ? "" : "s"}`;
-        messageCenterSummaryEl.textContent = sms.enabled
-            ? `${buildingLabel} has ${issueText} and ${messageText}. ${provider} is ready${sender}.`
-            : `${buildingLabel} has ${issueText}. SMS is not configured on this server.`;
+        messageCenterSummaryEl.textContent = sms.enabled ? "" : "SMS is not set up yet.";
     }
     if (messageSendBtnEl instanceof HTMLButtonElement) {
         messageSendBtnEl.disabled = !sms.enabled || state.buildings.length === 0;
@@ -1012,7 +1003,7 @@ function renderMessageCenter() {
                 ? "Building"
                 : message.recipientKind === "phone"
                     ? "Phone"
-                    : "Room",
+                    : "House No.",
             building,
             message.houseNumber ? `House ${message.houseNumber}` : ""
         ].filter(Boolean);
@@ -1196,6 +1187,9 @@ function setActiveLandlordView(nextView, options = {}) {
     }
     if (targetView === "settings" && previousView !== "settings" && !options.skipLoad) {
         syncSettingsBuildingOptions();
+        void loadAutomaticMessageRules().catch((error) => {
+            handleLandlordError(error, "Unable to load automatic SMS.");
+        });
     }
 }
 function scrollToLandlordSection(sectionId) {
@@ -1371,7 +1365,7 @@ function openResidentDrawer(resident) {
             }
         })
             .catch((error) => {
-            handleLandlordError(error, "Unable to load room issues.");
+            handleLandlordError(error, "Unable to load house issues.");
         });
     }
 }
@@ -1465,7 +1459,7 @@ function syncDirectTenantRoomOptions() {
         });
     }
     if (directTenantHouseEl instanceof HTMLInputElement) {
-        directTenantHouseEl.placeholder = roomOptions.length ? "Choose room" : "A10";
+        directTenantHouseEl.placeholder = roomOptions.length ? "Choose house" : "A10";
     }
 }
 function getDirectTenantHouseNumber(buildingId) {
@@ -2091,10 +2085,10 @@ function updateResidentsSearchSummary(totalRows, visibleRows) {
     }
     const query = String(state.residentSearchQuery ?? "").trim();
     if (!query) {
-        residentsSearchSummaryEl.textContent = `Showing ${visibleRows} room${visibleRows === 1 ? "" : "s"} for the selected building filter.`;
+        residentsSearchSummaryEl.textContent = `${visibleRows} house${visibleRows === 1 ? "" : "s"}`;
         return;
     }
-    residentsSearchSummaryEl.textContent = `Found ${visibleRows} of ${totalRows} room${totalRows === 1 ? "" : "s"} for "${query}".`;
+    residentsSearchSummaryEl.textContent = `Found ${visibleRows} of ${totalRows} house${totalRows === 1 ? "" : "s"} for "${query}".`;
 }
 function getResidentOccupancyLabel(resident) {
     const hasResident = resident?.hasActiveResident || resident?.residentUserId || resident?.residentName;
@@ -2680,7 +2674,7 @@ function openRoomAccountPage(buildingId, houseNumber) {
     const normalizedBuildingId = String(buildingId ?? "").trim();
     const normalizedHouseNumber = normalizeHouse(houseNumber);
     if (!normalizedBuildingId || !normalizedHouseNumber) {
-        showError("Room details missing. Refresh and retry.");
+        showError("House details missing. Refresh and retry.");
         return false;
     }
     window.location.href = buildRoomAccountPath(normalizedBuildingId, normalizedHouseNumber);
@@ -2690,7 +2684,7 @@ function openResidentSearchMatch() {
     const visibleRows = getVisibleResidentDirectoryRows(state.residentDirectory);
     const query = String(state.residentSearchQuery ?? "").trim();
     if (visibleRows.length === 0) {
-        showError(query ? `No rooms matched "${query}".` : "No rooms matched the current filters.");
+        showError(query ? `No houses matched "${query}".` : "No houses matched the current filters.");
         return;
     }
     const exactMatches = getResidentLookupExactMatches(visibleRows, query);
@@ -2703,16 +2697,16 @@ function openResidentSearchMatch() {
         return;
     }
     if (!query) {
-        showError("Enter a resident name, phone, or house number to open one room account directly.");
+        showError("Enter a resident name, phone, or house number to open one house account directly.");
         return;
     }
-    showError(`Found ${visibleRows.length} rooms for "${query}". Refine the search or choose a building first.`);
+    showError(`Found ${visibleRows.length} houses for "${query}". Refine the search or choose a building first.`);
 }
 async function openResidentLookup(query, buildingId = "all") {
     const normalizedQuery = String(query ?? "").trim();
     const normalizedBuildingId = String(buildingId || "all").trim() || "all";
     if (!normalizedQuery) {
-        showError("Enter a resident name, phone, or house number to open one room directly.");
+        showError("Enter a resident name, phone, or house number to open one house directly.");
         return;
     }
     state.residentSearchQuery = normalizedQuery;
@@ -2768,11 +2762,11 @@ function renderResidentsOverview(rows) {
     const totalArrears = withArrears.reduce((sum, resident) => sum +
         getResidentOperationalArrearsKsh(resident, getResidentUtilityRoomSummary(resident)), 0);
     const activeFilter = String(state.residentStatusFilter || "all");
-    const roomLabel = (count) => `room${count === 1 ? "" : "s"}`;
+    const roomLabel = (count) => `house${count === 1 ? "" : "s"}`;
     const cards = [
         {
             filter: "all",
-            label: "All Rooms",
+            label: "All Houses",
             value: items.length,
             detail: "Full tenant register"
         },
@@ -2804,7 +2798,7 @@ function renderResidentsOverview(rows) {
             filter: "vacant",
             label: "Vacant",
             value: vacantCount,
-            detail: "Available rooms"
+            detail: "Available houses"
         },
         {
             filter: "pending_review",
@@ -3270,11 +3264,11 @@ function buildPrintableTenantAgreementHtml(resident, agreementPayload) {
         "<style>body{font-family:Arial,sans-serif;margin:32px;color:#172033;}h1{margin:0 0 4px;}p{margin:4px 0 16px;}table{width:100%;border-collapse:collapse;margin-top:16px;}th,td{border:1px solid #cfd7e6;padding:10px;text-align:left;vertical-align:top;}th{width:32%;background:#f4f7fb}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:42px}.line{border-top:1px solid #172033;padding-top:8px}.documents a{display:block;margin:4px 0}@media print{button{display:none}}</style>",
         "</head><body>",
         '<button onclick="window.print()">Print</button>',
-        "<h1>Room Lease Agreement Summary</h1>",
-        "<p>Generated from the landlord housing manager. Keep this autofilled room summary with the mounted lease PDF.</p>",
+        "<h1>House Lease Agreement Summary</h1>",
+        "<p>Generated from the landlord housing manager. Keep this autofilled house summary with the mounted lease PDF.</p>",
         "<table><tbody>",
         row("Building", textValue(buildingName)),
-        row("House / Room", textValue(resident?.houseNumber)),
+        row("House / House", textValue(resident?.houseNumber)),
         row("Tenant", textValue(tenantName)),
         row("Phone", textValue(tenantPhone)),
         row("Verification", renderResidentVerificationBadge(resident)),
@@ -3347,7 +3341,7 @@ function parseHouseNumbers(value) {
     });
     const unique = [...new Set(items)];
     if (unique.length > 1000) {
-        throw new Error("Add rooms in batches of 1000 or fewer.");
+        throw new Error("Add houses in batches of 1000 or fewer.");
     }
     return unique;
 }
@@ -3383,7 +3377,7 @@ function expandRoomRange(prefix, start, end, width = 0) {
     const direction = end >= start ? 1 : -1;
     const count = Math.abs(end - start) + 1;
     if (count > 1000) {
-        throw new Error("Room ranges can include at most 1000 rooms at a time.");
+        throw new Error("House ranges can include at most 1000 houses at a time.");
     }
     return Array.from({ length: count }, (_item, index) => {
         const value = start + index * direction;
@@ -3451,7 +3445,7 @@ function buildGeneratedHouseNumbers() {
         step
     });
     if (list.length > 1000) {
-        throw new Error("Add rooms in batches of 1000 or fewer.");
+        throw new Error("Add houses in batches of 1000 or fewer.");
     }
     if (order === "desc") {
         list.reverse();
@@ -3559,7 +3553,7 @@ function renderBuildingRoomDrawerState() {
     }
     catch (error) {
         candidateRooms = [];
-        parseErrorMessage = error instanceof Error ? error.message : "Invalid room range.";
+        parseErrorMessage = error instanceof Error ? error.message : "Invalid house range.";
     }
     const newCandidateRooms = candidateRooms.filter((item) => !existingSet.has(normalizeHouse(item)));
     if (buildingCandidateRoomsCountEl instanceof HTMLElement) {
@@ -3578,19 +3572,19 @@ function renderBuildingRoomDrawerState() {
     else if (buildingCandidateRoomsEl instanceof HTMLElement && candidateRooms.length > 0) {
         renderRoomChipList(buildingCandidateRoomsEl, candidateRooms, {
             existingRooms,
-            emptyText: "No rooms queued."
+            emptyText: "No houses queued."
         });
     }
     else if (buildingCandidateRoomsEl instanceof HTMLElement && candidateRooms.length === 0) {
         renderRoomChipList(buildingCandidateRoomsEl, [], {
-            emptyText: "No rooms queued."
+            emptyText: "No houses queued."
         });
     }
     if (buildingExistingRoomsSummaryEl instanceof HTMLElement) {
-        buildingExistingRoomsSummaryEl.textContent = `${existingRooms.length} room${existingRooms.length === 1 ? "" : "s"}`;
+        buildingExistingRoomsSummaryEl.textContent = `${existingRooms.length} house${existingRooms.length === 1 ? "" : "s"}`;
     }
     renderRoomChipList(buildingExistingRoomsEl, existingRooms, {
-        emptyText: "No rooms in this building yet."
+        emptyText: "No houses in this building yet."
     });
 }
 function toIsoFromDateTimeLocal(value) {
@@ -3867,8 +3861,8 @@ function describeRegistryChargeSetup(item, buildingId, billingMonth) {
             return {
                 tone: "custom",
                 mode: "room_custom_combined",
-                label: `Room default ${formatCurrency(roomCombinedChargeKsh)}`,
-                detail: "This room has its own normal combined utility charge."
+                label: `House default ${formatCurrency(roomCombinedChargeKsh)}`,
+                detail: "This house has its own normal combined utility charge."
             };
         }
         if (monthlyOverrideKsh > 0) {
@@ -3876,7 +3870,7 @@ function describeRegistryChargeSetup(item, buildingId, billingMonth) {
                 tone: "default",
                 mode: "monthly_override_combined",
                 label: `Monthly adjustment ${formatCurrency(monthlyOverrideKsh)}`,
-                detail: `Applied for ${formatBillingMonth(billingMonth)} when the room has no room default charge.`
+                detail: `Applied for ${formatBillingMonth(billingMonth)} when the house has no house default charge.`
             };
         }
         if (buildingDefaultCombinedKsh > 0) {
@@ -3884,7 +3878,7 @@ function describeRegistryChargeSetup(item, buildingId, billingMonth) {
                 tone: "default",
                 mode: "building_default_combined",
                 label: `Building default ${formatCurrency(buildingDefaultCombinedKsh)}`,
-                detail: "Used when the room has no room default charge."
+                detail: "Used when the house has no house default charge."
             };
         }
     }
@@ -3900,8 +3894,8 @@ function describeRegistryChargeSetup(item, buildingId, billingMonth) {
         return {
             tone: "metered",
             mode: "metered",
-            label: "Metered room",
-            detail: "No room default or combined default is configured, so meter-based posting still applies."
+            label: "Metered house",
+            detail: "No house default or combined default is configured, so meter-based posting still applies."
         };
     }
     return {
@@ -3944,11 +3938,11 @@ function renderRegistryChargeSummary(rows) {
     const summaryLines = [];
     if (!buildingId) {
         registryChargeSummaryEl.textContent =
-            "Select a building to review building defaults and room defaults.";
+            "Select a building to review building defaults and house defaults.";
         return;
     }
     if (buildingMode === "combined_charge") {
-        summaryLines.push(`Charge order: room default -> ${formatBillingMonth(billingMonth)} monthly adjustment -> building default.`);
+        summaryLines.push(`Charge order: house default -> ${formatBillingMonth(billingMonth)} monthly adjustment -> building default.`);
         summaryLines.push(monthlyCombinedCharge && Number(monthlyCombinedCharge.amountKsh) > 0
             ? `${formatBillingMonth(billingMonth)} monthly adjustment is ${formatCurrency(Number(monthlyCombinedCharge.amountKsh))}.`
             : `${formatBillingMonth(billingMonth)} monthly adjustment is not set.`);
@@ -3957,7 +3951,7 @@ function renderRegistryChargeSummary(rows) {
             : "Building default combined charge is not set.");
     }
     else if (buildingMode === "fixed_charge") {
-        summaryLines.push("This building posts fixed-charge utility bills unless a room is fully metered.");
+        summaryLines.push("This building posts fixed-charge utility bills unless a house is fully metered.");
         summaryLines.push(`Building defaults: water ${buildingWaterFixedKsh > 0 ? formatCurrency(buildingWaterFixedKsh) : "not set"} • electricity ${buildingElectricFixedKsh > 0 ? formatCurrency(buildingElectricFixedKsh) : "not set"}.`);
     }
     else if (buildingMode === "disabled") {
@@ -3980,23 +3974,23 @@ function renderRegistryChargeSummary(rows) {
         <strong>${escapeHtml(formatBillingMonth(billingMonth))}</strong>
       </div>
       <div>
-        <span>Room Default Charges</span>
+        <span>House Default Charges</span>
         <strong>${customCombinedCount}</strong>
       </div>
       <div>
-        <span>Monthly Adjustment Rooms</span>
+        <span>Monthly Adjustment Houses</span>
         <strong>${monthlyOverrideCount}</strong>
       </div>
       <div>
-        <span>Building Default Rooms</span>
+        <span>Building Default Houses</span>
         <strong>${buildingDefaultCount}</strong>
       </div>
       <div>
-        <span>Metered Rooms</span>
+        <span>Metered Houses</span>
         <strong>${meteredCount}</strong>
       </div>
       <div>
-        <span>Fixed-Charge Rooms</span>
+        <span>Fixed-Charge Houses</span>
         <strong>${fixedChargeCount}</strong>
       </div>
       <div>
@@ -5336,7 +5330,7 @@ function renderLandlordFocusPanel() {
         landlordFocusOpenBillsEl.textContent = "-";
         landlordFocusOutstandingEl.textContent = "-";
         landlordFocusNoteEl.textContent =
-            "Create your first building to unlock room setup, residents, and utility workflows.";
+            "Create your first building to unlock house setup, residents, and utility workflows.";
         return;
     }
     const selectedBuildingId = getFocusedBuildingId() || state.buildings[0]?.id || "";
@@ -5450,7 +5444,7 @@ function renderBuildings(rows) {
           data-building-id="${escapeHtml(item.id)}"
           data-building-name="${escapeHtml(item.name)}"
         >
-          Add Rooms
+          Add Houses
         </button>
       `;
         const deleteBuildingButton = isCaretakerRole()
@@ -5523,7 +5517,7 @@ function handleDeleteBuildingClick(target, buildingId, buildingName) {
         showError("House manager accounts cannot delete buildings.");
         return;
     }
-    const shouldProceed = window.confirm(`Delete ${buildingName || getBuildingDisplayNameById(buildingId)}?\nThis permanently removes the building, rooms, active tenancy links, and linked unit records.`);
+    const shouldProceed = window.confirm(`Delete ${buildingName || getBuildingDisplayNameById(buildingId)}?\nThis permanently removes the building, houses, active tenancy links, and linked unit records.`);
     if (!shouldProceed) {
         return;
     }
@@ -5686,14 +5680,14 @@ function renderSettingsPanel() {
     const actionsDisabled = isCaretakerRole() || !building;
     if (!hasBuildings) {
         settingsSummaryEl.textContent =
-            "No buildings are available yet. Add a building before using workspace settings.";
+            "Add a building first.";
     }
     else if (isCaretakerRole()) {
         settingsSummaryEl.textContent =
-            "House manager accounts can view this page but cannot run cache-clearing or destructive building actions.";
+            "View only for house managers.";
     }
     else {
-        settingsSummaryEl.textContent = `Settings are focused on ${building?.name || getBuildingDisplayNameById(buildingId, "the selected building")}. Clear cache refreshes workspace state only. Delete data permanently removes the whole building.`;
+        settingsSummaryEl.textContent = "";
     }
     if (settingsClearCacheBtnEl instanceof HTMLButtonElement) {
         settingsClearCacheBtnEl.disabled = actionsDisabled;
@@ -5844,7 +5838,7 @@ function getSelectedRentSheetBuildingId() {
 function rentSetupSourceLabel(source) {
     const normalized = String(source ?? "").trim();
     if (normalized === "room_default") {
-        return "Room Default";
+        return "House Default";
     }
     if (normalized === "building_default") {
         return "Building Default";
@@ -5909,7 +5903,7 @@ function setRentSheetDefaultInputs(data) {
     if (rentSheetChargeStartDateEl instanceof HTMLInputElement) {
         rentSheetChargeStartDateEl.value = String(data?.chargeStartDate ?? "");
     }
-    setRentSheetStatus("Current month paid cannot exceed the resolved monthly rent. Due day controls the monthly due date.");
+    setRentSheetStatus("");
 }
 function renderRentSheetRows(rows) {
     if (!(rentSheetBodyEl instanceof HTMLElement)) {
@@ -5918,7 +5912,7 @@ function renderRentSheetRows(rows) {
     rentSheetBodyEl.replaceChildren();
     if (!Array.isArray(rows) || rows.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = '<td colspan="13">No rooms found for this building.</td>';
+        row.innerHTML = '<td colspan="13">No houses found for this building.</td>';
         rentSheetBodyEl.append(row);
         return;
     }
@@ -6011,7 +6005,7 @@ function renderRentSheetRows(rows) {
         <input
           data-field="active"
           type="checkbox"
-          title="Charge rent for this room when occupied"
+          title="Charge rent for this house when occupied"
           ${roomDefaultActive ? "checked" : ""}
         />
       </td>
@@ -6077,7 +6071,7 @@ function buildRentSheetPayload() {
         }
         const monthlyRentKsh = toOptionalNumber(rentInput.value);
         if (monthlyRentKsh != null && monthlyRentKsh < 0) {
-            throw new Error(`Room Default rent for ${houseNumber} cannot be negative.`);
+            throw new Error(`House Default rent for ${houseNumber} cannot be negative.`);
         }
         const depositKsh = depositInput instanceof HTMLInputElement ? toOptionalNumber(depositInput.value) : null;
         if (depositKsh != null && depositKsh < 0) {
@@ -6767,7 +6761,7 @@ function renderMoveOutSettlementReport(rows) {
         const residentName = item.residentName ||
             item.metadata?.resident?.fullName ||
             item.residentUserId ||
-            (isEmptyRoomLoss ? "Empty room" : "-");
+            (isEmptyRoomLoss ? "Empty house" : "-");
         const residentPhone = item.residentPhone || item.metadata?.resident?.phone || "";
         const actorLabel = item.createdBy?.name
             ? `${item.createdBy.name} (${formatRoleLabel(item.createdBy.role || "-")})`
@@ -6956,7 +6950,7 @@ function updateMoveOutSettlementHelp() {
         }
         else if (depositApplied > 0 && total <= 0) {
             moveOutSettlementHelpEl.textContent =
-                "The deposit covers the open balance, so the room can clear without resident debt.";
+                "The deposit covers the open balance, so the house can clear without resident debt.";
         }
         else if (action === "collect_before_move_out" && total > 0) {
             moveOutSettlementHelpEl.textContent =
@@ -6964,11 +6958,11 @@ function updateMoveOutSettlementHelp() {
         }
         else if (action === "transfer_to_resident_debt") {
             moveOutSettlementHelpEl.textContent =
-                "The room will clear, and the balance will be kept against this resident.";
+                "The house will clear, and the balance will be kept against this resident.";
         }
         else if (action === "write_off") {
             moveOutSettlementHelpEl.textContent =
-                "The room will clear, and the unpaid amount will be recorded as a landlord loss.";
+                "The house will clear, and the unpaid amount will be recorded as a landlord loss.";
         }
         else {
             moveOutSettlementHelpEl.textContent =
@@ -7009,7 +7003,7 @@ function renderMoveOutSettlement(summary, context) {
             ["Remaining Pending", total],
             ["Rent", summary?.rentOutstandingKsh ?? 0],
             ["Utilities", summary?.utilityOutstandingKsh ?? 0],
-            ["Room Charges", summary?.roomChargesOutstandingKsh ?? 0]
+            ["House Charges", summary?.roomChargesOutstandingKsh ?? 0]
         ];
         moveOutSettlementTotalsEl.innerHTML = totals
             .map(([label, amount]) => `
@@ -7158,7 +7152,7 @@ function renderRegistryRows(rows) {
           data-field="combinedUtilityChargeKsh"
           min="0"
           step="0.01"
-          title="Ignored for rooms that have both water and electricity meters."
+          title="Ignored for houses that have both water and electricity meters."
           value="${escapeHtml(numberToInputString(item.combinedUtilityChargeKsh ?? 0))}"
         />
       </td>
@@ -7186,7 +7180,7 @@ function renderRegistryRows(rows) {
                   data-building-id="${escapeHtml(state.selectedRegistryBuildingId)}"
                   data-house-number="${escapeHtml(houseNumber)}"
                 >
-                  Remove Room
+                  Remove House
                 </button>`
             : ""}
         </div>
@@ -7230,7 +7224,7 @@ function buildRegistrySavePayload() {
             throw new Error(`Electric fixed charge for ${houseNumber} must be between 0 and 200,000.`);
         }
         if (combinedUtilityChargeKsh < 0 || combinedUtilityChargeKsh > 200000) {
-            throw new Error(`Room utility amount for ${houseNumber} must be between 0 and 200,000.`);
+            throw new Error(`House utility amount for ${houseNumber} must be between 0 and 200,000.`);
         }
         rows.push({
             houseNumber,
@@ -7399,7 +7393,7 @@ function renderOverviewCollections(rows) {
           data-building-id="${escapeHtml(item.buildingId)}"
           data-house-number="${escapeHtml(item.houseNumber)}"
         >
-          Open Room Page
+          Open House Page
         </button>
       </td>
     `;
@@ -7465,7 +7459,7 @@ function renderRoomLedgerActions(resident, totalBalanceKsh, options = {}) {
         buttons.push(`<button type="button" class="btn-danger" data-action="write-off-room-balance" data-building-id="${escapeHtml(buildingId)}" data-house-number="${escapeHtml(houseNumber)}" data-amount-ksh="${escapeHtml(totalBalanceKsh)}">Clear Balance</button>`);
     }
     if (!hasResident && !isCaretakerRole() && totalBalanceKsh <= 0) {
-        buttons.push(`<button type="button" class="btn-danger" data-action="remove-room" data-building-id="${escapeHtml(buildingId)}" data-house-number="${escapeHtml(houseNumber)}">Remove Room</button>`);
+        buttons.push(`<button type="button" class="btn-danger" data-action="remove-room" data-building-id="${escapeHtml(buildingId)}" data-house-number="${escapeHtml(houseNumber)}">Remove House</button>`);
     }
     return `<div class="resident-row-actions room-ledger-actions">${buttons.join("")}</div>`;
 }
@@ -7502,7 +7496,7 @@ function renderRoomLedger(rows) {
     }, { balanceKsh: 0, depositKsh: 0, refundKsh: 0, occupied: 0, vacant: 0 });
     if (roomLedgerSummaryEl instanceof HTMLElement) {
         roomLedgerSummaryEl.textContent =
-            `${visibleRows.length} room${visibleRows.length === 1 ? "" : "s"} | ` +
+            `${visibleRows.length} house${visibleRows.length === 1 ? "" : "s"} | ` +
                 `${totals.occupied} occupied | ${totals.vacant} vacant | ` +
                 `Outstanding ${formatCurrency(totals.balanceKsh)} | ` +
                 `Deposits ${formatCurrency(totals.depositKsh)} | ` +
@@ -7510,13 +7504,13 @@ function renderRoomLedger(rows) {
     }
     if (allRows.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = `<td class="table-cell-full" colspan="${roomLedgerColumnCount}">No rooms found for this selection.</td>`;
+        row.innerHTML = `<td class="table-cell-full" colspan="${roomLedgerColumnCount}">No houses found for this selection.</td>`;
         roomLedgerBodyEl.append(row);
         return;
     }
     if (visibleRows.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = `<td class="table-cell-full" colspan="${roomLedgerColumnCount}">No rooms matched "${escapeHtml(state.residentSearchQuery)}".</td>`;
+        row.innerHTML = `<td class="table-cell-full" colspan="${roomLedgerColumnCount}">No houses matched "${escapeHtml(state.residentSearchQuery)}".</td>`;
         roomLedgerBodyEl.append(row);
         return;
     }
@@ -7616,7 +7610,7 @@ function renderDocumentsPage(rows = state.residentDirectory) {
     documentsBodyEl.replaceChildren();
     if (activeRows.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = '<td colspan="8">No active tenants found. Add a tenant from Rooms first.</td>';
+        row.innerHTML = '<td colspan="8">No active tenants found. Add a tenant from Houses first.</td>';
         documentsBodyEl.append(row);
         return;
     }
@@ -7659,13 +7653,13 @@ function renderResidentDirectory(rows) {
     residentsBodyEl.replaceChildren();
     if (allRows.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = `<td class="table-cell-full" colspan="${residentDirectoryColumnCount}">No rooms found for this selection.</td>`;
+        row.innerHTML = `<td class="table-cell-full" colspan="${residentDirectoryColumnCount}">No houses found for this selection.</td>`;
         residentsBodyEl.append(row);
         return;
     }
     if (filteredRows.length === 0) {
         const row = document.createElement("tr");
-        row.innerHTML = `<td class="table-cell-full" colspan="${residentDirectoryColumnCount}">No rooms matched "${escapeHtml(state.residentSearchQuery)}".</td>`;
+        row.innerHTML = `<td class="table-cell-full" colspan="${residentDirectoryColumnCount}">No houses matched "${escapeHtml(state.residentSearchQuery)}".</td>`;
         residentsBodyEl.append(row);
         return;
     }
@@ -7775,7 +7769,7 @@ function renderResidentDrawer(resident) {
             normalizeHouse(ticket.houseNumber) === normalizeHouse(resident.houseNumber))
         : [];
     const roomIssuesSummary = roomIssues.length === 0
-        ? '<p class="status-text">No room issues recorded for this room.</p>'
+        ? '<p class="status-text">No house issues recorded for this house.</p>'
         : `<div class="stack-list">${roomIssues
             .slice(0, 4)
             .map((ticket) => `
@@ -7787,7 +7781,7 @@ function renderResidentDrawer(resident) {
             `)
             .join("")}</div>`
             + (roomIssues.length > 4
-                ? `<p class="status-text">Showing 4 of ${roomIssues.length} issue(s) for this room.</p>`
+                ? `<p class="status-text">Showing 4 of ${roomIssues.length} issue(s) for this house.</p>`
                 : "");
     const roomUtilityBills = getResidentUtilityBills(resident);
     const roomUtilityPayments = getResidentUtilityPayments(resident);
@@ -7921,7 +7915,7 @@ function renderResidentDrawer(resident) {
         data-building-id="${escapeHtml(resident.buildingId)}"
         data-house-number="${escapeHtml(resident.houseNumber)}"
       >
-        Open Room Account
+        Open House Account
       </button>
     </div>
   `;
@@ -7962,11 +7956,11 @@ function renderResidentDrawer(resident) {
       <div><span>Rent Arrears</span><strong>${escapeHtml(rentArrears)}</strong></div>`
         : ""}
       <div><span>Utility Balance</span><strong>${escapeHtml(utilityBalance)}</strong></div>
-      <div><span>Room Charges</span><strong>${escapeHtml(expenseBalance)}</strong></div>
+      <div><span>House Charges</span><strong>${escapeHtml(expenseBalance)}</strong></div>
     </div>
     <p class="status-text resident-agreement-note">
       This drawer is a quick read-only preview. Tenant details, rent setup, payment recording,
-      and account corrections are managed from the room account.
+      and account corrections are managed from the house account.
     </p>
     <details class="resident-drawer-panel resident-agreement-card" ${agreementOpenAttr}>
       <summary>
@@ -7999,7 +7993,7 @@ function renderResidentDrawer(resident) {
         ? `<details class="resident-drawer-panel" ${rentPaymentsOpenAttr}>
       <summary>
         <span>Rent + Payments</span>
-        <small>managed in room account</small>
+        <small>managed in house account</small>
       </summary>
       <div class="resident-drawer-panel-body">
         <div class="resident-grid resident-grid-secondary">
@@ -8020,7 +8014,7 @@ function renderResidentDrawer(resident) {
         : ""}
     <details class="resident-drawer-panel" ${roomProfileOpenAttr}>
       <summary>
-        <span>Room Profile</span>
+        <span>House Profile</span>
         <small>meters and billing context</small>
       </summary>
       <div class="resident-drawer-panel-body">
@@ -8030,21 +8024,21 @@ function renderResidentDrawer(resident) {
           <div><span>Current Utility Due</span><strong>${escapeHtml(currentUtilityDue)}</strong></div>
           <div><span>Utility Arrears</span><strong>${escapeHtml(utilityArrears)}</strong></div>
           <div><span>Utility Balance</span><strong>${escapeHtml(utilityBalance)}</strong></div>
-          <div><span>Room Charges</span><strong>${escapeHtml(expenseBalance)}</strong></div>
+          <div><span>House Charges</span><strong>${escapeHtml(expenseBalance)}</strong></div>
         </div>
         ${roomAccountButton}
       </div>
     </details>
     <details class="resident-drawer-panel" ${roomLedgerOpenAttr}>
       <summary>
-        <span>Room Ledger</span>
+        <span>House Ledger</span>
         <small>${escapeHtml(roomLedgerSummary)}</small>
       </summary>
       <div class="resident-drawer-panel-body">
         <div class="resident-agreement-overview resident-ledger-overview">
           <div><span>Utility Outstanding</span><strong>${escapeHtml(utilityBalance)}</strong></div>
           <div><span>Utility Paid</span><strong>${escapeHtml(formatCurrency(roomUtilityPaidKsh))}</strong></div>
-          <div><span>Room Charges</span><strong>${escapeHtml(formatCurrency(roomExpenditureTotalKsh))}</strong></div>
+          <div><span>House Charges</span><strong>${escapeHtml(formatCurrency(roomExpenditureTotalKsh))}</strong></div>
           <div><span>Latest Bill Month</span><strong>${escapeHtml(latestLedgerBillingLabel)}</strong></div>
         </div>
         ${roomLedgerFlags.length > 0
@@ -8057,7 +8051,7 @@ function renderResidentDrawer(resident) {
     </details>
     <details class="resident-drawer-panel" ${roomIssuesOpenAttr}>
       <summary>
-        <span>Room Issues</span>
+        <span>House Issues</span>
         <small>${roomIssues.length} total</small>
       </summary>
       <div class="resident-drawer-panel-body">
@@ -8437,7 +8431,7 @@ function renderUtilityRoomSummary(rows) {
             const row = document.createElement("tr");
             const emptyText = allSummaryRows.length === 0
                 ? "No utility bill history found."
-                : "No utility rooms match current filters.";
+                : "No utility houses match current filters.";
             row.innerHTML = `<td colspan="10">${escapeHtml(emptyText)}</td>`;
             bodyEl.append(row);
             return;
@@ -8457,7 +8451,7 @@ function renderUtilityRoomSummary(rows) {
             row.dataset.houseNumber = item.houseNumber;
             row.tabIndex = 0;
             row.setAttribute("role", "link");
-            row.setAttribute("title", `Open room account ${item.houseNumber}`);
+            row.setAttribute("title", `Open house account ${item.houseNumber}`);
             row.innerHTML = `
         <td>${escapeHtml(item.houseNumber)}</td>
         <td>${item.overdueMonths.length > 0 ? escapeHtml(item.overdueMonths.join(", ")) : "-"}</td>
@@ -8552,7 +8546,7 @@ function renderUtilityRoomSummaryActions(item, accountBuildingId) {
               data-building-id="${escapeHtml(accountBuildingId)}"
               data-house-number="${escapeHtml(houseNumber)}"
             >
-              Remove Room
+              Remove House
             </button>`
         : ""}
     </div>
@@ -8721,7 +8715,7 @@ function prefillRentPaymentFromStatus(action) {
     const billingMonth = String(action?.billingMonth ?? "").trim();
     const amountKsh = Math.max(0, Number(action?.amountKsh ?? 0));
     if (!buildingId || !houseNumber || !Number.isFinite(amountKsh) || amountKsh <= 0) {
-        showError("Rent payment shortcut is missing room or balance details. Refresh and try again.");
+        showError("Rent payment shortcut is missing house or balance details. Refresh and try again.");
         return;
     }
     state.selectedRentPaymentBuildingId = buildingId;
@@ -9621,7 +9615,7 @@ generateHouseNumbersBtnEl?.addEventListener("click", () => {
         clearError();
     }
     catch (error) {
-        handleLandlordError(error, "Unable to generate room numbers.");
+        handleLandlordError(error, "Unable to generate house numbers.");
     }
 });
 buildingHouseNumbersEl?.addEventListener("input", () => {
@@ -9788,11 +9782,11 @@ directTenantFormEl?.addEventListener("submit", (event) => {
         : undefined;
     const note = String(directTenantNoteEl?.value || "").trim() || undefined;
     if (!buildingId || !houseNumber || !fullName || !phoneNumber || !leaseStartDate) {
-        showError(staffMode ? "Agreement onboarding requires building, room, name, phone, ID number, and lease start date." : "Tenant intake requires building, room, name, phone, and move-in date.");
+        showError(staffMode ? "Agreement onboarding requires building, house, name, phone, ID number, and lease start date." : "Tenant intake requires building, house, name, phone, and move-in date.");
         return;
     }
     if (!isDirectTenantRoomInSelectedBuilding(buildingId, houseNumber)) {
-        showError("Choose a room that belongs to the selected building.");
+        showError("Choose a house that belongs to the selected building.");
         return;
     }
     if (staffMode && !identityNumber) {
@@ -9847,7 +9841,7 @@ directTenantFormEl?.addEventListener("submit", (event) => {
                 await Promise.all([loadApplications(), loadBuildings(), loadResidents()]);
             }
             catch (error) {
-                setDirectTenantStatus("Tenant intake needs building, room, tenant details, and move-in date.");
+                setDirectTenantStatus("Tenant intake needs building, house, tenant details, and move-in date.");
                 handleLandlordError(error, "Failed to send tenant intake to staff.");
             }
             finally {
@@ -10341,7 +10335,7 @@ paymentProfilesBodyEl?.addEventListener("click", (event) => {
         "",
         `Shortcode: ${profile.shortCode || "-"}`,
         `Party B: ${profile.partyB || "-"}`,
-        `Account reference: ${accountReference || profile.accountReferencePrefix || "room number"}`
+        `Account reference: ${accountReference || profile.accountReferencePrefix || "house number"}`
     ].join("\n"));
     if (!confirmation) {
         return;
@@ -10466,7 +10460,7 @@ buildingFormEl.addEventListener("submit", (event) => {
         houseNumbers = parseHouseNumbers(buildingHouseNumbersEl.value);
     }
     catch (error) {
-        showError(error instanceof Error ? error.message : "Invalid room range.");
+        showError(error instanceof Error ? error.message : "Invalid house range.");
         return;
     }
     if (houseNumbers.length === 0) {
@@ -10480,7 +10474,7 @@ buildingFormEl.addEventListener("submit", (event) => {
         }
     }
     if (houseNumbers.length === 0) {
-        showError("Provide at least one room/house number (e.g. A-1, A-2).");
+        showError("Provide at least one house number (e.g. A-1, A-2).");
         return;
     }
     const submitButton = buildingFormEl.querySelector("button[type='submit']");
@@ -10498,14 +10492,14 @@ buildingFormEl.addEventListener("submit", (event) => {
             renderGeneratedHousePreview([]);
             const addedCount = Number(payload?.data?.addedCount ?? houseNumbers.length);
             setStatus(addedCount > 0
-                ? `Added ${addedCount} room(s) to building ${buildingId}.`
-                : `No new rooms added to building ${buildingId}.`);
+                ? `Added ${addedCount} house(s) to building ${buildingId}.`
+                : `No new houses added to building ${buildingId}.`);
             await Promise.all([loadBuildings(), loadApplications()]);
             await loadRegistryRows();
             renderBuildingRoomDrawerState();
         }
         catch (error) {
-            handleLandlordError(error, "Failed to add rooms to building.");
+            handleLandlordError(error, "Failed to add houses to building.");
         }
         finally {
             submitButton.disabled = false;
@@ -10527,7 +10521,7 @@ createBuildingFormEl?.addEventListener("submit", (event) => {
         houseNumbers = parseHouseNumbers(createBuildingHouseNumbersEl?.value ?? "");
     }
     catch (error) {
-        showError(error instanceof Error ? error.message : "Invalid room range.");
+        showError(error instanceof Error ? error.message : "Invalid house range.");
         return;
     }
     if (!name || !county || !address) {
@@ -10535,7 +10529,7 @@ createBuildingFormEl?.addEventListener("submit", (event) => {
         return;
     }
     if (houseNumbers.length === 0) {
-        showError("Provide at least one room/house number for the new building.");
+        showError("Provide at least one house number for the new building.");
         return;
     }
     const submitButton = createBuildingFormEl.querySelector("button[type='submit']");
@@ -10715,10 +10709,10 @@ buildingsBodyEl.addEventListener("click", (event) => {
 });
 function handleRemoveRoomClick(target, buildingId, houseNumber) {
     if (isCaretakerRole()) {
-        showError("House manager accounts cannot remove rooms.");
+        showError("House manager accounts cannot remove houses.");
         return;
     }
-    const shouldProceed = window.confirm(`Remove room ${houseNumber} from building ${buildingId}?\nThis cannot be undone if the room has no tenancy history.`);
+    const shouldProceed = window.confirm(`Remove house ${houseNumber} from building ${buildingId}?\nThis cannot be undone if the house has no tenancy history.`);
     if (!shouldProceed) {
         return;
     }
@@ -10736,7 +10730,7 @@ function handleRemoveRoomClick(target, buildingId, houseNumber) {
                     confirmHouseNumber: houseNumber
                 })
             });
-            setStatus(`Removed room ${houseNumber} from ${buildingId}.`);
+            setStatus(`Removed house ${houseNumber} from ${buildingId}.`);
             await Promise.all([
                 loadBuildings(),
                 loadRegistryRows(),
@@ -10747,7 +10741,7 @@ function handleRemoveRoomClick(target, buildingId, houseNumber) {
             ]);
         }
         catch (error) {
-            handleLandlordError(error, "Failed to remove room.");
+            handleLandlordError(error, "Failed to remove house.");
         }
         finally {
             target.disabled = false;
@@ -10756,11 +10750,11 @@ function handleRemoveRoomClick(target, buildingId, houseNumber) {
 }
 function handleWriteOffRoomBalanceClick(target, buildingId, houseNumber, amountKsh) {
     if (isCaretakerRole()) {
-        showError("House manager accounts cannot clear room balances.");
+        showError("House manager accounts cannot clear house balances.");
         return;
     }
     const amountLabel = formatCurrency(Math.max(0, Number(amountKsh ?? 0)));
-    const shouldProceed = window.confirm(`Clear the open balance for room ${houseNumber} in ${buildingId}?\n${amountLabel} will be recorded as landlord loss and the room will stay available.`);
+    const shouldProceed = window.confirm(`Clear the open balance for house ${houseNumber} in ${buildingId}?\n${amountLabel} will be recorded as landlord loss and the house will stay available.`);
     if (!shouldProceed) {
         return;
     }
@@ -10774,11 +10768,11 @@ function handleWriteOffRoomBalanceClick(target, buildingId, houseNumber, amountK
                     "content-type": "application/json"
                 },
                 body: JSON.stringify({
-                    reason: "Empty room balance cleared from housing UI"
+                    reason: "Empty house balance cleared from housing UI"
                 })
             });
             const settled = Number(response?.data?.settlement?.totalSettledKsh ?? amountKsh ?? 0);
-            setStatus(`Cleared room ${houseNumber}. ${formatCurrency(settled)} recorded as landlord loss.`);
+            setStatus(`Cleared house ${houseNumber}. ${formatCurrency(settled)} recorded as landlord loss.`);
             await Promise.all([
                 loadBills(),
                 loadPayments(),
@@ -10789,7 +10783,7 @@ function handleWriteOffRoomBalanceClick(target, buildingId, houseNumber, amountK
             ]);
         }
         catch (error) {
-            handleLandlordError(error, "Failed to clear room balance.");
+            handleLandlordError(error, "Failed to clear house balance.");
         }
         finally {
             target.disabled = false;
@@ -10861,7 +10855,7 @@ async function submitMoveOutSettlement(event) {
             setStatus(`Removed ${residentName} from house ${houseNumber}. ${formatCurrency(refundDue)} deposit refund recorded as due.`);
         }
         else if (depositApplied > 0) {
-            setStatus(`Removed ${residentName} from house ${houseNumber}. ${formatCurrency(depositApplied)} deposit applied to close the room balance.`);
+            setStatus(`Removed ${residentName} from house ${houseNumber}. ${formatCurrency(depositApplied)} deposit applied to close the house balance.`);
         }
         else {
             setStatus(`Removed ${residentName} from house ${houseNumber}.`);
@@ -11004,7 +10998,7 @@ roomLedgerBodyEl?.addEventListener("click", (event) => {
             return;
         }
         if (!buildingId || !houseNumber) {
-            showError("Room ledger details missing. Refresh and retry.");
+            showError("House ledger details missing. Refresh and retry.");
             return;
         }
         if (action === "open-room-account") {
@@ -12187,12 +12181,12 @@ overviewRoomSearchInputEl?.addEventListener("keydown", (event) => {
     }
     event.preventDefault();
     void openResidentLookup(overviewRoomSearchInputEl.value, state.selectedOverviewRoomBuildingId).catch((error) => {
-        handleLandlordError(error, "Unable to open room lookup.");
+        handleLandlordError(error, "Unable to open house lookup.");
     });
 });
 overviewOpenRoomBtnEl?.addEventListener("click", () => {
     void openResidentLookup(overviewRoomSearchInputEl?.value, state.selectedOverviewRoomBuildingId).catch((error) => {
-        handleLandlordError(error, "Unable to open room lookup.");
+        handleLandlordError(error, "Unable to open house lookup.");
     });
 });
 landlordGlobalSearchFormEl?.addEventListener("submit", (event) => {
@@ -12203,7 +12197,7 @@ landlordGlobalSearchFormEl?.addEventListener("submit", (event) => {
     void openResidentLookup(landlordGlobalSearchInputEl instanceof HTMLInputElement
         ? landlordGlobalSearchInputEl.value
         : "", buildingId).catch((error) => {
-        handleLandlordError(error, "Unable to open room lookup.");
+        handleLandlordError(error, "Unable to open house lookup.");
     });
 });
 landlordGlobalSearchInputEl?.addEventListener("input", () => {
@@ -12228,6 +12222,110 @@ landlordGlobalSearchBuildingEl?.addEventListener("change", () => {
         overviewRoomBuildingSelectEl.value = buildingId;
     }
     updateLandlordBranding();
+});
+function getHouseSheetBuildingId() {
+    const selected = String(state.selectedResidentsBuildingId || "").trim();
+    return selected && selected !== "all" && state.buildings.some((item) => item.id === selected)
+        ? selected
+        : getFocusedBuildingId();
+}
+const houseSheetApi = (path, init) => requestJson(path, init
+    ? {
+        method: init.method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(init.body)
+    }
+    : { cache: "no-store" });
+async function exportHouseSheet() {
+    const buildingId = getHouseSheetBuildingId();
+    if (!buildingId) {
+        showError("Add a building first.");
+        return;
+    }
+    const payload = await requestJson(`/api/landlord/buildings/${encodeURIComponent(buildingId)}/utility-registry`, { cache: "no-store" });
+    const buildingName = getBuildingDisplayNameById(buildingId, buildingId);
+    const bytes = buildXlsx(buildingName, houseSheetTable(houseSheetRowsFromRegistry(Array.isArray(payload?.data) ? payload.data : [])));
+    const url = URL.createObjectURL(new Blob([bytes], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${buildingName.replace(/[^\w -]+/g, "").trim() || "houses"} houses.xlsx`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function importHouseSheet(file) {
+    const buildingId = getHouseSheetBuildingId();
+    if (!buildingId) {
+        showError("Add a building first.");
+        return;
+    }
+    const table = await readSpreadsheet(new Uint8Array(await file.arrayBuffer()), file.name);
+    const { rows, errors } = parseHouseSheet(table);
+    if (rows.length === 0) {
+        showError(errors[0] || "No houses found in this file.");
+        return;
+    }
+    const tenantMode = "draft";
+    const plan = await prepareHouseSheetImport(houseSheetApi, buildingId, rows, tenantMode);
+    const changes = describeHouseSheetPlan(plan);
+    const skipped = [...errors, ...plan.skipped];
+    const skippedText = skipped.length
+        ? `\n\nSkipped:\n${skipped.slice(0, 8).join("\n")}${skipped.length > 8 ? `\n…and ${skipped.length - 8} more` : ""}`
+        : "";
+    if (changes.length === 0) {
+        showError(`Nothing to change in ${getBuildingDisplayNameById(buildingId, buildingId)}.${skippedText}`);
+        return;
+    }
+    if (!window.confirm(`${getBuildingDisplayNameById(buildingId, buildingId)}\n\n${changes.join("\n")}${skippedText}`)) {
+        return;
+    }
+    setStatus("Importing...");
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Nairobi" });
+    const result = await applyHouseSheetImport(houseSheetApi, buildingId, plan, tenantMode, today);
+    await Promise.all([loadBuildings(), loadApplications()]);
+    await Promise.all([loadRegistryRows(), loadResidents()]);
+    if (result.failed.length) {
+        showError(`${result.failed.slice(0, 8).join("\n")}${result.failed.length > 8 ? `\n…and ${result.failed.length - 8} more` : ""}`);
+    }
+    setStatus(result.done.length ? `Imported: ${result.done.join(", ")}.` : "Nothing imported.");
+}
+houseSheetExportBtnEl?.addEventListener("click", () => {
+    clearError();
+    void exportHouseSheet().catch((error) => {
+        handleLandlordError(error, "Unable to export houses.");
+    });
+});
+houseSheetImportBtnEl?.addEventListener("click", () => {
+    if (isCaretakerRole()) {
+        showError("House manager accounts cannot import houses.");
+        return;
+    }
+    if (houseSheetFileEl instanceof HTMLInputElement) {
+        houseSheetFileEl.value = "";
+        houseSheetFileEl.click();
+    }
+});
+houseSheetFileEl?.addEventListener("change", () => {
+    const file = houseSheetFileEl instanceof HTMLInputElement ? houseSheetFileEl.files?.[0] : null;
+    if (!file) {
+        return;
+    }
+    clearError();
+    if (houseSheetImportBtnEl instanceof HTMLButtonElement) {
+        houseSheetImportBtnEl.disabled = true;
+    }
+    void importHouseSheet(file)
+        .catch((error) => {
+        handleLandlordError(error, "Unable to import this file.");
+    })
+        .finally(() => {
+        if (houseSheetImportBtnEl instanceof HTMLButtonElement) {
+            houseSheetImportBtnEl.disabled = false;
+        }
+    });
 });
 refreshResidentsBtnEl?.addEventListener("click", () => {
     void loadResidents().catch((error) => {
@@ -12428,6 +12526,17 @@ landlordNotificationsRefreshBtnEl?.addEventListener("click", () => {
 landlordNotificationsReadBtnEl?.addEventListener("click", () => {
     void markOwnerNotificationsRead().catch((error) => {
         handleLandlordError(error, "Unable to mark owner alerts as read.");
+    });
+});
+settingsBuildingSelectEl?.addEventListener("change", () => {
+    const buildingId = String(settingsBuildingSelectEl instanceof HTMLSelectElement ? settingsBuildingSelectEl.value : "").trim();
+    if (!buildingId) {
+        return;
+    }
+    setPreferredBuildingSelection(buildingId);
+    renderSettingsPanel();
+    void loadAutomaticMessageRules(buildingId).catch((error) => {
+        handleLandlordError(error, "Unable to load automatic SMS.");
     });
 });
 messageRecipientScopeEl?.addEventListener("change", () => {
