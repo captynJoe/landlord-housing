@@ -620,7 +620,7 @@ export class UtilityBillingService {
     const meterNumber = normalizeConfiguredMeterNumber(input.meterNumber);
     if (!meterNumber) {
       throw new Error(
-        "Enter the actual meter number. Leave the field blank for rooms without a meter."
+        "Enter the actual meter number. Leave the field blank for houses without a meter."
       );
     }
     const meter: UtilityMeterRecord = {

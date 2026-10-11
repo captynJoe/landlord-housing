@@ -299,15 +299,15 @@ function formatVerificationLabel(session, profile = state.profile) {
 
 function getDefaultRentalTerms(profile = state.profile) {
   const buildingName = profile?.building?.name || "the building";
-  const houseNumber = profile?.session?.houseNumber || "your assigned room";
+  const houseNumber = profile?.session?.houseNumber || "your assigned house";
   return [
-    `The tenant occupies ${houseNumber} at ${buildingName} and must use the room for lawful residential purposes only.`,
+    `The tenant occupies ${houseNumber} at ${buildingName} and must use the house for lawful residential purposes only.`,
     "Rent, deposits, utilities, and other approved charges must be paid on or before the due dates shown in this agreement or communicated by management.",
-    "The tenant must keep the room and shared areas clean, avoid damage, and report maintenance issues promptly through the resident portal or management contacts.",
+    "The tenant must keep the house and shared areas clean, avoid damage, and report maintenance issues promptly through the resident portal or management contacts.",
     "Noise, visitor activity, waste disposal, and shared-facility use must follow building rules and reasonable instructions from landlord or authorized staff.",
     "The tenant must not sublet, transfer occupation, or make structural changes without written landlord approval.",
     "Management may issue lawful notices for arrears, breach of building rules, inspection, repairs, or move-out procedures.",
-    "By accepting, the tenant confirms the personal details, room assignment, lease dates, rent setup, and terms shown here are correct or will be corrected with management immediately."
+    "By accepting, the tenant confirms the personal details, house assignment, lease dates, rent setup, and terms shown here are correct or will be corrected with management immediately."
   ];
 }
 

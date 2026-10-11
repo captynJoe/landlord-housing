@@ -154,7 +154,7 @@ const state: AppState = {
   search: "",
   loading: true,
   selectedPaymentRoom: null,
-  rentPaymentStatus: "Select a room to record a rent payment.",
+  rentPaymentStatus: "Select a house to record a rent payment.",
   rentPaymentSaving: false,
   rentSetupBuildingId: "",
   rentSetupSheet: null,
@@ -376,14 +376,14 @@ function renderSidebar(): string {
         </div>
       </div>
       <nav>
-        <button class="${state.view === "rooms" ? "active" : ""}" type="button" data-view="rooms">Room Ledger</button>
+        <button class="${state.view === "rooms" ? "active" : ""}" type="button" data-view="rooms">House Ledger</button>
         <button class="${state.view === "rent" ? "active" : ""}" type="button" data-view="rent">Rent Standards</button>
         <a href="/landlord">Classic Tools</a>
         <a href="/resident">Resident Desk</a>
       </nav>
       <div class="sidebar-note">
         <strong>${escapeHtml(String(state.rooms.length))}</strong>
-        <span>rooms tracked across ${escapeHtml(String(state.buildings.length || 0))} building${state.buildings.length === 1 ? "" : "s"}</span>
+        <span>houses tracked across ${escapeHtml(String(state.buildings.length || 0))} building${state.buildings.length === 1 ? "" : "s"}</span>
       </div>
     </aside>
   `;
@@ -398,13 +398,13 @@ function renderOperationsHeader(): string {
     <section class="ops-header">
       <div>
         <p class="management-kicker">Live property desk</p>
-        <h2>${state.view === "rent" ? "Rent Standards" : "Room Ledger"}</h2>
+        <h2>${state.view === "rent" ? "Rent Standards" : "House Ledger"}</h2>
         <p class="management-muted">${escapeHtml(selectedBuilding)} · ${escapeHtml(String(allRooms.occupied))} occupied · ${escapeHtml(String(allRooms.vacant))} vacant</p>
       </div>
       <div class="ops-header-strip" aria-label="Portfolio snapshot">
         <span><strong>${escapeHtml(formatMoney(allRooms.balance))}</strong> outstanding</span>
         <span><strong>${escapeHtml(formatMoney(allRooms.utilities))}</strong> utilities</span>
-        <span><strong>${escapeHtml(String(allRooms.rooms))}</strong> rooms</span>
+        <span><strong>${escapeHtml(String(allRooms.rooms))}</strong> houses</span>
       </div>
     </section>
   `;
@@ -426,7 +426,7 @@ function renderRoomsView(): string {
     <section class="management-toolbar">
       <div>
         <p class="management-kicker">Portfolio ledger</p>
-        <h2>Room control desk</h2>
+        <h2>House control desk</h2>
       </div>
       <div class="management-controls">
         <label>
@@ -456,8 +456,8 @@ function renderRoomsView(): string {
       </div>
     </section>
 
-    <section class="management-metrics" aria-label="Room account summary">
-      ${metric("Rooms", summary.rooms)}
+    <section class="management-metrics" aria-label="House account summary">
+      ${metric("Houses", summary.rooms)}
       ${metric("Occupied", summary.occupied)}
       ${metric("Vacant", summary.vacant)}
       ${metric("Outstanding", formatMoney(summary.balance))}
@@ -468,7 +468,7 @@ function renderRoomsView(): string {
 
     <section class="management-table-card">
       <div class="management-table-head">
-        <strong>${state.loading ? "Loading rooms..." : `${rows.length} room${rows.length === 1 ? "" : "s"}`}</strong>
+        <strong>${state.loading ? "Loading houses..." : `${rows.length} house${rows.length === 1 ? "" : "s"}`}</strong>
         <span class="management-muted">Operational view for balances, tenant status, and quick rent posting.</span>
       </div>
       <div class="management-table-wrap">
@@ -487,7 +487,7 @@ function renderRoomsView(): string {
             </tr>
           </thead>
           <tbody>
-            ${rows.length ? rows.map(renderRoomRow).join("") : renderEmptyRow(9, "No rooms match this view.")}
+            ${rows.length ? rows.map(renderRoomRow).join("") : renderEmptyRow(9, "No houses match this view.")}
           </tbody>
         </table>
       </div>
@@ -501,7 +501,7 @@ function renderRentPaymentPanel(): string {
     return `
       <section class="rent-payment-panel is-empty">
         <strong>Rent payment desk</strong>
-        <span class="management-muted">Pick a room from the ledger to post rent without leaving this desk.</span>
+        <span class="management-muted">Pick a house from the ledger to post rent without leaving this desk.</span>
       </section>
     `;
   }
@@ -598,7 +598,7 @@ function renderRentSetupView(): string {
 
       <section class="management-table-card rent-table-card">
         <div class="management-table-head">
-          <strong>${state.rentSetupLoading ? "Loading rent setup..." : `${rows.length} room${rows.length === 1 ? "" : "s"}`}</strong>
+          <strong>${state.rentSetupLoading ? "Loading rent setup..." : `${rows.length} house${rows.length === 1 ? "" : "s"}`}</strong>
           <span class="management-muted">${escapeHtml(state.rentSetupStatus)}</span>
         </div>
         <div class="management-table-wrap rent-setup-wrap">
@@ -609,7 +609,7 @@ function renderRentSetupView(): string {
                 <th>Resident</th>
                 <th>Source</th>
                 <th>Resolved</th>
-                <th>Room Rent</th>
+                <th>House Rent</th>
                 <th>Deposit</th>
                 <th>Due Day</th>
                 <th>Grace</th>
@@ -620,7 +620,7 @@ function renderRentSetupView(): string {
               </tr>
             </thead>
             <tbody>
-              ${rows.length ? rows.map(renderRentSetupRow).join("") : renderEmptyRow(12, selectedBuildingId ? "Choose a building to load room defaults." : "No rent-enabled building is available.")}
+              ${rows.length ? rows.map(renderRentSetupRow).join("") : renderEmptyRow(12, selectedBuildingId ? "Choose a building to load house defaults." : "No rent-enabled building is available.")}
             </tbody>
           </table>
         </div>
@@ -703,7 +703,7 @@ function renderEmptyRow(colspan: number, message: string): string {
 
 function rentSetupSourceLabel(source: unknown): string {
   const value = text(source);
-  if (value === "room_default") return "Room Default";
+  if (value === "room_default") return "House Default";
   if (value === "building_default") return "Building Default";
   if (value === "agreement_legacy") return "Tenant Record";
   if (value === "room_disabled") return "No Charge";
@@ -765,7 +765,7 @@ function bindRenderedControls(): void {
       ) ?? null;
       state.rentPaymentStatus = state.selectedPaymentRoom
         ? `Ready to post rent for ${state.selectedPaymentRoom.buildingName} ${state.selectedPaymentRoom.houseNumber}.`
-        : "Room details were not found. Refresh and try again.";
+        : "House details were not found. Refresh and try again.";
       render();
       document.querySelector<HTMLInputElement>("#rent-payment-amount")?.focus();
     });
@@ -902,7 +902,7 @@ async function loadRentSetup(): Promise<void> {
     );
     state.role = text(response.role, state.role);
     state.rentSetupSheet = response.data;
-    state.rentSetupStatus = "Current month paid cannot exceed resolved rent. Empty room values use the building defaults.";
+    state.rentSetupStatus = "Current month paid cannot exceed resolved rent. Empty house values use the building defaults.";
   } catch (error) {
     state.rentSetupStatus = error instanceof Error ? error.message : "Failed to load rent setup.";
   } finally {
@@ -940,7 +940,7 @@ async function saveRentSetup(): Promise<void> {
     state.role = text(response.role, state.role);
     state.rentSetupSheet = response.data;
     const updated = numberValue(response.data.updatedCount);
-    state.rentSetupStatus = `Saved rent setup. ${updated} room${updated === 1 ? "" : "s"} updated.`;
+    state.rentSetupStatus = `Saved rent setup. ${updated} house${updated === 1 ? "" : "s"} updated.`;
     await refreshRoomsQuietly();
   } catch (error) {
     state.rentSetupStatus = error instanceof Error ? error.message : "Failed to save rent setup.";
@@ -984,7 +984,7 @@ function buildRentSetupPayload(): RentSetupPayload {
 
   const rows = [...document.querySelectorAll<HTMLTableRowElement>('tr[data-rent-row="true"]')].map((row) => {
     const houseNumber = text(row.dataset.houseNumber);
-    const monthlyRentKsh = readRowOptionalNumber(row, "monthlyRentKsh", `Room Default rent for ${houseNumber}`);
+    const monthlyRentKsh = readRowOptionalNumber(row, "monthlyRentKsh", `House Default rent for ${houseNumber}`);
     const depositKsh = readRowOptionalNumber(row, "depositKsh", `Deposit for ${houseNumber}`);
     const paymentDueDay = readRowOptionalNumber(row, "paymentDueDay", `Due day for ${houseNumber}`);
     const graceDays = readRowOptionalNumber(row, "graceDays", `Grace days for ${houseNumber}`);

@@ -1092,7 +1092,7 @@ function renderAdminUtilityRegistry(rows) {
     appendEmptyRow(
       adminUtilityRegistryBodyEl,
       6,
-      "No rooms found for the selected building."
+      "No houses found for the selected building."
     );
     return;
   }
@@ -1116,7 +1116,7 @@ function renderAdminUtilityRegistry(rows) {
         <td><input data-field="combinedUtilityChargeKsh" type="number" min="0" step="1" value="${escapeHtml(numberToInputString(item.combinedUtilityChargeKsh))}" /></td>
         <td>
           <button type="button" data-action="save-room-billing" data-house-number="${escapeHtml(item.houseNumber)}">
-            Save Room
+            Save House
           </button>
         </td>
       `;
@@ -1144,7 +1144,7 @@ function renderAdminBillingSummary() {
     ? state.adminUtilityPayments.length
     : 0;
   adminBillingSummaryEl.textContent =
-    `${getBuildingDisplayName(building)} has ${roomCount} room billing row(s) in view and ${paymentCount} recent utility payment(s) loaded.`;
+    `${getBuildingDisplayName(building)} has ${roomCount} house billing row(s) in view and ${paymentCount} recent utility payment(s) loaded.`;
 }
 
 function syncAdminBillingBuildingOptions() {
@@ -1588,7 +1588,7 @@ if (adminUtilityRegistryBodyEl instanceof HTMLElement) {
     const houseNumber = normalizeHouse(target.dataset.houseNumber);
     const row = target.closest("tr");
     if (!buildingId || !houseNumber || !(row instanceof HTMLTableRowElement)) {
-      showError("Select a building and room before saving room billing.");
+      showError("Select a building and house before saving house billing.");
       return;
     }
 
@@ -1635,10 +1635,10 @@ if (adminUtilityRegistryBodyEl instanceof HTMLElement) {
           }
         );
 
-        setStatus(`Room billing defaults saved for house ${houseNumber} in ${buildingId}.`);
+        setStatus(`House billing defaults saved for house ${houseNumber} in ${buildingId}.`);
         await loadAdminUtilityRegistry();
       } catch (error) {
-        handleAdminError(error, "Failed to save room billing defaults.");
+        handleAdminError(error, "Failed to save house billing defaults.");
       } finally {
         target.disabled = false;
       }

@@ -95,9 +95,6 @@
       <section id="resident-auth-panel" class="panel-card auth-stack">
         <section class="section-head">
           <h2>Resident access</h2>
-          <p>
-            Sign in with phone number and password. Add room details only for access requests or password recovery.
-          </p>
         </section>
 
         <form id="resident-auth-form" class="report-form">
@@ -144,8 +141,7 @@
           </label>
 
           <section class="section-head">
-            <h2>Room details</h2>
-            <p>Used for access requests and password recovery.</p>
+            <h2>House details</h2>
           </section>
 
           <div class="field-grid">
@@ -217,10 +213,6 @@
               />
             </label>
           </div>
-          <p class="item-guidance">
-            ID type and ID number complete the resident ID requirement. Management
-            may still attach an ID photo from the room account when they need one.
-          </p>
 
           <div class="action-row auth-request-actions">
             <button id="resident-signup-btn" type="button" class="ghost-btn">
@@ -317,7 +309,7 @@
                   <label>
                     Request Type
                     <select id="report-type" required>
-                      <option value="room_issue">Room Issue</option>
+                      <option value="room_issue">House Issue</option>
                       <option value="stolen_item">Stolen Item</option>
                       <option value="general">General</option>
                     </select>
@@ -368,9 +360,6 @@
                 </div>
 
                 <section id="theft-workflow-fields" class="theft-workflow hidden">
-                  <p class="item-details">
-                    Theft reports route directly to security and require incident timeline details.
-                  </p>
                   <div class="field-grid">
                     <label>
                       Stolen Item
@@ -482,9 +471,7 @@
                     Use suggested starter
                   </button>
                 </div>
-                <p class="quick-pay-note payment-summary-note">
-                  Rent and utilities still pay separately. Use the room/account reference shown below.
-                </p>
+                <p class="quick-pay-note payment-summary-note">Rent and utilities pay separately.</p>
               </section>
               <section id="payment-instructions-card" class="payment-instructions-card">
                 <div class="payment-instructions-head">
@@ -518,10 +505,6 @@
                           />
                           <div class="payment-priority-copy">
                             <p class="subheading">Pay utility via M-PESA</p>
-                            <p class="item-details">
-                              Confirm the phone number first, then approve the STK prompt on your
-                              phone.
-                            </p>
                           </div>
                         </div>
                       </div>
@@ -566,18 +549,12 @@
                         <p id="utility-payment-balance" class="item-details">
                           Select a utility to load the current balance.
                         </p>
-                        <p class="item-details payment-encouragement">
-                          Pay any amount today. You do not need to clear the full utility balance at
-                          once.
-                        </p>
 
                         <label>
                           Amount (KSh)
                           <input id="utility-payment-amount" type="number" min="1" required />
                         </label>
-                        <p id="utility-payment-remaining" class="item-details payment-remaining">
-                          Enter any amount to preview what will remain after payment.
-                        </p>
+                        <p id="utility-payment-remaining" class="item-details payment-remaining"></p>
                         <div class="quick-pay-row" data-quick-pay="utility">
                           <button type="button" data-quick="half">Start with half</button>
                           <button type="button" data-quick="finish">Clear full balance</button>
@@ -588,10 +565,6 @@
                           <button type="button" data-fixed="200">KSh 200</button>
                           <button type="button" data-fixed="500">KSh 500</button>
                         </div>
-                        <p class="quick-pay-note">
-                          Use a shortcut or type your own amount. Every payment reduces your balance
-                          immediately.
-                        </p>
 
                         <label>
                           Reference (optional)
@@ -616,7 +589,7 @@
                     <section id="rent-payment-section" class="payment-section manual-payment-section">
                       <p class="subheading">Rent payment instructions</p>
                       <p id="rent-payment-state" class="item-details payment-state">
-                        Payment instructions will load with your room details.
+                        Payment instructions will load with your house details.
                       </p>
                       <p class="item-details payment-inline-note">
                         Use the building payment details above and include your house number or account reference.
@@ -649,16 +622,11 @@
                             />
                           </label>
                         </div>
-                        <p class="item-details payment-inline-note">
-                          This hidden form is retained for future automated payment support.
-                        </p>
                         <label>
                           Amount (KSh)
                           <input id="rent-payment-amount" type="number" min="1" required />
                         </label>
-                        <p id="rent-payment-remaining" class="item-details payment-remaining">
-                          Enter any amount to preview what will remain after payment.
-                        </p>
+                        <p id="rent-payment-remaining" class="item-details payment-remaining"></p>
                         <div class="quick-pay-row" data-quick-pay="rent">
                           <button type="button" data-quick="half">Start with half</button>
                           <button type="button" data-quick="finish">Clear full balance</button>
@@ -669,10 +637,6 @@
                           <button type="button" data-fixed="200">KSh 200</button>
                           <button type="button" data-fixed="500">KSh 500</button>
                         </div>
-                        <p class="quick-pay-note">
-                          Use a shortcut or type your own amount. Every payment reduces your balance
-                          immediately.
-                        </p>
 
                         <div class="action-row">
                           <button id="rent-payment-btn" type="submit">Online Rent Payment Disabled</button>
@@ -712,9 +676,7 @@
               <section class="notification-control-card">
                 <div class="notification-control-copy">
                   <p class="subheading">App & alerts</p>
-                  <p id="install-app-status" class="item-details">
-                    Install this portal for faster access on your phone.
-                  </p>
+                  <p id="install-app-status" class="item-details"></p>
                   <p id="push-status-text" class="item-details">
                     Sign in to enable browser alerts for rent, utility, and support updates.
                   </p>

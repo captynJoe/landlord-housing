@@ -41,8 +41,8 @@
               id="landlord-global-search-input"
               type="search"
               maxlength="120"
-              placeholder="Find a room: name, phone, house"
-              aria-label="Find a room"
+              placeholder="Search name, phone, house no."
+              aria-label="Find a house"
             />
             <select id="landlord-global-search-building" class="hidden" aria-hidden="true" tabindex="-1"></select>
             <button id="landlord-global-search-btn" type="submit">Open</button>
@@ -100,7 +100,7 @@
         <aside class="lh-sidebar" aria-label="Management workspace">
           <nav class="lh-nav" aria-label="Landlord sections">
             <button type="button" class="lh-nav-btn" data-landlord-view="overview" data-landlord-section-target="overview-collections-panel">Dashboard</button>
-            <button type="button" class="lh-nav-btn" data-landlord-view="tenants" data-landlord-section-target="residents-section">Rooms</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="tenants" data-landlord-section-target="residents-section">Houses</button>
             <button type="button" class="lh-nav-btn" data-landlord-view="applications" data-landlord-section-target="applications-section">
               <span class="landlord-nav-label">Requests</span>
               <span id="applications-nav-badge" class="lh-count-badge hidden" aria-live="polite"></span>
@@ -143,7 +143,7 @@
                 <strong id="overview-daily-outstanding">-</strong>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="unpaid-rooms">
-                <span>Unpaid Rooms</span>
+                <span>Unpaid Houses</span>
                 <strong id="overview-daily-unpaid">-</strong>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="issues">
@@ -155,12 +155,12 @@
                 <strong id="overview-daily-requests">-</strong>
               </button>
               <button type="button" class="daily-card daily-card-btn" data-dashboard-action="vacant-rooms">
-                <span>Vacant Rooms</span>
+                <span>Vacant Houses</span>
                 <strong id="overview-daily-vacant">-</strong>
               </button>
             </div>
             <div class="daily-action-grid">
-              <button type="button" data-dashboard-action="rooms">Room Ledger</button>
+              <button type="button" data-dashboard-action="rooms">House Ledger</button>
               <button type="button" data-dashboard-action="record-rent">Record Payment</button>
               <button type="button" data-dashboard-action="requests">Tenant Requests</button>
               <button type="button" data-dashboard-action="issues">Resident Issues</button>
@@ -169,7 +169,7 @@
           </section>
 
           <div class="dashboard-section-title">
-            <h3>Rooms To Watch</h3>
+            <h3>Houses To Watch</h3>
           </div>
           <div class="table-wrap dashboard-watch-table" id="overview-collections-section">
             <table>
@@ -305,7 +305,7 @@
           id="buildings-section"
         >
           <div class="panel-head">
-            <h2>Manage Buildings & Rooms</h2>
+            <h2>Manage Buildings & Houses</h2>
             <div class="action-row">
               <button
                 type="button"
@@ -326,9 +326,7 @@
                 placeholder="Name, ID, county, address"
               />
             </label>
-            <p id="building-management-summary" class="status-text">
-              Showing all buildings in your portfolio.
-            </p>
+            <p id="building-management-summary" class="status-text"></p>
           </div>
 
           <div class="package-card">
@@ -462,10 +460,8 @@
         >
           <div class="panel-head">
             <div>
-              <h2>Setup & Controls</h2>
-              <p id="settings-summary" class="status-text">
-                Payment setup, resident payment rules, cache refresh, and data controls.
-              </p>
+              <h2>Setup</h2>
+              <p id="settings-summary" class="status-text"></p>
             </div>
             <button id="refresh-settings-view" type="button">Refresh</button>
           </div>
@@ -477,20 +473,40 @@
                 <select id="settings-building-select"></select>
               </label>
             </div>
-            <p class="status-text settings-scope-note">
-              The selected building here stays aligned with the rest of the landlord workspace.
-            </p>
           </div>
+
+          <form id="message-rules-form" class="package-card message-center-rules">
+            <div class="section-head message-center-rules-head">
+              <h3>Automatic SMS</h3>
+            </div>
+            <div class="message-center-rule-grid">
+              <label class="checkbox-row">
+                <input id="message-rule-payment-receipts" type="checkbox" />
+                Payment receipts
+              </label>
+              <label class="checkbox-row">
+                <input id="message-rule-rent-reminders" type="checkbox" />
+                Rent reminders
+              </label>
+              <label class="checkbox-row">
+                <input id="message-rule-utility-reminders" type="checkbox" />
+                Utility reminders
+              </label>
+              <label class="checkbox-row">
+                <input id="message-rule-overdue-notices" type="checkbox" />
+                Overdue notices
+              </label>
+            </div>
+            <div class="message-center-compose-actions">
+              <button id="message-rules-save-btn" type="submit">Save</button>
+            </div>
+          </form>
 
           <div class="settings-danger-grid">
             <article class="package-card settings-danger-card">
               <div class="panel-head">
                 <div>
                   <h3>Clear Building Cache</h3>
-                  <p>
-                    Refresh the selected building's derived workspace cache and billing-hold cache
-                    without deleting rent, utility, resident, or room data.
-                  </p>
                 </div>
                 <button
                   id="settings-clear-cache-btn"
@@ -500,19 +516,12 @@
                   Clear Cache
                 </button>
               </div>
-              <p class="status-text settings-danger-note">
-                This is safe for live records and only refreshes cached landlord workspace state.
-              </p>
             </article>
 
             <article class="package-card settings-danger-card is-danger">
               <div class="panel-head">
                 <div>
                   <h3>Delete Building &amp; Data</h3>
-                  <p>
-                    Permanently remove the selected building, its rooms, tenancy links, ledger
-                    records, and linked building configuration.
-                  </p>
                 </div>
                 <button
                   id="settings-clear-data-btn"
@@ -537,9 +546,6 @@
           <div class="panel-head">
             <div>
               <h2>Resident Issues</h2>
-              <p class="status-text">
-                Track resident reports, update status, and record the message sent back to the room.
-              </p>
             </div>
             <div class="action-row">
               <label>
@@ -593,9 +599,7 @@
           <div class="panel-head">
             <div>
               <h2>Tenant Documents</h2>
-              <p id="documents-summary" class="status-text">
-                Staff writing desk for tenant details, verification, agreement documents, and printable paperwork.
-              </p>
+              <p id="documents-summary" class="status-text"></p>
             </div>
             <div class="action-row">
               <button id="refresh-documents" type="button">Refresh</button>
@@ -606,7 +610,7 @@
               <thead>
                 <tr>
                   <th>Building</th>
-                  <th>Room</th>
+                  <th>House No.</th>
                   <th>Tenant</th>
                   <th>Verification</th>
                   <th>ID</th>
@@ -753,7 +757,7 @@
           id="residents-section"
         >
           <div class="panel-head">
-            <h2>Room Ledger</h2>
+            <h2>House Ledger</h2>
             <div class="action-row">
               <label>
                 Building
@@ -762,14 +766,14 @@
               <label>
                 Filter
                 <select id="residents-status-filter">
-                  <option value="all">All rooms</option>
+                  <option value="all">All houses</option>
                   <option value="overdue">Overdue</option>
                   <option value="current_due">Current due</option>
                   <option value="awaiting_readings">Awaiting readings</option>
                   <option value="clear">Clear</option>
                   <option value="with_balance">With balance</option>
-                  <option value="vacant">Vacant rooms</option>
-                  <option value="occupied">Occupied rooms</option>
+                  <option value="vacant">Vacant houses</option>
+                  <option value="occupied">Occupied houses</option>
                   <option value="pending_review">Pending review</option>
                 </select>
               </label>
@@ -784,23 +788,26 @@
               </label>
               <button id="open-direct-tenant-drawer-btn" type="button">Add Tenant</button>
               <button id="residents-open-rent-sheet-btn" type="button">Rent Setup Sheet</button>
+              <button id="house-sheet-export-btn" type="button">Export Excel</button>
+              <button id="house-sheet-import-btn" type="button">Import Excel</button>
+              <input
+                id="house-sheet-file"
+                type="file"
+                accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                hidden
+              />
               <button id="residents-open-match-btn" type="button">Open Account</button>
               <button id="refresh-residents" type="button">Refresh</button>
             </div>
           </div>
           <div id="residents-overview" class="resident-overview-cards"></div>
-          <p id="residents-search-summary" class="status-text">
-            Showing rooms for the focused building.
-          </p>
+          <p id="residents-search-summary" class="status-text"></p>
 
           <details id="room-ledger-section" class="secondary-ledger-panel utility-summary-card room-ledger-card">
             <summary class="room-ledger-toggle">
-              <span>Room Accounts</span>
-              <small>Open balances, deposits, utilities, and actions</small>
+              <span>House Accounts</span>
             </summary>
-            <p id="room-ledger-summary" class="status-text">
-              Rent, utilities, deposits, charges, and settlement state in one sheet.
-            </p>
+            <p id="room-ledger-summary" class="status-text"></p>
             <div class="table-wrap room-ledger-table-wrap">
               <table class="room-ledger-table">
                 <thead>
@@ -828,7 +835,7 @@
           >
             <summary>Utility Status</summary>
             <div class="panel-head">
-              <h3>Utility Room Status</h3>
+              <h3>Utility House Status</h3>
             </div>
             <div class="table-wrap">
               <table>
@@ -913,9 +920,7 @@
                 <input id="utility-bill-fixed" type="number" min="0" step="0.01" value="0" />
               </label>
             </div>
-            <p id="utility-bill-input-guidance" class="status-text">
-              Metered or fixed charge.
-            </p>
+            <p id="utility-bill-input-guidance" class="status-text"></p>
             <div class="inline-fields compact-fields">
               <label>
                 Due Date
@@ -1022,9 +1027,7 @@
             </div>
             <button id="utility-payment-submit" type="submit">Record Utility Payment</button>
           </form>
-          <p id="utility-payment-help" class="status-text">
-            Click an overdue status to prefill.
-          </p>
+          <p id="utility-payment-help" class="status-text"></p>
 
           <div class="table-wrap">
             <table>
@@ -1053,52 +1056,20 @@
           <div class="panel-head">
             <div>
               <h2>Messages</h2>
-              <p id="message-center-summary" class="status-text">
-                Resident issues, outbound SMS, and automatic reminders for the focused building.
-              </p>
+              <p id="message-center-summary" class="status-text"></p>
             </div>
             <button id="refresh-messages" type="button">Refresh</button>
           </div>
 
-          <form id="message-rules-form" class="package-card message-center-rules">
-            <div class="section-head message-center-rules-head">
-              <h4>Automatic SMS Rules</h4>
-              <span id="message-rules-status" class="status-text"></span>
-            </div>
-            <div class="message-center-rule-grid">
-              <label class="checkbox-row">
-                <input id="message-rule-payment-receipts" type="checkbox" />
-                Payment receipts
-              </label>
-              <label class="checkbox-row">
-                <input id="message-rule-rent-reminders" type="checkbox" />
-                Rent reminders
-              </label>
-              <label class="checkbox-row">
-                <input id="message-rule-utility-reminders" type="checkbox" />
-                Utility reminders
-              </label>
-              <label class="checkbox-row">
-                <input id="message-rule-overdue-notices" type="checkbox" />
-                Overdue notices
-              </label>
-            </div>
-            <div class="message-center-compose-actions">
-              <span id="message-rules-updated" class="status-text"></span>
-              <button id="message-rules-save-btn" type="submit">Save Rules</button>
-            </div>
-          </form>
-
           <form id="message-center-form" class="package-card message-center-compose">
             <div class="section-head message-center-rules-head">
               <h4>Send SMS</h4>
-              <span class="status-text">Use this for notices, follow-ups, and bulk building updates.</span>
-            </div>
+                          </div>
             <div class="inline-fields compact-fields">
               <label>
                 Send To
                 <select id="message-recipient-scope">
-                  <option value="room">Room</option>
+                  <option value="room">House</option>
                   <option value="building">Building</option>
                   <option value="phone">Phone Number</option>
                 </select>
@@ -1108,7 +1079,7 @@
                 <select id="message-building-select"></select>
               </label>
               <label id="message-house-field">
-                Room / House
+                House No.
                 <input
                   id="message-house-number"
                   type="text"
@@ -1177,9 +1148,7 @@
           <div class="panel-head">
             <div>
               <h2>Landlord Expense Dashboard</h2>
-              <p id="expense-dashboard-summary" class="status-text">
-                Track landlord-only building costs, shared utilities, recoverable room charges, and recent expense activity.
-              </p>
+              <p id="expense-dashboard-summary" class="status-text"></p>
             </div>
             <button id="refresh-expenditures" type="button">Refresh</button>
           </div>
@@ -1200,27 +1169,22 @@
             <article class="resident-overview-card">
               <span>Landlord Only</span>
               <strong id="expense-dashboard-landlord-total">-</strong>
-              <small>Building costs not billed to rooms</small>
             </article>
             <article class="resident-overview-card">
               <span>Recoverable Charges</span>
               <strong id="expense-dashboard-recoverable-total">-</strong>
-              <small>Room charges passed to residents</small>
             </article>
             <article class="resident-overview-card">
               <span>Common Electricity</span>
               <strong id="expense-dashboard-common-electricity-total">-</strong>
-              <small>Includes gate and security lights</small>
             </article>
             <article class="resident-overview-card">
               <span>Common Water</span>
               <strong id="expense-dashboard-common-water-total">-</strong>
-              <small>Plot and shared compound water</small>
             </article>
             <article class="resident-overview-card">
               <span>Shared Services</span>
               <strong id="expense-dashboard-shared-services-total">-</strong>
-              <small>Cleaning, garbage, grounds, and service vendors</small>
             </article>
           </div>
 
@@ -1242,7 +1206,7 @@
           <form id="expenditure-form" class="package-card">
             <div class="inline-fields compact-fields">
               <label>
-                Room / House (optional)
+                House No. (optional)
                 <input id="expenditure-house-number" type="text" maxlength="24" placeholder="A-12" />
               </label>
               <label>
@@ -1274,12 +1238,10 @@
               Note (optional)
               <textarea id="expenditure-note" rows="3" maxlength="500" placeholder="Pipe leak repair for bathroom line"></textarea>
             </label>
-            <p id="expenditure-form-guidance" class="status-text expense-form-guidance">
-              Use common utility and shared service categories for landlord-only costs such as gate lights, plot water, garbage collection, cleaning, and shared compound services.
-            </p>
+            <p id="expenditure-form-guidance" class="status-text expense-form-guidance"></p>
             <label class="checkbox-row">
               <input id="expenditure-chargeable" type="checkbox" />
-              Charge this room's resident
+              Charge this house's resident
             </label>
             <button id="expenditure-submit-btn" type="submit">Record Expenditure</button>
           </form>
@@ -1326,7 +1288,7 @@
                   <th>Total</th>
                   <th>Rent</th>
                   <th>Utilities</th>
-                  <th>Room Charges</th>
+                  <th>House Charges</th>
                   <th>Deposit Applied</th>
                   <th>Refund</th>
                   <th>Recorded By</th>
@@ -1371,7 +1333,7 @@
               <button id="registry-save-btn" type="button">Save All</button>
             </div>
             <div id="registry-charge-summary" class="landlord-generator registry-charge-summary">
-              Select a building to review building defaults and room defaults.
+              Select a building to review building defaults and house defaults.
             </div>
             <div class="table-wrap utility-registry-table-wrap">
               <table>
@@ -1387,7 +1349,7 @@
                     <th>Electricity Reading</th>
                     <th>Water Fixed (KSh)</th>
                     <th>Electric Fixed (KSh)</th>
-                    <th>Room Utility Amount (KSh)</th>
+                    <th>House Utility Amount (KSh)</th>
                     <th>Charge Setup</th>
                     <th>Action</th>
                   </tr>
@@ -1451,10 +1413,6 @@
         </header>
 
         <form id="utility-sheet-form" class="package-card landlord-sheet-form">
-          <p class="status-text">
-            Bulk entry for all houses in the selected building. Fill meter numbers,
-            then add readings or fixed charges where needed and submit once.
-          </p>
 
           <div class="inline-fields compact-fields">
             <label>
@@ -1487,7 +1445,7 @@
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Leave blank to use room/default entry only"
+                placeholder="Leave blank to use house/default entry only"
               />
             </label>
           </div>
@@ -1500,7 +1458,7 @@
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Leave blank to use room/default entry only"
+                placeholder="Leave blank to use house/default entry only"
               />
             </label>
             <label>
@@ -1572,9 +1530,6 @@
         </header>
 
         <form id="rent-sheet-form" class="package-card landlord-sheet-form rent-sheet-form">
-          <p class="status-text">
-            Set the Building Default once, then only fill Room Default values for rooms that charge differently.
-          </p>
 
           <div class="inline-fields compact-fields">
             <label>
@@ -1609,7 +1564,7 @@
               id="rent-sheet-note"
               type="text"
               maxlength="280"
-              placeholder="Room rent setup by landlord."
+              placeholder="House rent setup by landlord."
             />
           </label>
 
@@ -1621,7 +1576,7 @@
                   <th>Resident</th>
                   <th>Source</th>
                   <th>Resolved Rent</th>
-                  <th>Room Default Rent</th>
+                  <th>House Default Rent</th>
                   <th>Deposit</th>
                   <th>Due Day</th>
                   <th>Grace</th>
@@ -1637,11 +1592,9 @@
 
           <div class="action-row">
             <button id="rent-sheet-submit-btn" type="submit">Save Billing Terms</button>
-            <button id="rent-sheet-reload-btn" type="button" class="ghost-btn">Reload Rooms</button>
+            <button id="rent-sheet-reload-btn" type="button" class="ghost-btn">Reload Houses</button>
           </div>
-          <p id="rent-sheet-status" class="status-text">
-            Current month paid cannot exceed the resolved monthly rent. Due day controls the monthly due date.
-          </p>
+          <p id="rent-sheet-status" class="status-text"></p>
         </form>
       </aside>
 
@@ -1703,9 +1656,7 @@
             />
           </label>
 
-          <p id="overview-utility-payment-help" class="status-text">
-            The bill and overdue totals refresh after save.
-          </p>
+          <p id="overview-utility-payment-help" class="status-text"></p>
 
           <div class="action-row">
             <button id="overview-utility-payment-submit-btn" type="submit">
@@ -1748,14 +1699,14 @@
               <input type="radio" name="moveOutSettlementAction" value="write_off" checked />
               <span>
                 <strong>Write off as loss</strong>
-                Clear the room and record the unpaid balance as landlord loss.
+                Clear the house and record the unpaid balance as landlord loss.
               </span>
             </label>
             <label>
               <input type="radio" name="moveOutSettlementAction" value="transfer_to_resident_debt" />
               <span>
                 <strong>Transfer to resident debt</strong>
-                Clear the room, but keep the amount attached to this resident.
+                Clear the house, but keep the amount attached to this resident.
               </span>
             </label>
           </fieldset>
@@ -1771,7 +1722,7 @@
           </label>
 
           <p id="move-out-settlement-help" class="status-text">
-            Room balances will not carry to the next resident after settlement.
+            House balances will not carry to the next resident after settlement.
           </p>
 
           <div class="action-row">
@@ -1831,7 +1782,7 @@
           </label>
 
           <label>
-            Starting Room/House Numbers
+            Starting House Numbers
             <textarea
               id="create-building-house-numbers"
               rows="5"
@@ -1849,17 +1800,13 @@
             />
           </label>
 
-          <p class="status-text">
-            Landlord or staff-created buildings must start with at least one room/house number. You can add
-            more rooms after creation.
-          </p>
 
           <button type="submit">Create Building</button>
         </form>
       </aside>
-      <aside id="building-drawer" class="landlord-drawer hidden" aria-label="Add rooms">
+      <aside id="building-drawer" class="landlord-drawer hidden" aria-label="Add houses">
         <header class="landlord-drawer-head">
-          <h2>Add Rooms</h2>
+          <h2>Add Houses</h2>
           <button id="close-building-drawer-btn" type="button" class="ghost-btn">Close</button>
         </header>
 
@@ -1870,12 +1817,12 @@
               <select id="room-target-building" required></select>
             </label>
             <div class="status-text">
-              Rooms/houses are generated in bulk and added to the selected building.
+              Houses are generated in bulk and added to the selected building.
             </div>
           </div>
 
           <section class="landlord-generator">
-            <h3>Auto-generate room numbers</h3>
+            <h3>Auto-generate house numbers</h3>
             <div class="inline-fields compact-fields">
               <label>
                 Format
@@ -1932,7 +1879,7 @@
             </p>
             <div class="building-room-preview">
               <div class="building-room-preview-head">
-                <h4>Rooms to add</h4>
+                <h4>Houses to add</h4>
                 <span id="building-candidate-rooms-count">0</span>
               </div>
               <div id="building-candidate-rooms" class="building-room-chip-list"></div>
@@ -1940,17 +1887,17 @@
           </section>
 
           <label>
-            Room/House Numbers or Ranges
+            House Numbers or Ranges
             <textarea id="building-house-numbers" rows="5" placeholder="A1-A20, B1-B16" required></textarea>
           </label>
           <details class="building-room-list" open>
             <summary>
-              <span>Show rooms</span>
-              <small id="building-existing-rooms-summary">0 rooms</small>
+              <span>Show houses</span>
+              <small id="building-existing-rooms-summary">0 houses</small>
             </summary>
             <div id="building-existing-rooms" class="building-room-chip-list"></div>
           </details>
-          <button type="submit">Add Rooms To Building</button>
+          <button type="submit">Add Houses To Building</button>
         </form>
       </aside>
 
@@ -1983,7 +1930,7 @@
 
           <div class="inline-fields compact-fields">
             <label>
-              Room / House
+              House No.
               <input
                 id="direct-tenant-house"
                 type="text"
@@ -2067,7 +2014,7 @@
 
           <label id="direct-tenant-staff-confirm-wrap" class="checkbox-row hidden">
             <input id="direct-tenant-staff-confirm" type="checkbox" />
-            I showed the tenant this building's mounted lease agreement in person and they agreed to proceed for this room.
+            I showed the tenant this building's mounted lease agreement in person and they agreed to proceed for this house.
           </label>
 
           <label id="direct-tenant-acceptance-note-wrap" class="hidden">
@@ -2090,9 +2037,7 @@
             />
           </label>
 
-          <p id="direct-tenant-status" class="status-text">
-            Upload ID evidence, open the lease PDF, set the lease date, and confirm the tenant reviewed it.
-          </p>
+          <p id="direct-tenant-status" class="status-text"></p>
           <button id="direct-tenant-submit-btn" type="submit">Create Tenant Agreement</button>
         </form>
       </aside>

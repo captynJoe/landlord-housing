@@ -366,7 +366,7 @@ function syncRentDueDayDefaultAction(room) {
     )}`;
     roomRentDueDayDefaultActionEl.title =
       roomDefaultDay == null
-        ? "This room is using the building default. Click to edit the building rent setup."
+        ? "This house is using the building default. Click to edit the building rent setup."
         : "Click to edit the building rent setup.";
     return;
   }
@@ -513,7 +513,7 @@ function formatAuditActionLabel(value) {
     case "resident.debt.transferred":
       return "Debt transferred";
     case "room.removed":
-      return "Room removed";
+      return "House removed";
     case "billing.hold.created":
       return "Billing hold added";
     case "billing.hold.canceled":
@@ -825,7 +825,7 @@ function setLoading(loading) {
 function parseRoomRoute() {
   const segments = window.location.pathname.split("/").filter(Boolean);
   if (segments.length < 4 || segments[0] !== "landlord" || segments[1] !== "rooms") {
-    throw new Error("Invalid room account route.");
+    throw new Error("Invalid house account route.");
   }
 
   return {
@@ -843,28 +843,28 @@ function describeChargeSource(source, utilityBillingMode) {
       };
     case "metered":
       return {
-        label: "Metered room",
+        label: "Metered house",
         detail: "Both meters are present, so combined-charge defaults do not apply here."
       };
     case "room_custom_combined":
       return {
-        label: "Room default",
-        detail: "This room has its own normal combined utility charge."
+        label: "House default",
+        detail: "This house has its own normal combined utility charge."
       };
     case "monthly_override_combined":
       return {
         label: "Monthly adjustment",
-        detail: "This room is following this month's building adjustment because no room default is set."
+        detail: "This house is following this month's building adjustment because no house default is set."
       };
     case "building_default_combined":
       return {
         label: "Building default",
-        detail: "This room is following the building default combined charge."
+        detail: "This house is following the building default combined charge."
       };
     case "fixed_charge":
       return {
         label: "Fixed-charge fallback",
-        detail: "This room is using fixed water and electricity charges instead of a combined amount."
+        detail: "This house is using fixed water and electricity charges instead of a combined amount."
       };
     default:
       return {
@@ -872,7 +872,7 @@ function describeChargeSource(source, utilityBillingMode) {
           String(utilityBillingMode ?? "").trim() === "combined_charge"
             ? "Needs combined-charge setup"
             : "Needs charge setup",
-        detail: "Add meters, fixed charges, or a room default amount before relying on recurring billing."
+        detail: "Add meters, fixed charges, or a house default amount before relying on recurring billing."
       };
   }
 }
@@ -1081,7 +1081,7 @@ function renderBillingHolds(payload) {
 
   if (sorted.length === 0) {
     roomBillingHoldsEl.innerHTML =
-      '<p class="status-text">No billing holds recorded for this room.</p>';
+      '<p class="status-text">No billing holds recorded for this house.</p>';
     return;
   }
 
@@ -1220,10 +1220,10 @@ function renderManagementForms(payload) {
 
   setManagementStatus(
     hasActiveResident
-      ? "Complete lease details, resident documents, and room billing terms from this workspace."
+      ? "Complete lease details, resident documents, and house billing terms from this workspace."
       : isDraft
-        ? "A tenant draft is saved for this room. Add the Lease End date (and any other details) below, then save to create the tenant."
-        : "This room has no active resident. Billing terms can be prepared, and lease details unlock after assignment."
+        ? "A tenant draft is saved for this house. Add the Lease End date (and any other details) below, then save to create the tenant."
+        : "This house has no active resident. Billing terms can be prepared, and lease details unlock after assignment."
   );
   setPillText(
     roomAgreementStateEl,
@@ -1379,13 +1379,13 @@ function renderAnomalies(payload) {
 
   if (payload?.building?.houseRegistered === false || anomalyData?.overstatedOrphanedRoom) {
     anomalies.push(
-      "This room has utility or charge activity but is not in the building house list. Confirm whether it should be archived or registered."
+      "This house has utility or charge activity but is not in the building house list. Confirm whether it should be archived or registered."
     );
   }
 
   if (payload?.building?.visibleToLandlord === false) {
     anomalies.push(
-      "This room is not normally visible to the current landlord scope. Access is limited to direct route review."
+      "This house is not normally visible to the current landlord scope. Access is limited to direct route review."
     );
   }
 
@@ -1397,7 +1397,7 @@ function renderAnomalies(payload) {
 
   if (String(chargeSetup?.source ?? "").trim() === "unconfigured") {
     anomalies.push(
-      "This room still needs a reliable utility charge rule. Add meters, a room default amount, or a building default before future months post."
+      "This house still needs a reliable utility charge rule. Add meters, a house default amount, or a building default before future months post."
     );
   }
 
@@ -1406,7 +1406,7 @@ function renderAnomalies(payload) {
     Number(summary.displayedOutstandingKsh ?? 0) < Number(summary.projectedOutstandingKsh ?? 0)
   ) {
     anomalies.push(
-      `Room charges are already part of the visible outstanding. Projected outstanding also includes missing recurring utility months.`
+      `House charges are already part of the visible outstanding. Projected outstanding also includes missing recurring utility months.`
     );
   }
 
@@ -1415,7 +1415,7 @@ function renderAnomalies(payload) {
       ? anomalies
           .map((message) => `<p class="status-text resident-ledger-flag">${escapeHtml(message)}</p>`)
           .join("")
-      : '<p class="status-text resident-ledger-flag">No room anomalies detected right now.</p>';
+      : '<p class="status-text resident-ledger-flag">No house anomalies detected right now.</p>';
 }
 
 function renderUtilityBills(payload) {
@@ -1428,7 +1428,7 @@ function renderUtilityBills(payload) {
 
   if (rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="7">No utility bills recorded for this room.</td>';
+    row.innerHTML = '<td colspan="7">No utility bills recorded for this house.</td>';
     roomBillsBodyEl.append(row);
     return;
   }
@@ -1469,7 +1469,7 @@ function renderRentPayments(payload) {
 
   if (rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="6">No rent payments recorded for this room.</td>';
+    row.innerHTML = '<td colspan="6">No rent payments recorded for this house.</td>';
     roomRentPaymentsBodyEl.append(row);
     return;
   }
@@ -1498,7 +1498,7 @@ function renderUtilityPayments(payload) {
 
   if (rows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="7">No utility payments recorded for this room.</td>';
+    row.innerHTML = '<td colspan="7">No utility payments recorded for this house.</td>';
     roomPaymentsBodyEl.append(row);
     return;
   }
@@ -1540,7 +1540,7 @@ function renderRoomCharges(payload) {
     row.innerHTML = `
       <td>${escapeHtml(formatDateTime(item?.createdAt))}</td>
       <td>${escapeHtml(formatExpenditureCategory(item?.category))}</td>
-      <td>${escapeHtml(item?.title || "Room charge")}</td>
+      <td>${escapeHtml(item?.title || "House charge")}</td>
       <td>${escapeHtml(formatCurrency(item?.amountKsh ?? 0))}</td>
       <td>${escapeHtml(item?.chargeableToResident ? "Yes" : "No")}</td>
       <td>${escapeHtml(item?.note || "-")}</td>
@@ -1557,7 +1557,7 @@ function renderRoomAuditEvents(payload) {
   const events = Array.isArray(payload?.auditEvents) ? payload.auditEvents : [];
   if (events.length === 0) {
     roomAuditEventsEl.innerHTML =
-      '<p class="status-text">No account audit events recorded for this room.</p>';
+      '<p class="status-text">No account audit events recorded for this house.</p>';
     return;
   }
 
@@ -1583,7 +1583,7 @@ function renderRoomIssues(payload) {
 
   const tickets = Array.isArray(payload?.tickets) ? payload.tickets : [];
   if (tickets.length === 0) {
-    roomIssuesEl.innerHTML = '<p class="status-text">No room issues recorded for this room.</p>';
+    roomIssuesEl.innerHTML = '<p class="status-text">No house issues recorded for this house.</p>';
     return;
   }
 
@@ -1594,7 +1594,7 @@ function renderRoomIssues(payload) {
           <p class="status-text">${escapeHtml(ticket.queue || "support")} • ${escapeHtml(
             ticket.status || "open"
           )} • ${escapeHtml(formatDateTime(ticket.createdAt))}</p>
-          <h4>${escapeHtml(ticket.title || "Room issue")}</h4>
+          <h4>${escapeHtml(ticket.title || "House issue")}</h4>
           <p class="status-text">${escapeHtml(ticket.details || "No extra details recorded.")}</p>
         </article>
       `
@@ -1608,7 +1608,7 @@ function renderRoomAccount(payload) {
   const buildingName = building.name || "Selected building";
   const shellBrand = getLandlordShellBrand(buildingName);
   const portalTitle = getLandlordPortalTitle(buildingName);
-  const residentName = room.residentName || "Vacant room";
+  const residentName = room.residentName || "Vacant house";
   const subtitleParts = [
     `${buildingName} • House ${normalizeHouse(room.houseNumber || state.houseNumber)}`
   ];
@@ -1620,13 +1620,13 @@ function renderRoomAccount(payload) {
     subtitleParts.push([building.county, building.address].filter(Boolean).join(" • "));
   }
 
-  applyDocumentBranding(`${portalTitle} • Room ${normalizeHouse(room.houseNumber || state.houseNumber)}`, shellBrand);
+  applyDocumentBranding(`${portalTitle} • House ${normalizeHouse(room.houseNumber || state.houseNumber)}`, shellBrand);
 
   if (roomAccountTagEl instanceof HTMLElement) {
     roomAccountTagEl.textContent = shellBrand;
   }
   if (roomAccountTitleEl instanceof HTMLElement) {
-    roomAccountTitleEl.textContent = `${buildingName} • Room ${normalizeHouse(
+    roomAccountTitleEl.textContent = `${buildingName} • House ${normalizeHouse(
       room.houseNumber || state.houseNumber
     )}`;
   }
@@ -2062,7 +2062,7 @@ async function saveRoomRentSetup(event) {
   if (requestedBalanceKsh != null && requestedBalanceKsh !== currentBalanceKsh) {
     const targetLabel =
       String(room.residentName ?? "").trim() ||
-      `room ${normalizeHouse(room.houseNumber || state.houseNumber)}`;
+      `house ${normalizeHouse(room.houseNumber || state.houseNumber)}`;
     const confirmed = await confirmBalanceAdjustment({
       currentBalanceKsh,
       nextBalanceKsh: requestedBalanceKsh,
@@ -2127,7 +2127,7 @@ async function saveRoomRentSetup(event) {
         monthlyRentKsh,
         balanceKsh,
         dueDate,
-        note: note || "Room rent setup updated from room account."
+        note: note || "House rent setup updated from house account."
       })
     });
 
@@ -2195,9 +2195,9 @@ async function loadRoomAccount() {
     }
 
     const message =
-      error instanceof Error ? error.message : "Unable to load the room account.";
+      error instanceof Error ? error.message : "Unable to load the house account.";
     showError(message);
-    setStatus("Room account load failed.");
+    setStatus("House account load failed.");
   } finally {
     setLoading(false);
   }
@@ -2213,7 +2213,7 @@ async function unrecordPayment(button) {
 
   const paymentLabel = action === "unrecord-rent-payment" ? "rent" : "utility";
   const confirmed = window.confirm(
-    `Unrecord ${amount} ${paymentLabel} payment? The room balance will reopen by that amount.`
+    `Unrecord ${amount} ${paymentLabel} payment? The house balance will reopen by that amount.`
   );
   if (!confirmed) {
     return;
@@ -2398,7 +2398,7 @@ async function init() {
     const route = parseRoomRoute();
     state.buildingId = route.buildingId;
     state.houseNumber = route.houseNumber;
-    setStatus("Loading room account...");
+    setStatus("Loading house account...");
     await loadRoomAccount();
 
     let flashMessage = null;
@@ -2418,9 +2418,9 @@ async function init() {
     }
 
     const message =
-      error instanceof Error ? error.message : "Unable to open this room account.";
+      error instanceof Error ? error.message : "Unable to open this house account.";
     showError(message);
-    setStatus("Room account unavailable.");
+    setStatus("House account unavailable.");
   }
 }
 
