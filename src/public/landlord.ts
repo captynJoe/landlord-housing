@@ -1029,7 +1029,13 @@ function isLandlordViewAvailableForRole(view) {
   const normalizedView = String(view ?? "").trim();
 
   if (isCaretakerRole()) {
-    return normalizedView === "overview" || normalizedView === "tenants" || normalizedView === "applications";
+    return (
+      normalizedView === "overview" ||
+      normalizedView === "tenants" ||
+      normalizedView === "rent" ||
+      normalizedView === "meters" ||
+      normalizedView === "applications"
+    );
   }
 
   if (!isOwnerAccessRole() && normalizedView === "settings") {
@@ -1555,6 +1561,8 @@ function setActiveLandlordView(nextView, options = {}) {
     normalizedView === "messages" ||
     normalizedView === "documents" ||
     normalizedView === "tenants" ||
+    normalizedView === "rent" ||
+    normalizedView === "meters" ||
     normalizedView === "expenses"
       ? normalizedView
       : "overview";
@@ -1620,7 +1628,7 @@ function scrollToLandlordSection(sectionId) {
 function openMetricTarget(target) {
   switch (target) {
     case "meters":
-      setActiveLandlordView("tenants");
+      setActiveLandlordView("meters");
       scrollToLandlordSection("utilities-registry-section");
       void openUtilitySetupModal().catch((error) => {
         handleLandlordError(error, "Unable to open meter setup.");
@@ -1631,7 +1639,7 @@ function openMetricTarget(target) {
       scrollToLandlordSection("residents-section");
       break;
     case "posted-bills":
-      setActiveLandlordView("tenants");
+      setActiveLandlordView("meters");
       scrollToLandlordSection("utilities-bills-section");
       break;
     case "payments":
@@ -3449,7 +3457,7 @@ async function openRentSetupDeepLinkIfRequested() {
     state.selectedRegistryBuildingId = deepLink.buildingId;
   }
 
-  setActiveLandlordView("tenants");
+  setActiveLandlordView("rent");
   scrollToLandlordSection("overview-rent-status-section");
   await openRentSheetModal();
   clearRentSetupDeepLink();
@@ -3550,10 +3558,8 @@ function sortResidentsForDirectory(rows) {
   return [...rows].sort(compareStableRoomOrder);
 }
 
-function getResidentOverviewTargetSection(filter) {
-  return filter === "awaiting_readings"
-    ? "utility-room-status-section"
-    : "room-ledger-section";
+function getResidentOverviewTargetSection(_filter) {
+  return "room-ledger-section";
 }
 
 function renderResidentsOverview(rows) {
@@ -7387,8 +7393,7 @@ function syncRentPaymentBuildingOptions() {
   });
 
   if (rentPaymentHelpEl instanceof HTMLElement) {
-    rentPaymentHelpEl.textContent =
-      "Record a landlord-side rent payment only for buildings that still use rent billing.";
+    rentPaymentHelpEl.textContent = "";
   }
 }
 
@@ -9232,7 +9237,7 @@ function renderRentStatus(rows) {
   const visibleRows = getRowsForFocusedBuilding(rows);
   if (visibleRows.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = '<td colspan="11">No rent status data for the current building.</td>';
+    row.innerHTML = '<td colspan="10">No rent status data for the current building.</td>';
     rentStatusBodyEl.append(row);
     return;
   }
@@ -9258,7 +9263,6 @@ function renderRentStatus(rows) {
       <td>${formatCurrency(currentDueKsh)}</td>
       <td>${formatCurrency(item.arrearsKsh ?? 0)}</td>
       <td>${formatDateTime(item.dueDate)}</td>
-      <td>${item.latestPaymentReference ?? "-"}</td>
       <td>
         ${
           canRecordPayment
@@ -11047,7 +11051,7 @@ function prefillRentPaymentFromStatus(action) {
   }
 
   clearError();
-  setActiveLandlordView("tenants");
+  setActiveLandlordView("rent");
   scrollToLandlordSection("overview-rent-status-section");
   window.requestAnimationFrame(() => {
     if (rentPaymentAmountEl instanceof HTMLInputElement) {
@@ -11792,7 +11796,7 @@ dashboardActionButtons.forEach((button) => {
         break;
       case "record-rent":
         clearRoomLedgerWorkspace();
-        setActiveLandlordView("tenants");
+        setActiveLandlordView("rent");
         if (rentPaymentDetailsEl instanceof HTMLDetailsElement) {
           rentPaymentDetailsEl.open = true;
         }

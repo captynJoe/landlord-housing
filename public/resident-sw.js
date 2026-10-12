@@ -12,7 +12,7 @@ const APP_ASSETS = [
   "/dedicated-theme.css?v=aefbff730d",
   "/users.js?v=b870364c13",
   "/user.js?v=3591447a03",
-  "/landlord.js?v=c574959b0a",
+  "/landlord.js?v=899567274a",
   "/password-visibility.js",
   "/manifest.webmanifest",
   "/icons/housing-app.svg",

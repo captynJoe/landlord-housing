@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="/landlord.css?v=8709b98621" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=aefbff730d" />
     <link rel="stylesheet" href="/landlord-modern.css?v=921be132d5" />
-    <link rel="stylesheet" href="/landlord-shell.css?v=81fc36dbf7" />
+    <link rel="stylesheet" href="/landlord-shell.css?v=82a543361a" />
   </head>
   <body>
     <div class="backdrop"></div>
@@ -101,6 +101,8 @@
           <nav class="lh-nav" aria-label="Landlord sections">
             <button type="button" class="lh-nav-btn" data-landlord-view="overview" data-landlord-section-target="overview-collections-panel">Dashboard</button>
             <button type="button" class="lh-nav-btn" data-landlord-view="tenants" data-landlord-section-target="residents-section">Houses</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="rent" data-landlord-section-target="overview-rent-status-section">Rent</button>
+            <button type="button" class="lh-nav-btn" data-landlord-view="meters" data-landlord-section-target="utilities-registry-section">Utilities</button>
             <button type="button" class="lh-nav-btn" data-landlord-view="applications" data-landlord-section-target="applications-section">
               <span class="landlord-nav-label">Requests</span>
               <span id="applications-nav-badge" class="lh-count-badge hidden" aria-live="polite"></span>
@@ -666,21 +668,20 @@
           </div>
         </section>
 
-        <details
-          class="panel wide-panel landlord-view hidden secondary-ledger-panel"
-          data-landlord-view-panel="tenants"
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="rent"
           id="overview-rent-status-section"
         >
-          <summary>Rent</summary>
           <div class="panel-head">
-            <h2>Rent Setup Sheet + Manual Payments</h2>
+            <h2>Rent</h2>
             <div class="action-row">
               <button id="open-rent-sheet-btn" type="button">Rent Setup Sheet</button>
               <button id="refresh-rent-status" type="button">Refresh</button>
             </div>
           </div>
-          <details id="rent-payment-details" class="landlord-inline-details">
-            <summary>Record offline rent payment</summary>
+          <div id="rent-payment-details" class="landlord-inline-block">
+            <h3>Record rent payment</h3>
             <form id="rent-payment-form" class="package-card">
               <div class="inline-fields compact-fields">
                 <label>
@@ -727,7 +728,7 @@
               <button id="rent-payment-submit" type="submit">Record Rent Payment</button>
             </form>
             <p id="rent-payment-help" class="status-text">Manual rent payment.</p>
-          </details>
+          </div>
 
           <div class="table-wrap">
             <table>
@@ -742,14 +743,13 @@
                   <th>Due This Month</th>
                   <th>Arrears</th>
                   <th>Due Date</th>
-                  <th>Latest Reference</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody id="rent-status-body"></tbody>
             </table>
           </div>
-        </details>
+        </section>
 
         <section
           class="panel wide-panel landlord-view hidden"
@@ -808,10 +808,8 @@
           <div id="residents-overview" class="resident-overview-cards"></div>
           <p id="residents-search-summary" class="status-text"></p>
 
-          <details id="room-ledger-section" class="secondary-ledger-panel utility-summary-card room-ledger-card" open>
-            <summary class="room-ledger-toggle">
-              <span>House Accounts</span>
-            </summary>
+          <div id="room-ledger-section" class="utility-summary-card room-ledger-card">
+            <h3 class="room-ledger-title">House Accounts</h3>
             <p id="room-ledger-summary" class="status-text"></p>
             <div class="table-wrap room-ledger-table-wrap">
               <table class="room-ledger-table">
@@ -833,10 +831,10 @@
                 <tbody id="room-ledger-body"></tbody>
               </table>
             </div>
-          </details>
+          </div>
           <details
             id="utility-room-status-section"
-            class="secondary-ledger-panel utility-summary-card"
+            class="secondary-ledger-panel utility-summary-card hidden"
           >
             <summary>Utility Status</summary>
             <div class="panel-head">
@@ -864,28 +862,26 @@
           </details>
         </section>
 
-        <details
-          class="panel wide-panel landlord-view secondary-ledger-panel"
-          data-landlord-view-panel="tenants"
+        <section
+          class="panel wide-panel landlord-view"
+          data-landlord-view-panel="meters"
           id="utilities-registry-section"
         >
-          <summary>Meters</summary>
           <div class="panel-head">
-            <h2>Meters + Bulk Utility Setup</h2>
+            <h2>Meters</h2>
             <div class="action-row">
               <button id="open-utility-setup-btn" type="button">Open Setup</button>
             </div>
           </div>
-        </details>
+        </section>
 
-        <details
-          class="panel wide-panel landlord-view hidden secondary-ledger-panel"
-          data-landlord-view-panel="tenants"
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="meters"
           id="utilities-bills-section"
         >
-          <summary>Utility Bills</summary>
           <div class="panel-head">
-            <h2>Post Monthly Utility Bill</h2>
+            <h2>Utility Bills</h2>
             <button id="refresh-bills" type="button">Refresh</button>
           </div>
 
@@ -939,8 +935,8 @@
             <button type="submit">Post Monthly Bill</button>
           </form>
 
-          <details class="secondary-ledger-panel">
-            <summary>Monthly Bill Details</summary>
+          <div class="landlord-inline-block">
+            <h3>Monthly bills</h3>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -959,15 +955,14 @@
                 <tbody id="utility-bills-body"></tbody>
               </table>
             </div>
-          </details>
-        </details>
+          </div>
+        </section>
 
-        <details
-          class="panel wide-panel landlord-view hidden secondary-ledger-panel"
-          data-landlord-view-panel="tenants"
+        <section
+          class="panel wide-panel landlord-view hidden"
+          data-landlord-view-panel="meters"
           id="utilities-payments-section"
         >
-          <summary>Utility Payments</summary>
           <div class="panel-head">
             <h2>Utility Payments</h2>
             <button id="refresh-payments" type="button">Refresh</button>
@@ -1051,7 +1046,7 @@
               <tbody id="utility-payments-body"></tbody>
             </table>
           </div>
-        </details>
+        </section>
 
         <section
           class="panel wide-panel landlord-view hidden"
@@ -2124,6 +2119,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=e2ea7c2d9b"></script>
+    <script type="module" src="/landlord.js?v=ca95eef2c3"></script>
   </body>
 </html>
