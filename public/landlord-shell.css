@@ -1073,3 +1073,49 @@ body.landlord-rooms-route .lh-workspace {
   margin: 0;
   font-size: 1.05rem;
 }
+
+/* Checkboxes and radios at their normal size everywhere */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  min-height: 0 !important;
+  margin: 0;
+  padding: 0 !important;
+  flex: 0 0 auto;
+  accent-color: #0f5c4a;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.checkbox-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px;
+}
+
+/* House Accounts fills the screen once scrolled to: the table scrolls inside it */
+#room-ledger-section {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--ledger-dock-top, 0px) - var(--ledger-below, 0px));
+  height: calc(100dvh - var(--ledger-dock-top, 0px) - var(--ledger-below, 0px));
+  min-height: 360px;
+  scroll-margin-top: var(--ledger-dock-top, 0px);
+}
+
+#room-ledger-section .room-ledger-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+#room-ledger-section.is-docked .room-ledger-table-wrap {
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+}

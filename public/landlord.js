@@ -12413,6 +12413,40 @@ document.addEventListener("click", (event) => {
         }
     });
 });
+// House Accounts docks under the top bar: sized to the screen, and its table only
+// scrolls once the page has brought it to the top.
+function measureLedgerDock() {
+    if (!(roomLedgerSectionEl instanceof HTMLElement) || roomLedgerSectionEl.offsetParent === null) {
+        return;
+    }
+    let dockTop = 0;
+    document.querySelectorAll(".lh-topbar, .lh-sidebar").forEach((element) => {
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        if ((style.position === "sticky" || style.position === "fixed") &&
+            rect.width >= window.innerWidth * 0.5) {
+            dockTop = Math.max(dockTop, (Number.parseFloat(style.top) || 0) + rect.height);
+        }
+    });
+    const rect = roomLedgerSectionEl.getBoundingClientRect();
+    const below = document.documentElement.scrollHeight - (rect.bottom + window.scrollY);
+    roomLedgerSectionEl.style.setProperty("--ledger-dock-top", `${Math.round(dockTop)}px`);
+    roomLedgerSectionEl.style.setProperty("--ledger-below", `${Math.max(0, Math.round(below))}px`);
+    syncLedgerDocked();
+}
+function syncLedgerDocked() {
+    if (!(roomLedgerSectionEl instanceof HTMLElement)) {
+        return;
+    }
+    const dockTop = Number.parseFloat(roomLedgerSectionEl.style.getPropertyValue("--ledger-dock-top")) || 0;
+    const top = roomLedgerSectionEl.getBoundingClientRect().top;
+    roomLedgerSectionEl.classList.toggle("is-docked", roomLedgerSectionEl.offsetParent !== null && top <= dockTop + 4);
+}
+window.addEventListener("scroll", syncLedgerDocked, { passive: true });
+window.addEventListener("resize", measureLedgerDock);
+if (typeof ResizeObserver === "function") {
+    new ResizeObserver(() => measureLedgerDock()).observe(document.body);
+}
 refreshResidentsBtnEl?.addEventListener("click", () => {
     void loadResidents().catch((error) => {
         handleLandlordError(error, "Unable to refresh residents.");

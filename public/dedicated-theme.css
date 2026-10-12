@@ -426,3 +426,19 @@ body .landlord-side-panel .landlord-focus-actions button:hover {
   background: #f3c55b !important;
   color: #102331 !important;
 }
+
+/* Checkboxes and radios at their normal size everywhere */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  min-height: 0 !important;
+  margin: 0;
+  padding: 0 !important;
+  flex: 0 0 auto;
+  accent-color: #0f5c4a;
+  box-shadow: none !important;
+  cursor: pointer;
+}
