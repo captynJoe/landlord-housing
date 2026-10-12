@@ -105,6 +105,7 @@ const rentDueEl = document.getElementById("rent-due");
 
 const paymentsSummaryActionEl = document.getElementById("payments-summary-action");
 const paymentsTotalOutstandingEl = document.getElementById("payments-total-outstanding");
+const residentBalanceAdjustedEl = document.getElementById("resident-balance-adjusted");
 const paymentsRentOutstandingEl = document.getElementById("payments-rent-outstanding");
 const paymentsUtilityOutstandingEl = document.getElementById("payments-utility-outstanding");
 const paymentsMonthPaidEl = document.getElementById("payments-month-paid");
@@ -211,6 +212,7 @@ const state = {
   buildings: [],
   residentSession: null,
   rentDue: null,
+  balanceAdjustment: null,
   reports: [],
   notifications: [],
   pushConfig: null,
@@ -1146,7 +1148,29 @@ function computeRemainingBalance(balance, amount) {
   return Math.max(0, Math.ceil(toPositiveNumber(balance)) - Math.ceil(toPositiveNumber(amount)));
 }
 
+function renderResidentBalanceAdjusted() {
+  if (!(residentBalanceAdjustedEl instanceof HTMLElement)) {
+    return;
+  }
+  const adjustment =
+    state.residentSession && !canResidentAccessBilling() ? null : state.balanceAdjustment;
+  residentBalanceAdjustedEl.classList.toggle("hidden", !adjustment);
+  if (!adjustment) {
+    residentBalanceAdjustedEl.textContent = "";
+    return;
+  }
+  const adjustedOn = new Date(adjustment.adjustedAt).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short"
+  });
+  const what = adjustment.kind === "utility" ? "Utility balance" : "Rent balance";
+  residentBalanceAdjustedEl.textContent = `${what} manually adjusted · ${adjustedOn}${
+    adjustment.reason ? ` · ${adjustment.reason}` : ""
+  }`;
+}
+
 function updatePaymentsSummaryCard() {
+  renderResidentBalanceAdjusted();
   if (state.residentSession && !canResidentAccessBilling()) {
     paymentsTotalOutstandingEl.textContent = formatCurrency(0);
     paymentsRentOutstandingEl.textContent = formatCurrency(0);
@@ -4040,6 +4064,7 @@ async function loadTenantData() {
     state.notifications = data.notifications ?? [];
     state.paymentInstructions = data.paymentInstructions ?? null;
     state.rentDue = data.rentDue ?? null;
+    state.balanceAdjustment = data.balanceAdjustment ?? null;
     state.identityRequirement =
       data.identityRequirement ?? state.residentSession?.identityRequirement ?? null;
     if (state.residentSession && data.agreementStatus) {

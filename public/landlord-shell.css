@@ -707,3 +707,356 @@ body.landlord-rooms-route .lh-workspace {
 .daily-card.daily-card-primary small {
   color: #ffffff !important;
 }
+
+/* Balance card (house quick actions), shared with captyn-housing */
+.mr-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--captyn-line);
+  border-radius: 999px;
+  background: var(--captyn-panel-soft);
+  color: var(--captyn-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mr-chip.is-due {
+  border-color: rgba(194, 43, 31, 0.3);
+  background: var(--danger-bg);
+  color: var(--captyn-red);
+}
+
+.mr-chip.is-ok {
+  background: var(--ok-bg);
+  color: var(--captyn-green);
+}
+
+.mr-room {
+  display: grid;
+  min-width: 0;
+}
+
+.mr-room strong {
+  color: var(--captyn-ink-strong);
+  font-size: 1.1rem;
+}
+
+.mr-room span {
+  overflow: hidden;
+  color: var(--captyn-muted);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mr-empty {
+  margin: 0;
+  padding: 18px 4px;
+  color: var(--captyn-muted);
+}
+
+.bal-filters {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--captyn-line);
+  border-radius: 999px;
+  background: var(--captyn-panel-soft);
+}
+
+.bal-filters button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--captyn-muted) !important;
+  box-shadow: none !important;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.bal-filters button.active {
+  background: var(--captyn-navy) !important;
+  color: #fff !important;
+}
+
+.bal-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 12px;
+  border: 1px solid var(--captyn-line);
+  border-top: 3px solid var(--captyn-line);
+  border-radius: var(--radius-md);
+  background: var(--captyn-panel-strong);
+}
+
+.bal-card.is-owing {
+  border-top-color: var(--captyn-amber);
+}
+
+.bal-card.is-checked {
+  border-top-color: var(--captyn-green);
+}
+
+.bal-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bal-check {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--captyn-panel-soft);
+  color: var(--captyn-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.bal-check.is-done {
+  background: var(--ok-bg);
+  color: var(--captyn-green);
+}
+
+.bal-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.bal-figures div {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--captyn-panel-soft);
+}
+
+.bal-figures dt {
+  color: var(--captyn-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.bal-figures dd {
+  margin: 2px 0 0;
+  color: var(--captyn-ink-strong);
+  font-size: 1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bal-figures .bal-total {
+  background: var(--captyn-blue-soft);
+}
+
+.bal-tag {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--captyn-amber);
+  border-radius: 6px;
+  background: var(--warn-bg);
+  color: var(--captyn-ink);
+  font-size: 0.78rem;
+}
+
+.bal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bal-actions button {
+  flex: 1 1 auto;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 0.86rem;
+}
+
+.bal-panel {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--captyn-panel-soft);
+}
+
+.bal-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bal-fields label {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: var(--captyn-muted) !important;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.bal-fields .bal-wide {
+  grid-column: 1 / -1;
+}
+
+.bal-input {
+  min-height: 42px;
+  padding: 0 10px;
+  font-size: 0.95rem;
+}
+
+.bal-note {
+  margin: 0;
+  color: var(--captyn-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.bal-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.bal-panel-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+  .bal-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+@media (max-width: 420px) {
+  .bal-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* House quick actions (tap a row in Houses To Watch) */
+.landlord-sheet-modal.house-actions-modal {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  grid-template-rows: none;
+  gap: 12px;
+  border-radius: 16px !important;
+  transform: translate(-50%, -50%);
+}
+
+.house-actions-modal .landlord-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.house-actions-modal .landlord-drawer-head h2 {
+  margin: 0;
+}
+
+.dashboard-watch-table tr.is-clickable {
+  cursor: pointer;
+}
+
+/* House Ledger toolbar: secondary actions in one menu */
+.lh-more-menu {
+  position: relative;
+}
+
+.lh-more-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--captyn-line);
+  border-radius: 10px;
+  background: var(--captyn-panel-strong);
+  color: var(--captyn-ink-strong);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.lh-more-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.lh-more-menu-list {
+  position: absolute;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid var(--captyn-line);
+  border-radius: 12px;
+  background: var(--captyn-panel-strong);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.16);
+}
+
+.lh-more-menu-list button {
+  justify-content: flex-start;
+  width: 100%;
+  text-align: left;
+}
+
+.resident-overview-card.is-zero {
+  opacity: 0.55;
+}
+
+/* Section headers read left to right, like House Accounts */
+.secondary-ledger-panel > summary {
+  justify-content: flex-start;
+}
+
+.lh-more-menu-list button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--captyn-ink-strong) !important;
+  box-shadow: none !important;
+  font-weight: 600;
+}
+
+.lh-more-menu-list button:hover,
+.lh-more-menu-list button:focus-visible {
+  background: var(--captyn-panel-soft) !important;
+}
+
+/* House Ledger toolbar layout */
+#residents-section > .panel-head {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+#residents-section > .panel-head .action-row {
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+#residents-section > .panel-head .action-row > button,
+.lh-more-menu > summary {
+  white-space: nowrap;
+}
+
+#residents-section .resident-search-field {
+  flex: 1 1 220px;
+}
+
+#residents-building-select {
+  min-width: 150px;
+}

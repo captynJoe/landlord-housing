@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { initResponsiveTables } from "./mobile-table.js?v=c4c693a0d2";
 import { notifyError, notifyStatus } from "./notifications.js?v=eccde9f9f2";
+import { createBalancesView } from "./balances-view.js?v=f6403291af";
 import { applyHouseSheetImport, buildXlsx, describeHouseSheetPlan, houseSheetRowsFromRegistry, houseSheetTable, parseHouseSheet, prepareHouseSheetImport, readSpreadsheet } from "./house-sheet.js?v=dc667cfbc0";
 import { createUploadedImageGallery, renderSelectedImagePreviews, uploadImageFiles, validateImageFiles } from "./media-upload.js?v=50b8cea2ba";
 import { applyDocumentBranding, getLandlordPortalTitle, getLandlordShellBrand } from "./portal-branding.js?v=d15ebc0cd6";
@@ -278,6 +279,28 @@ const refreshWifiPackagesBtnEl = document.getElementById("refresh-wifi-packages"
 const overviewWifiPackagesSectionEl = document.getElementById("overview-wifi-packages-section");
 const refreshOverviewDashboardBtnEl = document.getElementById("refresh-overview-dashboard");
 const overviewCollectionsBodyEl = document.getElementById("overview-collections-body");
+const houseActionsModalEl = document.getElementById("house-actions-modal");
+const houseActionsBackdropEl = document.getElementById("house-actions-backdrop");
+const houseActionsTitleEl = document.getElementById("house-actions-title");
+const closeHouseActionsBtnEl = document.getElementById("close-house-actions-btn");
+const houseActionsOpenPageBtnEl = document.getElementById("house-actions-open-page-btn");
+let houseActionsTarget = { buildingId: "", houseNumber: "" };
+const houseActionsView = houseActionsModalEl
+    ? createBalancesView({
+        root: houseActionsModalEl,
+        requestJson: (url, options) => requestJson(url, options),
+        getBuildingId: () => houseActionsTarget.buildingId,
+        onlyHouse: () => houseActionsTarget.houseNumber,
+        formatCurrency: (value) => formatCurrency(value),
+        onStatus: (message) => setStatus(message),
+        onError: (error, fallback) => handleLandlordError(error, fallback),
+        onSaved: () => {
+            void Promise.all([loadRentStatus(), loadBills(), loadPayments(), loadResidents()]).catch((error) => {
+                handleLandlordError(error, "Unable to refresh balances.");
+            });
+        }
+    })
+    : null;
 const overviewRoomBuildingSelectEl = document.getElementById("overview-room-building-select");
 const overviewRoomSearchInputEl = document.getElementById("overview-room-search-input");
 const overviewOpenRoomBtnEl = document.getElementById("overview-open-room-btn");
@@ -2085,7 +2108,7 @@ function updateResidentsSearchSummary(totalRows, visibleRows) {
     }
     const query = String(state.residentSearchQuery ?? "").trim();
     if (!query) {
-        residentsSearchSummaryEl.textContent = `${visibleRows} house${visibleRows === 1 ? "" : "s"}`;
+        residentsSearchSummaryEl.textContent = "";
         return;
     }
     residentsSearchSummaryEl.textContent = `Found ${visibleRows} of ${totalRows} house${totalRows === 1 ? "" : "s"} for "${query}".`;
@@ -2768,7 +2791,7 @@ function renderResidentsOverview(rows) {
             filter: "all",
             label: "All Houses",
             value: items.length,
-            detail: "Full tenant register"
+            detail: ""
         },
         {
             filter: "overdue",
@@ -2786,35 +2809,36 @@ function renderResidentsOverview(rows) {
             filter: "awaiting_readings",
             label: "Awaiting Readings",
             value: awaitingReadings.length,
-            detail: "Meter follow-up"
+            detail: ""
         },
         {
             filter: "clear",
             label: "Clear",
             value: clearRooms.length,
-            detail: "No open balance"
+            detail: ""
         },
         {
             filter: "vacant",
             label: "Vacant",
             value: vacantCount,
-            detail: "Available houses"
+            detail: ""
         },
         {
             filter: "pending_review",
             label: "Pending Review",
             value: pendingCount,
-            detail: "Access requests"
+            detail: ""
         }
     ];
     residentsOverviewEl.innerHTML = cards
         .map((card) => {
         const isActive = activeFilter === card.filter;
+        const isZero = card.value === 0 || card.value === formatCurrency(0);
         const targetSection = getResidentOverviewTargetSection(card.filter);
         return `
         <button
           type="button"
-          class="resident-overview-card${isActive ? " is-active" : ""}"
+          class="resident-overview-card${isActive ? " is-active" : ""}${isZero && !isActive ? " is-zero" : ""}"
           data-resident-filter="${escapeHtml(card.filter)}"
           data-resident-target-section="${escapeHtml(targetSection)}"
           aria-controls="${escapeHtml(targetSection)}"
@@ -2822,7 +2846,7 @@ function renderResidentsOverview(rows) {
         >
           <p>${escapeHtml(card.label)}</p>
           <strong>${escapeHtml(card.value)}</strong>
-          <small>${escapeHtml(card.detail)}</small>
+          ${card.detail ? `<small>${escapeHtml(card.detail)}</small>` : ""}
         </button>
       `;
     })
@@ -7374,7 +7398,9 @@ function renderOverviewCollections(rows) {
         const latestPayment = Number(item.latestPaymentAmountKsh ?? 0) > 0
             ? `${formatCurrency(item.latestPaymentAmountKsh)} • ${formatDateTime(item.latestPaymentAt)}`
             : "-";
-        row.className = tableRowToneClass(rentVisualState.toneClass);
+        row.className = `${tableRowToneClass(rentVisualState.toneClass)} is-clickable`;
+        row.dataset.buildingId = item.buildingId;
+        row.dataset.houseNumber = item.houseNumber;
         row.innerHTML = `
       <td>${escapeHtml(buildingLabel)}</td>
       <td>${escapeHtml(item.houseNumber)}</td>
@@ -7385,15 +7411,14 @@ function renderOverviewCollections(rows) {
       <td>${escapeHtml(formatCurrency(dueThisMonthKsh))}</td>
       <td>${escapeHtml(formatCurrency(totalOutstandingKsh))}</td>
       <td>${escapeHtml(latestPayment)}</td>
-      <td>${escapeHtml(item.latestPaymentReference ?? "-")}</td>
       <td>
         <button
           type="button"
-          data-action="open-room-account"
+          data-action="house-actions"
           data-building-id="${escapeHtml(item.buildingId)}"
           data-house-number="${escapeHtml(item.houseNumber)}"
         >
-          Open House Page
+          Actions
         </button>
       </td>
     `;
@@ -12324,6 +12349,65 @@ houseSheetFileEl?.addEventListener("change", () => {
         .finally(() => {
         if (houseSheetImportBtnEl instanceof HTMLButtonElement) {
             houseSheetImportBtnEl.disabled = false;
+        }
+    });
+});
+function openHouseActions(buildingId, houseNumber) {
+    const normalizedBuildingId = String(buildingId || "").trim();
+    const normalizedHouseNumber = normalizeHouse(houseNumber);
+    if (!houseActionsView || !normalizedBuildingId || !normalizedHouseNumber) {
+        return;
+    }
+    houseActionsTarget = { buildingId: normalizedBuildingId, houseNumber: normalizedHouseNumber };
+    if (houseActionsTitleEl instanceof HTMLElement) {
+        houseActionsTitleEl.textContent =
+            state.buildings.length > 1
+                ? `${getBuildingDisplayNameById(normalizedBuildingId, normalizedBuildingId)} · ${normalizedHouseNumber}`
+                : `House ${normalizedHouseNumber}`;
+    }
+    houseActionsModalEl?.classList.remove("hidden");
+    houseActionsBackdropEl?.classList.remove("hidden");
+    void houseActionsView.open(normalizedHouseNumber).catch((error) => {
+        handleLandlordError(error, "Unable to load this house.");
+    });
+}
+function closeHouseActions() {
+    houseActionsModalEl?.classList.add("hidden");
+    houseActionsBackdropEl?.classList.add("hidden");
+}
+overviewCollectionsBodyEl?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+        return;
+    }
+    const row = target.closest("tr[data-house-number]");
+    if (!(row instanceof HTMLElement)) {
+        return;
+    }
+    openHouseActions(row.dataset.buildingId, row.dataset.houseNumber);
+});
+closeHouseActionsBtnEl?.addEventListener("click", closeHouseActions);
+houseActionsBackdropEl?.addEventListener("click", closeHouseActions);
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !houseActionsModalEl?.classList.contains("hidden")) {
+        closeHouseActions();
+    }
+});
+houseActionsOpenPageBtnEl?.addEventListener("click", () => {
+    closeHouseActions();
+    openRoomAccountPage(houseActionsTarget.buildingId, houseActionsTarget.houseNumber);
+});
+document.querySelectorAll(".lh-more-menu").forEach((menu) => {
+    menu.addEventListener("click", (event) => {
+        if (event.target instanceof HTMLElement && event.target.closest(".lh-more-menu-list button")) {
+            menu.removeAttribute("open");
+        }
+    });
+});
+document.addEventListener("click", (event) => {
+    document.querySelectorAll(".lh-more-menu[open]").forEach((menu) => {
+        if (!(event.target instanceof Node) || !menu.contains(event.target)) {
+            menu.removeAttribute("open");
         }
     });
 });

@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="/landlord.css?v=8709b98621" />
     <link rel="stylesheet" href="/dedicated-theme.css?v=aefbff730d" />
     <link rel="stylesheet" href="/landlord-modern.css?v=921be132d5" />
-    <link rel="stylesheet" href="/landlord-shell.css?v=2fc3444f04" />
+    <link rel="stylesheet" href="/landlord-shell.css?v=81fc36dbf7" />
   </head>
   <body>
     <div class="backdrop"></div>
@@ -184,7 +184,7 @@
                   <th>Due This Month</th>
                   <th>Total Outstanding</th>
                   <th>Latest Payment</th>
-                  <th>Last Receipt</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody id="overview-collections-body"></tbody>
@@ -671,7 +671,7 @@
           data-landlord-view-panel="tenants"
           id="overview-rent-status-section"
         >
-          <summary>Rent Setup + Collection</summary>
+          <summary>Rent</summary>
           <div class="panel-head">
             <h2>Rent Setup Sheet + Manual Payments</h2>
             <div class="action-row">
@@ -763,7 +763,7 @@
                 Building
                 <select id="residents-building-select"></select>
               </label>
-              <label>
+              <label class="hidden">
                 Filter
                 <select id="residents-status-filter">
                   <option value="all">All houses</option>
@@ -787,23 +787,28 @@
                 />
               </label>
               <button id="open-direct-tenant-drawer-btn" type="button">Add Tenant</button>
-              <button id="residents-open-rent-sheet-btn" type="button">Rent Setup Sheet</button>
-              <button id="house-sheet-export-btn" type="button">Export Excel</button>
-              <button id="house-sheet-import-btn" type="button">Import Excel</button>
+              <details class="lh-more-menu">
+                <summary>More</summary>
+                <div class="lh-more-menu-list">
+                  <button id="residents-open-rent-sheet-btn" type="button">Rent Setup Sheet</button>
+                  <button id="residents-open-match-btn" type="button">Open Account</button>
+                  <button id="house-sheet-export-btn" type="button">Export Excel</button>
+                  <button id="house-sheet-import-btn" type="button">Import Excel</button>
+                </div>
+              </details>
               <input
                 id="house-sheet-file"
                 type="file"
                 accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 hidden
               />
-              <button id="residents-open-match-btn" type="button">Open Account</button>
-              <button id="refresh-residents" type="button">Refresh</button>
+              <button id="refresh-residents" type="button" class="hidden">Refresh</button>
             </div>
           </div>
           <div id="residents-overview" class="resident-overview-cards"></div>
           <p id="residents-search-summary" class="status-text"></p>
 
-          <details id="room-ledger-section" class="secondary-ledger-panel utility-summary-card room-ledger-card">
+          <details id="room-ledger-section" class="secondary-ledger-panel utility-summary-card room-ledger-card" open>
             <summary class="room-ledger-toggle">
               <span>House Accounts</span>
             </summary>
@@ -864,7 +869,7 @@
           data-landlord-view-panel="tenants"
           id="utilities-registry-section"
         >
-          <summary>Meter Setup Source Tools</summary>
+          <summary>Meters</summary>
           <div class="panel-head">
             <h2>Meters + Bulk Utility Setup</h2>
             <div class="action-row">
@@ -878,7 +883,7 @@
           data-landlord-view-panel="tenants"
           id="utilities-bills-section"
         >
-          <summary>Utility Billing Source Details</summary>
+          <summary>Utility Bills</summary>
           <div class="panel-head">
             <h2>Post Monthly Utility Bill</h2>
             <button id="refresh-bills" type="button">Refresh</button>
@@ -962,7 +967,7 @@
           data-landlord-view-panel="tenants"
           id="utilities-payments-section"
         >
-          <summary>Utility Payment Source Details</summary>
+          <summary>Utility Payments</summary>
           <div class="panel-head">
             <h2>Utility Payments</h2>
             <button id="refresh-payments" type="button">Refresh</button>
@@ -1666,6 +1671,21 @@
         </form>
       </aside>
 
+      <div id="house-actions-backdrop" class="landlord-drawer-backdrop hidden"></div>
+      <aside
+        id="house-actions-modal"
+        class="landlord-sheet-modal house-actions-modal hidden"
+        role="dialog"
+        aria-labelledby="house-actions-title"
+      >
+        <header class="landlord-drawer-head">
+          <h2 id="house-actions-title">House</h2>
+          <button id="close-house-actions-btn" type="button" class="ghost-btn">Close</button>
+        </header>
+        <div class="mr-list" data-balances-list></div>
+        <button id="house-actions-open-page-btn" type="button" class="ghost-btn">Open house page</button>
+      </aside>
+
       <div id="move-out-settlement-backdrop" class="landlord-drawer-backdrop hidden"></div>
       <aside
         id="move-out-settlement-modal"
@@ -2104,6 +2124,6 @@
       <section id="landlord-error" class="error-box hidden"></section>
     </main>
 
-    <script type="module" src="/landlord.js?v=47fb72fd07"></script>
+    <script type="module" src="/landlord.js?v=e2ea7c2d9b"></script>
   </body>
 </html>

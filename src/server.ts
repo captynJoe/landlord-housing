@@ -169,6 +169,7 @@ import {
   createRoomBillingHoldSchema,
   cancelRoomBillingHoldSchema,
   landlordUtilityRegistryUpsertSchema,
+  landlordBalanceAdjustmentSchema,
   landlordAssignCaretakerSchema,
   caretakerAccessResolveSchema,
   caretakerPasswordSetupSchema,
@@ -13843,6 +13844,11 @@ async function bootstrap() {
         });
       }
 
+      const balanceAdjustment = hasResidentBillingAccess(session)
+        ? ((await listBalanceAuditByHouse(session.buildingId, session.houseNumber).catch(() => null))
+            ?.get(normalizeHouseNumber(session.houseNumber))?.lastAdjustment ?? null)
+        : null;
+
       return res.json({
         data: {
           paymentAccess,
@@ -13850,6 +13856,13 @@ async function bootstrap() {
           notifications,
           paymentInstructions,
           rentDue,
+          balanceAdjustment: balanceAdjustment
+            ? {
+                kind: balanceAdjustment.kind,
+                reason: balanceAdjustment.reason,
+                adjustedAt: balanceAdjustment.adjustedAt
+              }
+            : null,
           rentPayments,
           utilityBills,
           utilityMeters,
@@ -18387,6 +18400,280 @@ async function bootstrap() {
           role: context.role
         });
       } catch (error) {
+        return next(error);
+      }
+    }
+  );
+
+  const resolveManagedBuildingForRequest = async (
+    req: Request,
+    res: Response
+  ) => {
+    const context = await resolveLandlordAccessContext(req, res);
+    if (!context) {
+      return null;
+    }
+
+    const buildingId = String(req.params.buildingId ?? "").trim();
+    const building = buildingId ? await store.getBuilding(buildingId) : null;
+    if (!building) {
+      res.status(404).json({ error: "Building not found" });
+      return null;
+    }
+
+    if (!(await canManageBuildingFromLandlordContext(context, building.id))) {
+      res.status(403).json({ error: "Building access denied" });
+      return null;
+    }
+
+    return { context, building };
+  };
+
+  // ---------- Balances: per-room rent/utility balances and manual adjustments ----------
+
+  const BALANCE_AUDIT_PREFIX = "balance.";
+  const BALANCE_ADJUSTMENT_LOOKBACK_DAYS = 120;
+
+  type BalanceAuditSummary = {
+    kind: "rent" | "utility";
+    previousKsh: number;
+    newKsh: number;
+    reason: string;
+    adjustedAt: string;
+    adjustedBy?: string;
+  };
+
+  const readBalanceAuditMetadata = (metadata: unknown) => {
+    const value = (metadata && typeof metadata === "object" ? metadata : {}) as Record<
+      string,
+      unknown
+    >;
+    return {
+      previousKsh: Number(value.previousKsh ?? 0),
+      newKsh: Number(value.newKsh ?? 0),
+      reason: String(value.reason ?? "")
+    };
+  };
+
+  // Latest adjustment and latest check per room, from the room audit log.
+  const listBalanceAuditByHouse = async (buildingId: string, houseNumber?: string) => {
+    const byHouse = new Map<
+      string,
+      { lastAdjustment: BalanceAuditSummary | null; checkedAt: string | null }
+    >();
+    if (!repositoryContext.prisma) {
+      return byHouse;
+    }
+
+    const rows = await repositoryContext.prisma.roomAccountAuditEvent.findMany({
+      where: {
+        buildingId,
+        ...(houseNumber ? { houseNumber: normalizeHouseNumber(houseNumber) } : {}),
+        action: { startsWith: BALANCE_AUDIT_PREFIX },
+        createdAt: {
+          gte: new Date(Date.now() - BALANCE_ADJUSTMENT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 2_000
+    });
+
+    for (const row of rows) {
+      const house = normalizeHouseNumber(row.houseNumber);
+      const entry = byHouse.get(house) ?? { lastAdjustment: null, checkedAt: null };
+      const at = row.createdAt.toISOString();
+      if (!entry.checkedAt) {
+        entry.checkedAt = at;
+      }
+      if (!entry.lastAdjustment && row.action !== "balance.checked") {
+        const meta = readBalanceAuditMetadata(row.metadata);
+        entry.lastAdjustment = {
+          kind: row.action === "balance.utility.adjusted" ? "utility" : "rent",
+          previousKsh: meta.previousKsh,
+          newKsh: meta.newKsh,
+          reason: meta.reason,
+          adjustedAt: at,
+          adjustedBy: row.actorName ?? row.actorRole ?? undefined
+        };
+      }
+      byHouse.set(house, entry);
+    }
+    return byHouse;
+  };
+
+  const buildBalanceRows = async (building: { id: string; houseNumbers?: string[] }) => {
+    const [registryRows, auditByHouse] = await Promise.all([
+      buildLandlordUtilityRegistryRows(building.id, building.houseNumbers ?? []),
+      listBalanceAuditByHouse(building.id)
+    ]);
+
+    return registryRows.map((row) => {
+      const houseNumber = normalizeHouseNumber(row.houseNumber);
+      const rent = rentLedgerService.getRentDue(building.id, houseNumber);
+      const utilities = utilityBillingService.getVisibleOpenBalanceForHouse(
+        building.id,
+        houseNumber
+      );
+      const rentBalanceKsh = rent ? Math.max(0, Number(rent.balanceKsh ?? 0)) : 0;
+      const audit = auditByHouse.get(houseNumber);
+      return {
+        houseNumber: row.houseNumber,
+        residentName: row.residentName ?? "",
+        residentPhone: row.residentPhone ?? "",
+        hasActiveResident: Boolean(row.hasActiveResident),
+        rent: rent
+          ? {
+              balanceKsh: rentBalanceKsh,
+              monthlyRentKsh: Number(rent.monthlyRentKsh ?? 0),
+              dueDate: rent.dueDate,
+              status: rent.status
+            }
+          : null,
+        utilities,
+        totalKsh: rentBalanceKsh + utilities.total,
+        lastAdjustment: audit?.lastAdjustment ?? null,
+        checkedAt: audit?.checkedAt ?? null
+      };
+    });
+  };
+
+  app.get("/api/landlord/buildings/:buildingId/balances", async (req, res, next) => {
+    try {
+      const resolved = await resolveManagedBuildingForRequest(req, res);
+      if (!resolved) {
+        return;
+      }
+      const { context, building } = resolved;
+      await ensureRecurringUtilityBillsCurrent("balances-view", { buildingId: building.id });
+      return res.json({
+        data: await buildBalanceRows(building),
+        building: { id: building.id, name: building.name },
+        adjustmentsAvailable: Boolean(repositoryContext.prisma),
+        role: context.role
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  app.post(
+    "/api/landlord/buildings/:buildingId/houses/:houseNumber/balance-adjustments",
+    async (req, res, next) => {
+      try {
+        const resolved = await resolveManagedBuildingForRequest(req, res);
+        if (!resolved) {
+          return;
+        }
+        const { context, building } = resolved;
+        if (!repositoryContext.prisma) {
+          return res.status(503).json({
+            error: "Balance adjustments need the database so every change is recorded."
+          });
+        }
+
+        const houseNumber = normalizeHouseNumber(
+          houseNumberQuerySchema.parse({ houseNumber: req.params.houseNumber }).houseNumber
+        );
+        const allowedHouses = new Set(
+          (building.houseNumbers ?? []).map((item) => normalizeHouseNumber(item))
+        );
+        if (!allowedHouses.has(houseNumber)) {
+          return res.status(404).json({
+            error: `House ${houseNumber} is not in ${building.name}.`
+          });
+        }
+
+        const parsed = landlordBalanceAdjustmentSchema.parse(req.body ?? {});
+        const reason = (parsed.reason ?? "").trim();
+        const actor = actorFromLandlordContext(context);
+        const changes: Array<{ kind: "rent" | "utility"; previousKsh: number; newKsh: number }> =
+          [];
+
+        if (parsed.rentBalanceKsh !== undefined) {
+          const rent = rentLedgerService.getRentDue(building.id, houseNumber);
+          if (!rent) {
+            return res.status(409).json({
+              error: `Set up rent for ${houseNumber} before adjusting its rent balance.`
+            });
+          }
+          const previousKsh = Math.max(0, Number(rent.balanceKsh ?? 0));
+          if (previousKsh !== parsed.rentBalanceKsh) {
+            rentLedgerService.upsertRentDue(building.id, houseNumber, {
+              monthlyRentKsh: Number(rent.monthlyRentKsh ?? 0),
+              balanceKsh: parsed.rentBalanceKsh,
+              dueDate: rent.dueDate,
+              note: rent.note
+            });
+            await persistRentLedgerStateNow();
+            changes.push({ kind: "rent", previousKsh, newKsh: parsed.rentBalanceKsh });
+          }
+        }
+
+        if (parsed.utilityBalanceKsh !== undefined) {
+          await ensureRecurringUtilityBillsCurrent("balance-adjustment", {
+            buildingId: building.id,
+            houseNumber
+          });
+          const result = utilityBillingService.setVisibleOpenBalanceForHouse(
+            building.id,
+            houseNumber,
+            parsed.utilityBalanceKsh
+          );
+          if (result.previousKsh !== result.newKsh) {
+            await persistUtilityBillingStateNow();
+            changes.push({ kind: "utility", ...result });
+          }
+        }
+
+        for (const change of changes) {
+          await recordRoomAccountAuditEvent({
+            buildingId: building.id,
+            houseNumber,
+            action: `balance.${change.kind}.adjusted`,
+            summary: `${change.kind === "rent" ? "Rent" : "Utility"} balance manually adjusted from KSh ${change.previousKsh.toLocaleString("en-US")} to KSh ${change.newKsh.toLocaleString("en-US")}: ${reason}`,
+            actor,
+            metadata: { ...change, reason }
+          });
+        }
+        if (parsed.markChecked || changes.length > 0) {
+          await recordRoomAccountAuditEvent({
+            buildingId: building.id,
+            houseNumber,
+            action: "balance.checked",
+            summary: "Balance checked with the tenant.",
+            actor
+          });
+        }
+
+        if (changes.length > 0) {
+          await enqueueOwnerNotificationForManagerAction(context, {
+            title: "Balance Adjusted",
+            message: `${actor.name || "House manager"} adjusted ${changes
+              .map((item) => `${item.kind} KSh ${item.previousKsh} → ${item.newKsh}`)
+              .join(", ")} for ${building.name} ${houseNumber}: ${reason}`,
+            level: "warning",
+            action: "balance.adjusted",
+            buildingId: building.id,
+            buildingName: building.name,
+            houseNumber,
+            dedupeKey: `balance-adjusted-${building.id}-${houseNumber}-${Date.now()}`
+          });
+        }
+
+        const rows = await buildBalanceRows(building);
+        return res.json({
+          data: rows.find((row) => normalizeHouseNumber(row.houseNumber) === houseNumber) ?? null,
+          changes,
+          role: context.role
+        });
+      } catch (error) {
+        const mapped = mapUtilityDomainError(error);
+        if (mapped) {
+          return res.status(mapped.status).json({ error: mapped.message });
+        }
+        if (error instanceof Error && error.message.includes("has no utility bill yet")) {
+          return res.status(409).json({ error: error.message });
+        }
         return next(error);
       }
     }

@@ -1168,6 +1168,27 @@ const utilityRateDefaultsSchema = z
   })
   .optional();
 
+export const landlordBalanceAdjustmentSchema = z
+  .object({
+    rentBalanceKsh: z.number().int().min(0).max(5_000_000).optional(),
+    utilityBalanceKsh: z.number().int().min(0).max(5_000_000).optional(),
+    reason: z.string().trim().max(280).optional(),
+    markChecked: z.boolean().optional()
+  })
+  .refine(
+    (value) =>
+      value.rentBalanceKsh !== undefined ||
+      value.utilityBalanceKsh !== undefined ||
+      value.markChecked === true,
+    "Nothing to save."
+  )
+  .refine(
+    (value) =>
+      (value.rentBalanceKsh === undefined && value.utilityBalanceKsh === undefined) ||
+      (value.reason ?? "").length >= 3,
+    { message: "Give a short reason for the adjustment.", path: ["reason"] }
+  );
+
 export const landlordUtilityRegistryUpsertSchema = z.object({
   rows: z
     .array(
