@@ -500,6 +500,9 @@ model BuildingConfiguration {
   defaultCombinedUtilityChargeKsh  Int?
   defaultMonthlyRentKsh            Int?
   defaultRentDueDay                Int?
+  meterReadingDay                  Int?
+  includedWaterUnits               Float?
+  includedElectricityUnits         Float?
   utilityBalanceVisibleDays        Int                @default(7)
   rentGraceDays                    Int                @default(0)
   lateRentPenaltyEnabled           Boolean            @default(false)

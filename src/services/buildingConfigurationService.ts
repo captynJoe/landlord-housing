@@ -28,6 +28,9 @@ export type BuildingConfigurationRecord = {
   defaultCombinedUtilityChargeKsh: number | null;
   defaultMonthlyRentKsh: number | null;
   defaultRentDueDay: number | null;
+  meterReadingDay: number | null;
+  includedWaterUnits: number | null;
+  includedElectricityUnits: number | null;
   utilityBalanceVisibleDays: number;
   rentGraceDays: number;
   lateRentPenaltyEnabled: boolean;
@@ -65,6 +68,9 @@ export interface UpdateBuildingConfigurationInput {
   defaultCombinedUtilityChargeKsh?: number | null;
   defaultMonthlyRentKsh?: number | null;
   defaultRentDueDay?: number | null;
+  meterReadingDay?: number | null;
+  includedWaterUnits?: number | null;
+  includedElectricityUnits?: number | null;
   utilityBalanceVisibleDays?: number;
   rentGraceDays?: number;
   lateRentPenaltyEnabled?: boolean;
@@ -101,6 +107,9 @@ const DEFAULT_CONFIG = {
   defaultCombinedUtilityChargeKsh: null as number | null,
   defaultMonthlyRentKsh: null as number | null,
   defaultRentDueDay: null as number | null,
+  meterReadingDay: null as number | null,
+  includedWaterUnits: null as number | null,
+  includedElectricityUnits: null as number | null,
   utilityBalanceVisibleDays: 7,
   rentGraceDays: 0,
   lateRentPenaltyEnabled: false,
@@ -131,6 +140,9 @@ function mapConfig(value: BuildingConfiguration): BuildingConfigurationRecord {
     defaultCombinedUtilityChargeKsh: value.defaultCombinedUtilityChargeKsh,
     defaultMonthlyRentKsh: value.defaultMonthlyRentKsh,
     defaultRentDueDay: value.defaultRentDueDay,
+    meterReadingDay: value.meterReadingDay,
+    includedWaterUnits: value.includedWaterUnits ?? null,
+    includedElectricityUnits: value.includedElectricityUnits ?? null,
     utilityBalanceVisibleDays: value.utilityBalanceVisibleDays,
     rentGraceDays: value.rentGraceDays,
     lateRentPenaltyEnabled: value.lateRentPenaltyEnabled,
@@ -255,31 +267,34 @@ export class BuildingConfigurationService {
       return;
     }
 
-    await this.prisma.$transaction(
-      validRecords.map((row) =>
-        this.prisma.buildingConfiguration.upsert({
-          where: { buildingId: row.buildingId },
-          update: {
-            rentEnabled: row.rentEnabled,
-            waterEnabled: row.waterEnabled,
-            electricityEnabled: row.electricityEnabled,
-            updatedByRole: row.updatedByRole ?? null,
-            updatedByUserId: row.updatedByUserId ?? null,
-            note: row.note ?? null
-          },
-          create: {
-            buildingId: row.buildingId,
-            ...DEFAULT_CONFIG,
-            rentEnabled: row.rentEnabled,
-            waterEnabled: row.waterEnabled,
-            electricityEnabled: row.electricityEnabled,
-            updatedByRole: row.updatedByRole,
-            updatedByUserId: row.updatedByUserId,
-            note: row.note
-          }
-        })
-      )
+    const existingConfigurations = await this.prisma.buildingConfiguration.findMany({
+      where: { buildingId: { in: validRecords.map((row) => row.buildingId) } },
+      select: { buildingId: true }
+    });
+    const existingBuildingIds = new Set(
+      existingConfigurations.map((row) => row.buildingId)
     );
+    const recordsToSeed = validRecords.filter(
+      (row) => !existingBuildingIds.has(row.buildingId)
+    );
+
+    if (recordsToSeed.length === 0) {
+      return;
+    }
+
+    await this.prisma.buildingConfiguration.createMany({
+      data: recordsToSeed.map((row) => ({
+        buildingId: row.buildingId,
+        ...DEFAULT_CONFIG,
+        rentEnabled: row.rentEnabled,
+        waterEnabled: row.waterEnabled,
+        electricityEnabled: row.electricityEnabled,
+        updatedByRole: row.updatedByRole,
+        updatedByUserId: row.updatedByUserId,
+        note: row.note
+      })),
+      skipDuplicates: true
+    });
   }
 
   async updateForBuilding(
@@ -310,6 +325,16 @@ export class BuildingConfigurationService {
       input.defaultRentDueDay == null
         ? input.defaultRentDueDay
         : Math.min(31, Math.max(1, Math.round(Number(input.defaultRentDueDay) || 1)));
+    const normalizedMeterReadingDay =
+      input.meterReadingDay == null
+        ? input.meterReadingDay
+        : Math.min(31, Math.max(1, Math.round(Number(input.meterReadingDay) || 1)));
+    const normalizeIncludedUnits = (value: number | null | undefined) =>
+      value == null ? value : Math.min(100_000, Math.max(0, Number(value) || 0));
+    const normalizedIncludedWaterUnits = normalizeIncludedUnits(input.includedWaterUnits);
+    const normalizedIncludedElectricityUnits = normalizeIncludedUnits(
+      input.includedElectricityUnits
+    );
     const normalizedLateRentPenaltyAmountKsh =
       input.lateRentPenaltyAmountKsh == null
         ? input.lateRentPenaltyAmountKsh
@@ -326,6 +351,9 @@ export class BuildingConfigurationService {
         defaultCombinedUtilityChargeKsh: normalizedDefaultCombinedUtilityChargeKsh,
         defaultMonthlyRentKsh: normalizedDefaultMonthlyRentKsh,
         defaultRentDueDay: normalizedDefaultRentDueDay,
+        meterReadingDay: normalizedMeterReadingDay,
+        includedWaterUnits: normalizedIncludedWaterUnits,
+        includedElectricityUnits: normalizedIncludedElectricityUnits,
         lateRentPenaltyAmountKsh: normalizedLateRentPenaltyAmountKsh,
         updatedByRole: actor?.role ?? null,
         updatedByUserId: actor?.userId ?? null,
@@ -342,6 +370,9 @@ export class BuildingConfigurationService {
         defaultCombinedUtilityChargeKsh: normalizedDefaultCombinedUtilityChargeKsh,
         defaultMonthlyRentKsh: normalizedDefaultMonthlyRentKsh,
         defaultRentDueDay: normalizedDefaultRentDueDay,
+        meterReadingDay: normalizedMeterReadingDay,
+        includedWaterUnits: normalizedIncludedWaterUnits,
+        includedElectricityUnits: normalizedIncludedElectricityUnits,
         lateRentPenaltyAmountKsh: normalizedLateRentPenaltyAmountKsh,
         updatedByRole: actor?.role,
         updatedByUserId: actor?.userId,

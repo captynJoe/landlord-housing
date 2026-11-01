@@ -1115,6 +1115,9 @@ export const landlordBuildingConfigurationUpdateSchema = z
     defaultCombinedUtilityChargeKsh: z.number().int().min(0).max(200_000).nullable().optional(),
     defaultMonthlyRentKsh: z.number().int().min(0).max(10_000_000).nullable().optional(),
     defaultRentDueDay: z.number().int().min(1).max(31).nullable().optional(),
+    meterReadingDay: z.number().int().min(1).max(31).nullable().optional(),
+    includedWaterUnits: z.number().min(0).max(100_000).nullable().optional(),
+    includedElectricityUnits: z.number().min(0).max(100_000).nullable().optional(),
     utilityBalanceVisibleDays: z.number().int().min(0).max(60).optional(),
     rentGraceDays: z.number().int().min(0).max(31).optional(),
     lateRentPenaltyEnabled: z.boolean().optional(),
@@ -1145,6 +1148,9 @@ export const landlordBuildingConfigurationUpdateSchema = z
       value.defaultCombinedUtilityChargeKsh !== undefined ||
       value.defaultMonthlyRentKsh !== undefined ||
       value.defaultRentDueDay !== undefined ||
+      value.meterReadingDay !== undefined ||
+      value.includedWaterUnits !== undefined ||
+      value.includedElectricityUnits !== undefined ||
       typeof value.rentGraceDays === "number" ||
       typeof value.lateRentPenaltyEnabled === "boolean" ||
       typeof value.lateRentPenaltyAmountKsh === "number" ||
@@ -1167,6 +1173,41 @@ const utilityRateDefaultsSchema = z
     electricityRatePerUnitKsh: z.number().min(0).max(50_000).optional()
   })
   .optional();
+
+export const landlordMeterReadingsSaveSchema = z
+  .object({
+  rooms: z
+    .array(
+      z.object({
+        houseNumber: nonEmptyString.max(24),
+        householdMembers: householdMembersSchema.optional(),
+        flatAmountKsh: z.number().int().min(0).max(200_000).nullable().optional()
+      })
+    )
+    .max(2_000)
+    .default([]),
+  entries: z
+    .array(
+      z
+        .object({
+          houseNumber: nonEmptyString.max(24),
+          utilityType: utilityTypeSchema,
+          meterNumber: optionalMeterNumberSchema,
+          previousReading: z.number().min(0).max(10_000_000).optional(),
+          reading: z.number().min(0).max(10_000_000).optional()
+        })
+        .refine(
+          (value) => value.reading != null || Boolean(value.meterNumber),
+          "Each entry needs a reading or a meter number."
+        )
+    )
+    .max(2_000)
+    .default([])
+  })
+  .refine(
+    (value) => value.rooms.length > 0 || value.entries.length > 0,
+    "Nothing to save."
+  );
 
 export const landlordBalanceAdjustmentSchema = z
   .object({

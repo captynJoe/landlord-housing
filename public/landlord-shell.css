@@ -1119,3 +1119,174 @@ input[type="radio"] {
   overflow-y: auto;
   overscroll-behavior-y: auto;
 }
+
+/* House Ledger dashboard: compact filters and clear contrast on the dark shell. */
+#residents-section > .resident-overview-cards {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+
+#residents-section button.resident-overview-card {
+  display: flex;
+  min-width: 0;
+  min-height: 70px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 12px !important;
+  border: 1px solid rgba(151, 180, 166, 0.24) !important;
+  border-radius: 10px !important;
+  background: #10251d !important;
+  color: #f0f6f2 !important;
+  box-shadow: none !important;
+  text-align: left;
+  transition: border-color 140ms ease, background-color 140ms ease, transform 140ms ease;
+}
+
+#residents-section button.resident-overview-card:hover,
+#residents-section button.resident-overview-card:focus-visible {
+  border-color: rgba(88, 205, 157, 0.65) !important;
+  background: #153329 !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+
+#residents-section button.resident-overview-card.is-active {
+  border-color: #47bc8b !important;
+  background: #124432 !important;
+  color: #fff !important;
+  box-shadow: inset 3px 0 #57d49e !important;
+}
+
+#residents-section .resident-overview-card p {
+  margin: 0;
+  color: #a9c4b7 !important;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  line-height: 1.25;
+}
+
+#residents-section .resident-overview-card strong {
+  color: #f5faf7 !important;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+#residents-section .resident-overview-card small {
+  margin: 0;
+  color: #bfd1c8 !important;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+#residents-section .resident-overview-card.is-zero:not(.is-active) {
+  opacity: 0.78;
+}
+
+#room-ledger-section.room-ledger-card {
+  gap: 8px;
+  padding: 14px;
+  border-color: rgba(151, 180, 166, 0.24) !important;
+  background: #10231b !important;
+  color: #edf5f0 !important;
+  box-shadow: none !important;
+}
+
+#room-ledger-section .room-ledger-title {
+  color: #f4f8f5 !important;
+}
+
+#room-ledger-section #room-ledger-summary,
+#residents-section #residents-search-summary {
+  margin: 0;
+  color: #b4c9bf !important;
+  line-height: 1.5;
+}
+
+#room-ledger-section .room-ledger-table-wrap {
+  border-color: rgba(151, 180, 166, 0.22) !important;
+  border-radius: 10px;
+  background: #091a13 !important;
+}
+
+#room-ledger-section .room-ledger-table thead th {
+  border-bottom: 1px solid rgba(151, 180, 166, 0.25) !important;
+  background: #0a1d15 !important;
+  color: #b8d2c5 !important;
+}
+
+#room-ledger-section .room-ledger-table tbody td {
+  border-bottom: 1px solid rgba(151, 180, 166, 0.13) !important;
+  background: #10251c;
+  color: #e6f0ea !important;
+}
+
+#room-ledger-section .room-ledger-table tbody tr:nth-child(even) td {
+  background: #122a20;
+}
+
+#room-ledger-section .room-ledger-table tbody tr:hover td {
+  background: #19382b !important;
+}
+
+#room-ledger-section .room-ledger-table td small,
+#room-ledger-section .room-ledger-table .room-ledger-utility-status {
+  color: #b3c9bd !important;
+}
+
+#room-ledger-section .room-ledger-table td a,
+#room-ledger-section .room-ledger-table td strong {
+  color: #f1f7f3;
+}
+
+#room-ledger-section .room-ledger-status,
+#room-ledger-section .table-status-pill {
+  border: 1px solid rgba(160, 192, 175, 0.24);
+  background: #20382d;
+  color: #e4f1e9;
+}
+
+#room-ledger-section .room-ledger-status.is-active,
+#room-ledger-section .table-status-pill.is-success {
+  border-color: rgba(76, 202, 145, 0.35);
+  background: #164c36;
+  color: #a8f0cb;
+}
+
+#room-ledger-section .room-ledger-status.is-pending,
+#room-ledger-section .table-status-pill.is-warning {
+  border-color: rgba(239, 194, 99, 0.35);
+  background: #493b1c;
+  color: #f6d98d;
+}
+
+#room-ledger-section .table-status-pill.is-danger {
+  border-color: rgba(246, 132, 132, 0.35);
+  background: #4a2524;
+  color: #ffb5ac;
+}
+
+@media (max-width: 1100px) {
+  #residents-section > .resident-overview-cards {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  #residents-section > .resident-overview-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  #residents-section button.resident-overview-card {
+    min-height: 64px;
+    padding: 9px 10px !important;
+  }
+
+  #room-ledger-section.room-ledger-card {
+    padding: 10px;
+  }
+}
